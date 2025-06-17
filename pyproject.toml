@@ -1,0 +1,18 @@
+[project]
+dependencies = [
+    "numpy>=2.3.0",
+    "ruff",
+    "soundfile>=0.13.1",
+    "torch>=2.7.1",
+    "torchaudio>=2.7.1",
+    "tqdm>=4.67.1",
+]
+name = "audioloop"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+
+[tool.ruff]
+line-length = 100
+extend-select = ["I"]

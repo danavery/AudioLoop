@@ -1,0 +1,6 @@
+- get 10 positive and 10 negative samples
+- record them in a file
+- train model on those 20
+- end when at 100%
+- record confidences of entire dataset
+- read those confidences
