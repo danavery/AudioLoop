@@ -60,8 +60,7 @@ def collate_fn(batch):
         "data": data_tensor,
         "label": labels,
         "filename": [item["filename"] for item in batch],
-        "filepath": [item["filepath"] for item in batch],
-        "fold": [item["fold"] for item in batch]
+        "filepath": [item["filepath"] for item in batch]
     }
 
 
@@ -148,7 +147,6 @@ def run_inference(model_path, labels_file="outputs/urbansound8k_files.csv", outp
                     "entropy": entropies[i].item(),
                     "prob_negative": prob_negative,
                     "prob_positive": prob_positive,
-                    "fold": batch["fold"][i],
                     "filepath": batch["filepath"][i]
                 }
                 results.append(result)
@@ -192,7 +190,7 @@ def run_inference(model_path, labels_file="outputs/urbansound8k_files.csv", outp
     fieldnames = [
         "filename", "urbansound_class", "predicted_label", "prediction",
         "confidence", "entropy", "prob_negative", "prob_positive",
-        "fold", "filepath"
+        "filepath"
     ]
 
     with open(output_csv, 'w', newline='') as csvfile:

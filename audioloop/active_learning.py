@@ -1,6 +1,5 @@
 import csv
 import os
-from pathlib import Path
 
 import torch
 import torch.nn.functional as F
@@ -62,7 +61,6 @@ def collate_fn(batch):
         "label": labels,
         "filename": [item["filename"] for item in batch],
         "filepath": [item["filepath"] for item in batch],
-        "fold": [item["fold"] for item in batch],
         "original_class": [item.get("original_class", -1) for item in batch]
     }
 
@@ -94,7 +92,6 @@ def create_binary_labels(urbansound_csv="data/urbansound8k/UrbanSound8K.csv",
         for row in csv_reader:
             filename = row['slice_file_name']
             class_id = int(row['classID'])
-            fold = int(row['fold'])
 
             # Binary classification: specified class vs everything else
             is_positive = 1 if class_id == positive_class_id else 0
@@ -107,8 +104,7 @@ def create_binary_labels(urbansound_csv="data/urbansound8k/UrbanSound8K.csv",
             binary_data.append({
                 'filename': filename,
                 'is_positive': is_positive,
-                'original_class': class_id,
-                'fold': fold
+                'original_class': class_id
             })
 
     # Ensure outputs directory exists
@@ -116,7 +112,7 @@ def create_binary_labels(urbansound_csv="data/urbansound8k/UrbanSound8K.csv",
 
     # Write binary labels CSV
     with open(output_csv, 'w', newline='') as f:
-        fieldnames = ['filename', 'is_positive', 'original_class', 'fold']
+        fieldnames = ['filename', 'is_positive', 'original_class']
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(binary_data)
@@ -139,7 +135,7 @@ def run_binary_inference(model_path,
 
     Args:
         model_path: Path to trained binary model
-        labels_file: CSV file with binary labels (filename,is_positive,original_class,fold)
+        labels_file: CSV file with binary labels (filename,is_positive,original_class)
         output_csv: Path for output predictions CSV
         positive_class_name: Name for positive class (for logging and output)
         negative_class_name: Name for negative class (for logging and output)
@@ -177,7 +173,7 @@ def run_binary_inference(model_path,
 
     # Run inference and collect results
     results = []
-    print(f"Running binary classification inference...")
+    print("Running binary classification inference...")
 
     with torch.no_grad():
         for batch in tqdm(data_loader):
@@ -229,7 +225,6 @@ def run_binary_inference(model_path,
                     "prob_positive": prob_positive,
                     "correct": (true_is_positive == predicted_class),
                     "original_class": original_class if original_class is not None else -1,
-                    "fold": batch["fold"][i],
                     "filepath": batch["filepath"][i]
                 }
                 results.append(result)
@@ -245,7 +240,7 @@ def run_binary_inference(model_path,
     true_positives = sum(1 for r in results if r["true_is_positive"] == 1)
     true_negatives = total_samples - true_positives
 
-    print(f"\nBinary Classification Results:")
+    print("\nBinary Classification Results:")
     print(f"Total samples: {total_samples}")
     print(f"Accuracy: {accuracy:.4f} ({correct_predictions}/{total_samples})")
     print(f"True {positive_class_name}s in dataset: {true_positives}")
@@ -266,7 +261,7 @@ def run_binary_inference(model_path,
     fieldnames = [
         "filename", "true_is_positive", "predicted_is_positive", "prediction",
         "confidence", "entropy", "prob_negative", "prob_positive",
-        "correct", "original_class", "fold", "filepath"
+        "correct", "original_class", "filepath"
     ]
 
     with open(output_csv, 'w', newline='') as csvfile:
@@ -340,7 +335,7 @@ def select_candidates_for_labeling(predictions_csv="outputs/predictions.csv",
 
     all_candidates = positive_candidates + negative_candidates
 
-    print(f"\nActive Learning Candidate Selection:")
+    print("\nActive Learning Candidate Selection:")
     print(f"Available {positive_class_name} predictions: {len(positive_preds)}")
     print(f"Available {negative_class_name} predictions: {len(negative_preds)}")
     print(f"High-confidence {positive_class_name} (>={min_confidence}): {len(high_conf_positive)}")
@@ -381,7 +376,7 @@ def run_active_learning_cycle(positive_class_id=8,
                              negative_class_name="not_siren",
                              model_path="outputs/model_100pct_seed_42.pt",
                              urbansound_csv="data/urbansound8k/UrbanSound8K.csv",
-                             cycle_name="cycle1"):
+                             run_number=1):
     """
     Run a complete active learning cycle for binary classification.
 
@@ -391,7 +386,7 @@ def run_active_learning_cycle(positive_class_id=8,
         negative_class_name: Human-readable name for negative class
         model_path: Path to trained model
         urbansound_csv: Path to UrbanSound8K metadata
-        cycle_name: Name for this cycle (used in output filenames)
+        run_number: Version number for output files (e.g., 1 creates v1 files)
 
     Returns:
         tuple: (predictions_file, candidates_file)
@@ -402,16 +397,16 @@ def run_active_learning_cycle(positive_class_id=8,
     binary_labels_file = create_binary_labels(
         urbansound_csv=urbansound_csv,
         positive_class_id=positive_class_id,
-        output_csv=f"outputs/binary_labels_{cycle_name}.csv",
+        output_csv=f"outputs/binary_labels_v{run_number}.csv",
         positive_class_name=positive_class_name,
         negative_class_name=negative_class_name
     )
 
     # Step 2: Run inference on all files
-    print(f"\nStep 2: Running binary classification inference...")
-    predictions_file = f"outputs/predictions_{cycle_name}.csv"
+    print("\nStep 2: Running binary classification inference...")
+    predictions_file = f"outputs/predictions_v{run_number}.csv"
 
-    results = run_binary_inference(
+    _ = run_binary_inference(
         model_path=model_path,
         labels_file=binary_labels_file,
         output_csv=predictions_file,
@@ -420,10 +415,10 @@ def run_active_learning_cycle(positive_class_id=8,
     )
 
     # Step 3: Select candidates for active learning
-    print(f"\nStep 3: Selecting candidates for human labeling...")
-    candidates_file = f"outputs/labeling_candidates_{cycle_name}.csv"
+    print("\nStep 3: Selecting candidates for human labeling...")
+    candidates_file = f"outputs/labeling_candidates_v{run_number}.csv"
 
-    candidates = select_candidates_for_labeling(
+    _ = select_candidates_for_labeling(
         predictions_csv=predictions_file,
         num_positive=10,
         num_negative=10,
@@ -433,12 +428,12 @@ def run_active_learning_cycle(positive_class_id=8,
         negative_class_name=negative_class_name
     )
 
-    print(f"\n🎯 Active Learning Cycle Complete!")
-    print(f"Next steps:")
+    print("\n🎯 Active Learning Cycle Complete!")
+    print("Next steps:")
     print(f"1. Review {candidates_file}")
-    print(f"2. Add human labels to 'needs_human_label' column")
-    print(f"3. Add those labels to your training set")
-    print(f"4. Retrain model and repeat")
+    print("2. Add human labels to 'needs_human_label' column")
+    print("3. Add those labels to your training set")
+    print("4. Retrain model and repeat")
 
     return predictions_file, candidates_file
 
@@ -450,5 +445,5 @@ if __name__ == "__main__":
         positive_class_name="siren",
         negative_class_name="not_siren",
         model_path="outputs/model_100pct_seed_42.pt",
-        cycle_name="siren_cycle1"
+        run_number=1
     )

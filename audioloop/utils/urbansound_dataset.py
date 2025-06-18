@@ -10,7 +10,7 @@ class UrbanSoundDataset(torch.utils.data.Dataset):
         Dataset for loading UrbanSound8K precomputed spectrograms.
 
         Args:
-            csv_file: Path to CSV file with format: filename,is_positive,original_class,fold OR filename,class_id,fold
+            csv_file: Path to CSV file with format: filename,is_positive,original_class OR filename,class_id
             specs_dir: Directory containing precomputed .pt spectrogram files
         """
         self.specs_dir = specs_dir
@@ -26,19 +26,16 @@ class UrbanSoundDataset(torch.utils.data.Dataset):
                     # Binary labels format (generalized)
                     label = int(row['is_positive'])
                     original_class = int(row['original_class'])
-                    fold = int(row['fold'])
                 elif 'is_siren' in row:
                     # Legacy binary siren format (for backward compatibility)
                     label = int(row['is_siren'])
                     original_class = int(row['original_class'])
-                    fold = int(row['fold'])
                 else:
                     # Original UrbanSound8K format
                     class_id = int(row['class_id'])
                     # Convert to binary: siren (class 8) = 1, everything else = 0
                     label = 1 if class_id == 8 else 0
                     original_class = class_id
-                    fold = int(row['fold'])
 
                 # Convert audio filename to spectrogram filepath
                 spec_filename = filename.replace(".wav", ".pt")
@@ -48,8 +45,7 @@ class UrbanSoundDataset(torch.utils.data.Dataset):
                     'filename': filename,
                     'spec_filepath': spec_filepath,
                     'label': label,  # Binary label (0 or 1)
-                    'original_class': original_class,  # Original UrbanSound8K class
-                    'fold': fold
+                    'original_class': original_class  # Original UrbanSound8K class
                 })
 
     def __len__(self):
@@ -71,7 +67,6 @@ class UrbanSoundDataset(torch.utils.data.Dataset):
             "label": item['label'],  # Binary label (0 or 1)
             "filename": item['filename'],
             "filepath": spec_filepath,
-            "fold": item['fold'],
             "original_class": item['original_class']  # Original UrbanSound8K class
         }
 
@@ -89,6 +84,5 @@ if __name__ == "__main__":
             print(f"Binary label: {sample['label']}")
             print(f"Original class: {sample['original_class']}")
             print(f"Filename: {sample['filename']}")
-            print(f"Fold: {sample['fold']}")
         except Exception as e:
             print(f"Error loading spectrogram: {e}")

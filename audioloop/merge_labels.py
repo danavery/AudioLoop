@@ -1,6 +1,6 @@
+import argparse
 import csv
 import os
-import argparse
 from pathlib import Path
 
 
@@ -24,7 +24,7 @@ def candidates_to_labeling_format(candidates_csv, output_csv):
             labeling_data.append({
                 'filename': audio_filename,
                 'label': '',  # Human will fill this in (0 or 1)
-                'run': row.get('fold', '1')  # Use fold as run, or default to 1
+                'run': '1'  # Default run number
             })
 
     # Ensure output directory exists
@@ -38,7 +38,7 @@ def candidates_to_labeling_format(candidates_csv, output_csv):
 
     print(f"Created labeling format file: {output_csv}")
     print(f"Contains {len(labeling_data)} samples for human labeling")
-    print("Instructions: Fill in the 'label' column with 0 (not siren) or 1 (siren)")
+    print("Instructions: Fill in the 'label' column with 0 (negative class) or 1 (positive class)")
 
     return output_csv
 
@@ -129,7 +129,7 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv):
     for item in all_data:
         label_counts[item['label']] += 1
 
-    print(f"Label distribution: {label_counts[0]} not-siren, {label_counts[1]} siren")
+    print(f"Label distribution: {label_counts[0]} negative class, {label_counts[1]} positive class")
 
     return output_csv
 

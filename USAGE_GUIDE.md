@@ -36,7 +36,7 @@ config = get_binary_preset("siren_detection")
 predictions_file, candidates_file = run_active_learning_cycle(
     **config,
     model_path="outputs/model_v1.pt",
-    cycle_name="siren_cycle1"
+    run_number=1
 )
 
 # Custom configuration
@@ -45,7 +45,7 @@ predictions_file, candidates_file = run_active_learning_cycle(
     positive_class_name="dog_bark",
     negative_class_name="not_dog_bark", 
     model_path="outputs/model_v1.pt",
-    cycle_name="dog_cycle1"
+    run_number=1
 )
 ```
 
@@ -82,7 +82,25 @@ predictions_file, candidates_file = run_active_learning_cycle(
 uv run python -m audioloop.create_all_specs
 ```
 
-### 2. Train Initial Model
+### 2. Create Initial Training Set
+```bash
+# Create training set for siren detection (default)
+python -m audioloop.utils.start_labeling
+
+# Or create programmatically for any class
+python -c "from audioloop.utils.start_labeling import create_training_set; create_training_set(classname='dog_bark')"
+```
+
+```python
+from audioloop.utils.start_labeling import create_training_set
+
+# Create training set for any class
+create_training_set()  # Default: siren, 10 samples each
+create_training_set(classname="dog_bark", n=15)
+create_training_set(classname="gun_shot", output_path="training_sets/gunshot_v1.csv")
+```
+
+### 3. Train Initial Model
 ```python
 from audioloop.simple_train import run_training
 
@@ -94,7 +112,7 @@ accuracy = run_training(
 )
 ```
 
-### 3. Run Active Learning Cycle
+### 4. Run Active Learning Cycle
 ```python
 from audioloop.active_learning import run_active_learning_cycle
 
@@ -104,21 +122,21 @@ predictions_file, candidates_file = run_active_learning_cycle(
     positive_class_name="siren",
     negative_class_name="not_siren",
     model_path="outputs/model_100pct_seed_42.pt",
-    cycle_name="cycle1"
+    run_number=1
 )
 
 print(f"Predictions saved to: {predictions_file}")
 print(f"Candidates for labeling: {candidates_file}")
 ```
 
-### 4. Human Labeling
+### 5. Human Labeling
 1. Open `outputs/labeling_candidates_cycle1.csv`
 2. Review the high-confidence predictions
 3. Add human labels to the `needs_human_label` column
 4. Add these verified samples to your next training set
 
-### 5. Iterate
-Repeat steps 2-4 with expanded training sets for each cycle.
+### 6. Iterate
+Repeat steps 3-5 with expanded training sets for each cycle.
 
 ## File Formats
 
@@ -151,7 +169,7 @@ predictions_file, candidates_file = run_active_learning_cycle(
     positive_class_name="gunshot",      # Custom positive name
     negative_class_name="safe_sound",   # Custom negative name
     model_path="outputs/model.pt",
-    cycle_name="security_v1"
+    run_number=1
 )
 ```
 
@@ -180,7 +198,7 @@ for task in tasks:
     predictions, candidates = run_active_learning_cycle(
         **config,
         model_path="outputs/model.pt",
-        cycle_name=f"{task}_cycle1"
+        run_number=1
     )
     print(f"Completed {task}: {candidates}")
 ```
@@ -202,9 +220,9 @@ done
 - `data/all_specs/` - Precomputed spectrograms for all 8,732 UrbanSound8K files
 
 **Each active learning cycle generates:**
-- `outputs/binary_labels_{cycle_name}.csv` - Binary labels for the target class
-- `outputs/predictions_{cycle_name}.csv` - Model predictions on full dataset  
-- `outputs/labeling_candidates_{cycle_name}.csv` - High-confidence samples for human review
+- `outputs/binary_labels_v1.csv` - Binary labels for the target class
+- `outputs/predictions_v1.csv` - Model predictions on full dataset  
+- `outputs/labeling_candidates_v1.csv` - High-confidence samples for human review
 
 ## Tips
 

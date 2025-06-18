@@ -96,7 +96,7 @@ predictions_file, candidates_file = run_active_learning_cycle(
     positive_class_name="siren",       # Human-readable positive class name
     negative_class_name="not_siren",   # Human-readable negative class name
     model_path="outputs/model_v1.pt",
-    cycle_name="siren_cycle1"
+    run_number=1
 )
 
 # Or use presets for common tasks
@@ -131,6 +131,7 @@ python -m audioloop.run_active_learning --list-classes
 - **`test_model.py`**: Validates model performance on training data
 
 ### Data Handling
+- **`utils/start_labeling.py`**: Creates initial training sets for any class
 - **`utils/spec_dataset.py`**: Loads precomputed spectrograms for training
 - **`utils/urbansound_dataset.py`**: Handles UrbanSound8K format for inference
 - **`create_all_specs.py`**: Converts all UrbanSound8K audio files → spectrograms
@@ -157,10 +158,11 @@ python -m audioloop.run_active_learning --list-classes
 
 ### First Cycle
 1. **Prepare data**: `uv run python -m audioloop.create_all_specs`
-2. **Train initial model**: Use `simple_train.py` with `training_set_v1.csv`
-3. **Validate**: Run `test_model.py` to verify training worked
-4. **Get candidates**: Run `active_learning.py` to generate labeling candidates
-5. **Human labeling**: Review `outputs/cycle1_labeling_candidates.csv`
+2. **Create training set**: `python -m audioloop.utils.start_labeling` or `create_training_set(classname="dog_bark")`
+3. **Train initial model**: Use `simple_train.py` with `training_set_v1.csv`
+4. **Validate**: Run `test_model.py` to verify training worked
+5. **Get candidates**: Run `active_learning.py` to generate labeling candidates
+6. **Human labeling**: Review `outputs/cycle1_labeling_candidates.csv`
 
 ### Subsequent Cycles
 1. **Update training set**: Add human labels to `training_set_v2.csv`

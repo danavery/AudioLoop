@@ -127,7 +127,7 @@ def create_inference_csv(
 ):
     """
     Create a CSV file listing all UrbanSound8K files for inference.
-    Format: filename,class_id,fold
+    Format: filename,class_id
     """
 
     files_data = []
@@ -136,17 +136,15 @@ def create_inference_csv(
         for row in csv_reader:
             filename = row['slice_file_name']
             class_id = int(row['classID'])
-            fold = row['fold']
 
             files_data.append({
                 'filename': filename,
-                'class_id': class_id,
-                'fold': fold
+                'class_id': class_id
             })
 
     # Write to new CSV
     with open(output_csv, 'w', newline='') as f:
-        fieldnames = ['filename', 'class_id', 'fold']
+        fieldnames = ['filename', 'class_id']
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(files_data)

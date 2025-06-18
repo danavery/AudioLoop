@@ -20,27 +20,25 @@ from .urbansound_classes import (
 )
 
 
-def run_preset_cycle(preset_name, model_path, cycle_name=None):
+def run_preset_cycle(preset_name, model_path, run_number=1):
     """Run an active learning cycle using a predefined preset.
 
     Args:
         preset_name (str): Name of the binary classification preset
         model_path (str): Path to trained model
-        cycle_name (str, optional): Name for this cycle
+        run_number (int): Version number for output files
 
     Returns:
         tuple: (predictions_file, candidates_file)
     """
     config = get_binary_preset(preset_name)
 
-    if cycle_name is None:
-        cycle_name = f"{preset_name}_cycle1"
-
     print(f"Running active learning cycle: {preset_name}")
-    print(f"Positive class: {config['positive_class_name']} (ID: {config['positive_class_id']})")
+    print("-" * 60)
+    print(f"Positive class: {config['positive_class_name']}")
     print(f"Negative class: {config['negative_class_name']}")
     print(f"Model: {model_path}")
-    print(f"Cycle name: {cycle_name}")
+    print(f"Run number: v{run_number}")
     print("-" * 60)
 
     return run_active_learning_cycle(
@@ -48,17 +46,17 @@ def run_preset_cycle(preset_name, model_path, cycle_name=None):
         positive_class_name=config['positive_class_name'],
         negative_class_name=config['negative_class_name'],
         model_path=model_path,
-        cycle_name=cycle_name
+        run_number=run_number
     )
 
 
-def run_custom_cycle(class_id, model_path, cycle_name=None, positive_name=None, negative_name=None):
+def run_custom_cycle(class_id, model_path, run_number=1, positive_name=None, negative_name=None):
     """Run an active learning cycle for a custom class.
 
     Args:
         class_id (int): UrbanSound8K class ID to use as positive class
         model_path (str): Path to trained model
-        cycle_name (str, optional): Name for this cycle
+        run_number (int): Version number for output files
         positive_name (str, optional): Custom name for positive class
         negative_name (str, optional): Custom name for negative class
 
@@ -68,18 +66,15 @@ def run_custom_cycle(class_id, model_path, cycle_name=None, positive_name=None, 
     # Get default class name if not provided
     if positive_name is None:
         positive_name = get_class_name(class_id)
-
     if negative_name is None:
         negative_name = create_negative_class_name(positive_name)
 
-    if cycle_name is None:
-        cycle_name = f"{positive_name}_cycle1"
-
-    print("Running custom active learning cycle")
-    print(f"Positive class: {positive_name} (ID: {class_id})")
+    print(f"Running active learning cycle: {positive_name} detection")
+    print("-" * 60)
+    print(f"Positive class: {positive_name}")
     print(f"Negative class: {negative_name}")
     print(f"Model: {model_path}")
-    print(f"Cycle name: {cycle_name}")
+    print(f"Run number: v{run_number}")
     print("-" * 60)
 
     return run_active_learning_cycle(
@@ -87,7 +82,7 @@ def run_custom_cycle(class_id, model_path, cycle_name=None, positive_name=None, 
         positive_class_name=positive_name,
         negative_class_name=negative_name,
         model_path=model_path,
-        cycle_name=cycle_name
+        run_number=run_number
     )
 
 
@@ -105,7 +100,7 @@ Examples:
 
   # Run gunshot detection with custom names
   python -m audioloop.run_active_learning --class-id 6 --model outputs/model_v1.pt \\
-    --positive-name "gunshot" --negative-name "safe_sound" --cycle-name "security_v1"
+    --positive-name "gunshot" --negative-name "safe_sound" --run-number 2
 
   # List available presets
   python -m audioloop.run_active_learning --list-presets
@@ -128,8 +123,8 @@ Examples:
                        help='Path to trained model file (.pt)')
 
     # Optional customization
-    parser.add_argument('--cycle-name', type=str,
-                       help='Name for this active learning cycle (used in output filenames)')
+    parser.add_argument('--run-number', type=int, default=1,
+                       help='Version number for output files (default: 1)')
     parser.add_argument('--positive-name', type=str,
                        help='Custom name for positive class')
     parser.add_argument('--negative-name', type=str,
@@ -169,14 +164,14 @@ Examples:
             predictions_file, candidates_file = run_preset_cycle(
                 preset_name=args.preset,
                 model_path=str(model_path),
-                cycle_name=args.cycle_name
+                run_number=args.run_number
             )
 
         elif args.class_id is not None:
             predictions_file, candidates_file = run_custom_cycle(
                 class_id=args.class_id,
                 model_path=str(model_path),
-                cycle_name=args.cycle_name,
+                run_number=args.run_number,
                 positive_name=args.positive_name,
                 negative_name=args.negative_name
             )
