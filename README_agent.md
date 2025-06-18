@@ -25,7 +25,7 @@ audioloop/
 │   ├── simple_train.py          # Model training logic
 │   ├── test_model.py            # Model validation on training data
 │   ├── run_active_learning.py   # Command-line interface for active learning
-│   ├── urbansound_classes.py    # UrbanSound8K class definitions and presets
+│   ├── urbansound_classes.py    # UrbanSound8K class definitions
 │   ├── create_all_specs.py      # Spectrogram generation for full dataset
 │   ├── inference.py             # General inference utilities
 │   ├── models/                  # Model architectures
@@ -91,6 +91,18 @@ audio2.wav,0,2,1
 from audioloop.active_learning import run_active_learning_cycle
 
 # Step 1-3: Complete cycle for any binary classification task
+# Simple approach - just provide class name
+from audioloop.active_learning import run_active_learning_for_class
+
+predictions_file, candidates_file = run_active_learning_for_class(
+    positive_class_name="siren",       # Any UrbanSound8K class name
+    model_path="outputs/model_v1.pt",
+    run_number=1
+)
+
+# Or use the full function with more control
+from audioloop.active_learning import run_active_learning_cycle
+
 predictions_file, candidates_file = run_active_learning_cycle(
     positive_class_id=8,               # UrbanSound8K class ID (8=siren)
     positive_class_name="siren",       # Human-readable positive class name
@@ -98,24 +110,16 @@ predictions_file, candidates_file = run_active_learning_cycle(
     model_path="outputs/model_v1.pt",
     run_number=1
 )
-
-# Or use presets for common tasks
-from audioloop.urbansound_classes import get_binary_preset
-config = get_binary_preset("dog_detection")  # dog_bark vs not_dog_bark
-predictions_file, candidates_file = run_active_learning_cycle(**config)
 ```
 
 ### 6. Command Line Interface
 
 ```bash
-# Run siren detection with preset
-python -m audioloop.run_active_learning --preset siren_detection --model outputs/model_v1.pt
+# Run siren detection with class name
+python -m audioloop.run_active_learning --class-name siren --model outputs/model_v1.pt
 
-# Run custom dog bark detection
+# Run dog bark detection with class ID
 python -m audioloop.run_active_learning --class-id 3 --model outputs/model_v1.pt
-
-# List available presets
-python -m audioloop.run_active_learning --list-presets
 
 # List all UrbanSound8K classes
 python -m audioloop.run_active_learning --list-classes
@@ -126,7 +130,7 @@ python -m audioloop.run_active_learning --list-classes
 ### Core Workflow
 - **`active_learning.py`**: Generalized active learning pipeline for any binary classification
 - **`run_active_learning.py`**: Command-line interface for running cycles
-- **`urbansound_classes.py`**: Class definitions and binary classification presets
+- **`urbansound_classes.py`**: Class definitions and utility functions
 - **`simple_train.py`**: Training loop with early stopping at 100% accuracy
 - **`test_model.py`**: Validates model performance on training data
 
@@ -251,4 +255,4 @@ This demonstrates the classic active learning scenario: the model is confident b
 4. **Distributed labeling**: Support for multiple human annotators
 5. **Real-time inference**: Streaming audio classification
 
-This framework provides a solid foundation for exploring active learning in audio domains with full generalization across binary classification tasks. The system offers easy configuration for any UrbanSound8K class or custom binary classification scenarios through simple presets and configuration options.
+This framework provides a solid foundation for exploring active learning in audio domains with full generalization across binary classification tasks. The system offers easy configuration for any UrbanSound8K class through simple class name specification.

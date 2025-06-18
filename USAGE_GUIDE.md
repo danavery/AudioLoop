@@ -12,34 +12,31 @@ AudioLoop is a generalized active learning framework for binary audio classifica
 # List available sound classes
 python -m audioloop.run_active_learning --list-classes
 
-# List built-in presets
-python -m audioloop.run_active_learning --list-presets
+# Run siren detection with class name
+python -m audioloop.run_active_learning --class-name siren --model outputs/model_v1.pt
 
-# Run siren detection
-python -m audioloop.run_active_learning --preset siren_detection --model outputs/model_v1.pt
+# Run dog bark detection with class name
+python -m audioloop.run_active_learning --class-name dog_bark --model outputs/model_v1.pt
 
-# Run dog bark detection
-python -m audioloop.run_active_learning --preset dog_detection --model outputs/model_v1.pt
-
-# Run custom class (e.g., gunshot detection)
+# Run gunshot detection with class ID
 python -m audioloop.run_active_learning --class-id 6 --model outputs/model_v1.pt
 ```
 
 ### Option 2: Python API
 
 ```python
-from audioloop.active_learning import run_active_learning_cycle
-from audioloop.urbansound_classes import get_binary_preset
+# Simple approach - just provide class name
+from audioloop.active_learning import run_active_learning_for_class
 
-# Using presets
-config = get_binary_preset("siren_detection")
-predictions_file, candidates_file = run_active_learning_cycle(
-    **config,
+predictions_file, candidates_file = run_active_learning_for_class(
+    positive_class_name="siren",
     model_path="outputs/model_v1.pt",
     run_number=1
 )
 
-# Custom configuration
+# Custom configuration with full control
+from audioloop.active_learning import run_active_learning_cycle
+
 predictions_file, candidates_file = run_active_learning_cycle(
     positive_class_id=3,  # dog_bark
     positive_class_name="dog_bark",
@@ -64,15 +61,22 @@ predictions_file, candidates_file = run_active_learning_cycle(
 | 8 | siren | Emergency services, traffic management |
 | 9 | street_music | Entertainment monitoring, urban soundscapes |
 
-## Built-in Presets
+## Easy Class Selection
 
-| Preset Name | Target Class | Use Case |
-|-------------|--------------|----------|
-| `siren_detection` | Emergency sirens | Traffic/emergency monitoring |
-| `dog_detection` | Dog barks | Pet/animal detection |
-| `gunshot_detection` | Gunshots | Security applications |
-| `horn_detection` | Car horns | Traffic monitoring |
-| `drilling_detection` | Construction drilling | Noise monitoring |
+Just use any UrbanSound8K class name - the system automatically handles binary classification setup:
+
+| Class Name | Use Case |
+|------------|----------|
+| `siren` | Emergency vehicle detection |
+| `dog_bark` | Pet/animal monitoring |
+| `gun_shot` | Security applications |
+| `car_horn` | Traffic monitoring |
+| `drilling` | Construction noise monitoring |
+| `air_conditioner` | HVAC monitoring |
+| `children_playing` | Playground monitoring |
+| `engine_idling` | Vehicle detection |
+| `jackhammer` | Construction sites |
+| `street_music` | Entertainment monitoring |
 
 ## Complete Workflow
 
@@ -117,10 +121,8 @@ accuracy = run_training(
 from audioloop.active_learning import run_active_learning_cycle
 
 # Complete active learning cycle
-predictions_file, candidates_file = run_active_learning_cycle(
-    positive_class_id=8,  # siren
+predictions_file, candidates_file = run_active_learning_for_class(
     positive_class_name="siren",
-    negative_class_name="not_siren",
     model_path="outputs/model_100pct_seed_42.pt",
     run_number=1
 )
@@ -162,11 +164,10 @@ audio1.wav,1,1,siren,0.95,0.12,0.05,0.95,True,8,3,/path/to/spec.pt
 
 ## Customization
 
-### Custom Class Names
+### Custom Negative Class Names
 ```python
-predictions_file, candidates_file = run_active_learning_cycle(
-    positive_class_id=6,
-    positive_class_name="gunshot",      # Custom positive name
+predictions_file, candidates_file = run_active_learning_for_class(
+    positive_class_name="gun_shot",
     negative_class_name="safe_sound",   # Custom negative name
     model_path="outputs/model.pt",
     run_number=1
@@ -191,16 +192,15 @@ candidates = select_candidates_for_labeling(
 ### Multi-Class Experiments
 ```python
 # Run multiple binary classification tasks
-tasks = ["siren_detection", "dog_detection", "gunshot_detection"]
+classes = ["siren", "dog_bark", "gun_shot"]
 
-for task in tasks:
-    config = get_binary_preset(task)
-    predictions, candidates = run_active_learning_cycle(
-        **config,
+for class_name in classes:
+    predictions, candidates = run_active_learning_for_class(
+        positive_class_name=class_name,
         model_path="outputs/model.pt",
         run_number=1
     )
-    print(f"Completed {task}: {candidates}")
+    print(f"Completed {class_name}: {candidates}")
 ```
 
 ### Batch Processing
@@ -210,7 +210,7 @@ for class_id in {0..9}; do
     python -m audioloop.run_active_learning \
         --class-id $class_id \
         --model outputs/model.pt \
-        --cycle-name "class_${class_id}_cycle1"
+        --run-number 1
 done
 ```
 

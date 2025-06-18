@@ -1,13 +1,15 @@
 import csv
 import os
-
+import random
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from .models.simple_cnn import SimpleCNN
+from .utils.spec_dataset import SpectrogramDataset
 from .utils.urbansound_dataset import UrbanSoundDataset
+from .urbansound_classes import CLASS_NAME_TO_ID, create_negative_class_name
 
 
 def entropy(probabilities):
@@ -436,6 +438,46 @@ def run_active_learning_cycle(positive_class_id=8,
     print("4. Retrain model and repeat")
 
     return predictions_file, candidates_file
+
+
+def run_active_learning_for_class(positive_class_name,
+                                 model_path="outputs/model_100pct_seed_42.pt",
+                                 negative_class_name=None,
+                                 urbansound_csv="data/urbansound8k/UrbanSound8K.csv",
+                                 run_number=1):
+    """
+    Simplified active learning cycle - just provide the class name.
+
+    Args:
+        positive_class_name: UrbanSound8K class name (e.g., "dog_bark", "siren")
+        model_path: Path to trained model
+        negative_class_name: Name for negative class (auto-generated if None)
+        urbansound_csv: Path to UrbanSound8K metadata
+        run_number: Version number for output files
+
+    Returns:
+        tuple: (predictions_file, candidates_file)
+    """
+    # Validate class name and get class ID
+    if positive_class_name not in CLASS_NAME_TO_ID:
+        valid_names = list(CLASS_NAME_TO_ID.keys())
+        raise ValueError(f"Invalid class name: '{positive_class_name}'. Valid names: {valid_names}")
+
+    positive_class_id = CLASS_NAME_TO_ID[positive_class_name]
+
+    # Auto-generate negative class name if not provided
+    if negative_class_name is None:
+        negative_class_name = create_negative_class_name(positive_class_name)
+
+    # Call the main function
+    return run_active_learning_cycle(
+        positive_class_id=positive_class_id,
+        positive_class_name=positive_class_name,
+        negative_class_name=negative_class_name,
+        model_path=model_path,
+        urbansound_csv=urbansound_csv,
+        run_number=run_number
+    )
 
 
 if __name__ == "__main__":

@@ -77,63 +77,7 @@ def create_negative_class_name(positive_class_name):
     return f"not_{positive_class_name}"
 
 
-# Common binary classification presets
-BINARY_PRESETS = {
-    "siren_detection": {
-        "positive_class_id": 8,
-        "positive_class_name": "siren",
-        "negative_class_name": "not_siren"
-    },
-    "dog_detection": {
-        "positive_class_id": 3,
-        "positive_class_name": "dog_bark",
-        "negative_class_name": "not_dog_bark"
-    },
-    "gunshot_detection": {
-        "positive_class_id": 6,
-        "positive_class_name": "gun_shot",
-        "negative_class_name": "not_gun_shot"
-    },
-    "horn_detection": {
-        "positive_class_id": 1,
-        "positive_class_name": "car_horn",
-        "negative_class_name": "not_car_horn"
-    },
-    "drilling_detection": {
-        "positive_class_id": 4,
-        "positive_class_name": "drilling",
-        "negative_class_name": "not_drilling"
-    }
-}
 
-
-def get_binary_preset(preset_name):
-    """Get predefined binary classification settings.
-
-    Args:
-        preset_name (str): Name of the preset (e.g., "siren_detection")
-
-    Returns:
-        dict: Dictionary with positive_class_id, positive_class_name, negative_class_name
-
-    Raises:
-        ValueError: If preset_name is not valid
-    """
-    if preset_name not in BINARY_PRESETS:
-        valid_presets = list(BINARY_PRESETS.keys())
-        raise ValueError(f"Invalid preset: '{preset_name}'. Valid presets: {valid_presets}")
-    return BINARY_PRESETS[preset_name].copy()
-
-
-def list_binary_presets():
-    """Print all available binary classification presets."""
-    print("Available Binary Classification Presets:")
-    print("=" * 45)
-    for preset_name, config in BINARY_PRESETS.items():
-        pos_name = config['positive_class_name']
-        neg_name = config['negative_class_name']
-        class_id = config['positive_class_id']
-        print(f"{preset_name:<20} | Class {class_id}: {pos_name} vs {neg_name}")
 
 
 if __name__ == "__main__":
@@ -144,17 +88,14 @@ if __name__ == "__main__":
     list_classes()
     print()
 
-    list_binary_presets()
-    print()
-
     # Example usage
     print("Example Usage:")
     print("-" * 20)
-    siren_config = get_binary_preset("siren_detection")
-    print(f"Siren detection config: {siren_config}")
-
     class_name = get_class_name(8)
     print(f"Class 8 is: {class_name}")
 
     class_id = get_class_id("dog_bark")
     print(f"'dog_bark' is class: {class_id}")
+
+    negative_name = create_negative_class_name("siren")
+    print(f"Negative class for 'siren': {negative_name}")
