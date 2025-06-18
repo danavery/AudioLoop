@@ -132,13 +132,33 @@ print(f"Candidates for labeling: {candidates_file}")
 ```
 
 ### 5. Human Labeling
-1. Open `outputs/labeling_candidates_cycle1.csv`
+1. Open `outputs/labeling_candidates_v1.csv`
 2. Review the high-confidence predictions
-3. Add human labels to the `needs_human_label` column
-4. Add these verified samples to your next training set
+3. Fill in the `needs_human_label` column with `0` (negative) or `1` (positive)
+4. Save the file
 
-### 6. Iterate
-Repeat steps 3-5 with expanded training sets for each cycle.
+### 6. Merge Human Labels
+After completing human labeling, merge the labels back into your training set:
+
+```bash
+# Merge human labels back into training set
+python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv
+
+# This creates training_sets/training_set_v2.csv with combined data
+```
+
+Or use the Python API:
+```python
+from audioloop.active_learning import merge_human_labels
+
+new_training_set = merge_human_labels(
+    "training_sets/training_set_v1.csv",
+    "outputs/labeling_candidates_v1.csv"  # With human labels filled in
+)
+```
+
+### 7. Iterate
+Repeat steps 3-6 with expanded training sets for each cycle.
 
 ## File Formats
 
@@ -224,13 +244,166 @@ done
 - `outputs/predictions_v1.csv` - Model predictions on full dataset  
 - `outputs/labeling_candidates_v1.csv` - High-confidence samples for human review
 
+## Label Management Workflow
+
+### Complete Active Learning Cycle
+
+The complete active learning workflow includes merging human labels back into training sets:
+
+```bash
+# 1. Run initial active learning cycle
+python -m audioloop.run_active_learning --class-name siren --model outputs/model_v1.pt
+
+# 2. Human fills in 'needs_human_label' column in outputs/labeling_candidates_v1.csv
+
+# 3. Merge human labels back into training set
+python -m audioloop.merge_labels merge training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv
+
+# 4. Train new model with expanded training set (training_sets/training_set_v2.csv)
+
+# 5. Run next cycle with new model
+python -m audioloop.run_active_learning --class-name siren --model outputs/model_v2.pt --run-number 2
+```
+
+### Step-by-Step Example
+
+Here's a complete example of running two active learning cycles for siren detection:
+
+```bash
+# Initial setup (one-time)
+uv run python -m audioloop.create_all_specs
+
+# Cycle 1: Start with initial training set
+python -m audioloop.run_active_learning --class-name siren --model outputs/model_v1.pt --run-number 1
+# → Generates outputs/labeling_candidates_v1.csv
+
+# Human reviews outputs/labeling_candidates_v1.csv and fills in needs_human_label column:
+# Example content after human labeling:
+# filename,predicted_is_positive,confidence,needs_human_label,...
+# 24347-8-0-22.wav,1,0.95,1,...  # Human confirms: yes, this is a siren
+# 157821-3-0-15.wav,1,0.87,0,...  # Human corrects: no, this is not a siren
+
+# Merge human labels into training set
+python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv
+# → Creates training_sets/training_set_v2.csv with additional samples
+
+# Train model v2 with expanded training set
+python -m audioloop.simple_train training_sets/training_set_v2.csv outputs/model_v2.pt
+
+# Cycle 2: Use improved model
+python -m audioloop.run_active_learning --class-name siren --model outputs/model_v2.pt --run-number 2
+# → Generates outputs/labeling_candidates_v2.csv with better predictions
+
+# Continue the process...
+```
+
+### Manual Label Management
+
+For more control over the labeling process:
+
+```bash
+# Merge with custom output location
+python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv -o training_sets/custom_v2.csv
+```
+
+### Python API for Label Management
+
+```python
+from audioloop.active_learning import merge_human_labels
+
+# Simple merge with auto-versioning
+new_training_set = merge_human_labels(
+    "training_sets/training_set_v1.csv",
+    "outputs/labeling_candidates_v1.csv"
+)
+print(f"Created: {new_training_set}")
+# Output: Created: training_sets/training_set_v2.csv
+
+# Custom output path
+new_training_set = merge_human_labels(
+    "training_sets/training_set_v1.csv",
+    "outputs/labeling_candidates_v1.csv",
+    "training_sets/training_set_experimental.csv"
+)
+
+# Full workflow automation
+from audioloop.active_learning import run_active_learning_for_class
+
+# Run cycle 1
+predictions, candidates = run_active_learning_for_class(
+    positive_class_name="siren",
+    model_path="outputs/model_v1.pt",
+    run_number=1
+)
+
+# After human labeling, merge and continue
+new_training_set = merge_human_labels(
+    "training_sets/training_set_v1.csv", 
+    candidates
+)
+
+# Continue with cycle 2...
+```
+
+## Human Labeling Guidelines
+
+### What to Look For
+When reviewing `outputs/labeling_candidates_vX.csv`:
+
+1. **High Confidence Mistakes**: The model is very confident but wrong
+   - These are the most valuable for learning
+   - Example: Model predicts "siren" with 95% confidence, but it's actually a car horn
+
+2. **Borderline Cases**: Confidence around 0.6-0.8
+   - These help define decision boundaries
+   - Example: Distant siren that's hard to distinguish from background noise
+
+3. **Representative Samples**: Diverse examples of the target class
+   - Different recording conditions, distances, overlapping sounds
+   - Helps model generalize better
+
+### Filling in Labels
+In the `needs_human_label` column:
+- **1**: Positive class (e.g., "yes, this is a siren")  
+- **0**: Negative class (e.g., "no, this is not a siren")
+- **Leave empty**: Skip if unsure (won't be included in training)
+
+### Quality vs Quantity
+- **Better**: 10 high-quality, confident labels
+- **Worse**: 50 rushed, uncertain labels
+- Take time to listen carefully to each sample
+
+## Automated Workflow Example
+
+For a complete demonstration of the active learning workflow, use the included example script:
+
+```bash
+# Run automated workflow with simulated human labeling
+python example_workflow.py --class-name siren --cycles 2
+
+# Run with manual human labeling (you'll be prompted to fill in labels)
+python example_workflow.py --class-name dog_bark --cycles 3 --no-simulate
+
+# Use custom model
+python example_workflow.py --class-name gun_shot --model outputs/custom_model.pt
+```
+
+This script demonstrates:
+- Running active learning cycles
+- Merging human labels back into training sets  
+- Handling multiple cycles automatically
+- Both simulated and manual human labeling workflows
+
 ## Tips
 
 1. **Start Small**: Begin with 10-20 labeled samples per class
 2. **High Confidence**: Use confidence ≥ 0.8 for initial candidate selection
-3. **Balance**: Ensure roughly equal positive/negative samples in training
-4. **Iterate**: Run 3-5 active learning cycles for best results
-5. **Validate**: Always test final model on held-out data
+3. **Label Quality**: Focus on confident, clear examples rather than edge cases
+4. **Iterate Quickly**: Run short cycles (10-20 labels) rather than long ones (100+ labels)
+5. **Monitor Progress**: Check if model performance improves after each cycle
+6. **Balance**: Ensure roughly equal positive/negative samples in training
+7. **Iterate**: Run 3-5 active learning cycles for best results
+8. **Validate**: Always test final model on held-out data
 
 ## Troubleshooting
 

@@ -8,7 +8,6 @@ import torch.optim as optim
 from torch import nn
 from torch.utils.data import DataLoader
 
-from .models.cnn_5layer import SoundCNN
 from .models.simple_cnn import SimpleCNN
 from .utils.spec_dataset import SpectrogramDataset
 

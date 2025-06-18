@@ -1,15 +1,15 @@
 import csv
 import os
-import random
+
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from .merge_labels import merge_training_sets
 from .models.simple_cnn import SimpleCNN
-from .utils.spec_dataset import SpectrogramDataset
-from .utils.urbansound_dataset import UrbanSoundDataset
 from .urbansound_classes import CLASS_NAME_TO_ID, create_negative_class_name
+from .utils.urbansound_dataset import UrbanSoundDataset
 
 
 def entropy(probabilities):
@@ -478,6 +478,41 @@ def run_active_learning_for_class(positive_class_name,
         urbansound_csv=urbansound_csv,
         run_number=run_number
     )
+
+
+def merge_human_labels(original_training_set, human_labeled_csv, output_training_set=None):
+    """
+    Merge human-labeled samples back into the training set.
+
+    This function takes candidates that have been labeled by humans and merges them
+    with the existing training set to create an updated training set for the next
+    active learning cycle.
+
+    Args:
+        original_training_set: Path to existing training set CSV
+        human_labeled_csv: Path to CSV with human labels (candidates file with filled labels)
+        output_training_set: Path for merged training set (auto-generated if None)
+
+    Returns:
+        str: Path to the merged training set file
+
+    Example:
+        # After humans fill in labels in candidates file
+        new_training_set = merge_human_labels(
+            "training_sets/training_set_v1.csv",
+            "outputs/labeling_candidates_v1.csv"  # With human labels filled in
+        )
+    """
+    if output_training_set is None:
+        # Auto-generate version number
+        base = os.path.splitext(os.path.basename(original_training_set))[0]
+        if 'v' in base:
+            version = int(base.split('_v')[1]) + 1
+        else:
+            version = 2
+        output_training_set = f"training_sets/training_set_v{version}.csv"
+
+    return merge_training_sets(original_training_set, human_labeled_csv, output_training_set)
 
 
 if __name__ == "__main__":

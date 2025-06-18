@@ -22,6 +22,7 @@ Traditional supervised learning requires large labeled datasets. Active learning
 audioloop/
 ├── audioloop/                    # Main package
 │   ├── active_learning.py        # Generalized active learning workflow (any binary classification)
+│   ├── merge_labels.py          # Label management utilities for active learning cycles
 │   ├── simple_train.py          # Model training logic
 │   ├── test_model.py            # Model validation on training data
 │   ├── run_active_learning.py   # Command-line interface for active learning
@@ -166,12 +167,23 @@ python -m audioloop.run_active_learning --list-classes
 3. **Train initial model**: Use `simple_train.py` with `training_set_v1.csv`
 4. **Validate**: Run `test_model.py` to verify training worked
 5. **Get candidates**: Run `active_learning.py` to generate labeling candidates
-6. **Human labeling**: Review `outputs/cycle1_labeling_candidates.csv`
+6. **Human labeling**: Review `outputs/labeling_candidates_v1.csv`
+7. **Merge labels**: `python -m audioloop.merge_labels merge training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv`
 
 ### Subsequent Cycles
-1. **Update training set**: Add human labels to `training_set_v2.csv`
-2. **Retrain**: Train on expanded dataset
-3. **Iterate**: Repeat candidate selection and labeling
+1. **Human labeling**: Fill in the `needs_human_label` column in `outputs/labeling_candidates_v1.csv`
+2. **Merge labels**: Use `merge_labels.py` to combine human labels with existing training set
+3. **Update training set**: Creates `training_set_v2.csv` with expanded dataset
+4. **Retrain**: Train on expanded dataset
+5. **Iterate**: Repeat candidate selection and labeling
+
+### Label Management Commands
+```bash
+# Merge human labels into training set
+python -m audioloop.merge_labels merge training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv
+
+# This auto-creates training_sets/training_set_v2.csv
+```
 
 ## Performance Metrics
 
