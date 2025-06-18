@@ -199,11 +199,11 @@ predictions_file, candidates_file = run_active_learning_for_class(
 from audioloop.active_learning import select_candidates_for_labeling
 
 candidates = select_candidates_for_labeling(
-    predictions_csv="outputs/predictions.csv",
+    predictions_file="outputs/predictions.csv",
     num_positive=15,        # More positive samples
     num_negative=5,         # Fewer negative samples
     min_confidence=0.9,     # Higher confidence threshold
-    output_csv="outputs/high_conf_candidates.csv"
+    candidates_csv="outputs/high_conf_candidates.csv"
 )
 ```
 
@@ -237,7 +237,8 @@ done
 ## Generated Files
 
 **One-time setup:**
-- `data/all_specs/` - Precomputed spectrograms for all 8,732 UrbanSound8K files
+- `data/specs/` - Precomputed spectrograms (default directory)
+- `data/all_specs/` - Alternative directory for full UrbanSound8K dataset
 
 **Each active learning cycle generates:**
 - `outputs/binary_labels_v1.csv` - Binary labels for the target class

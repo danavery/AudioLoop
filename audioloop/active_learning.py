@@ -9,15 +9,8 @@ from tqdm import tqdm
 from .merge_labels import merge_training_sets
 from .models.simple_cnn import SimpleCNN
 from .urbansound_classes import CLASS_NAME_TO_ID, create_negative_class_name
+from .utils.data_utils import entropy, get_device, variable_length_collate_fn
 from .utils.urbansound_dataset import UrbanSoundDataset
-
-
-def entropy(probabilities):
-    """Calculate entropy of probability distribution."""
-    # Avoid log(0) by adding small epsilon
-    eps = 1e-10
-    probs = probabilities + eps
-    return -torch.sum(probs * torch.log(probs), dim=-1)
 
 
 def load_model(model_path, num_classes, device):
@@ -29,45 +22,10 @@ def load_model(model_path, num_classes, device):
     return model
 
 
-def collate_fn(batch):
-    """Custom collate function to handle variable-length spectrograms."""
-    # Extract data and other fields
-    data_list = [item["data"] for item in batch]
-    labels = torch.tensor([item["label"] for item in batch])
-
-    # Handle different channel dimensions and time lengths
-    max_time_frames = max(spec.shape[-1] for spec in data_list)
-
-    padded_data = []
-    for spec in data_list:
-        # Convert to mono by averaging channels if stereo
-        if spec.shape[0] > 1:
-            spec = spec.mean(dim=0, keepdim=True)  # Average channels, keep dimension
-
-        # Pad the time dimension (last dimension) to max_time_frames
-        pad_size = max_time_frames - spec.shape[-1]
-        if pad_size > 0:
-            # Pad with zeros on the right side of the time dimension
-            pad_tuple = (0, pad_size)  # (left_pad, right_pad) for last dimension
-            padded_spec = torch.nn.functional.pad(spec, pad_tuple, mode='constant', value=0)
-        else:
-            padded_spec = spec
-        padded_data.append(padded_spec)
-
-    # Stack the padded spectrograms
-    data_tensor = torch.stack(padded_data)
-
-    # Return in the same format as the original batch
-    return {
-        "data": data_tensor,
-        "label": labels,
-        "filename": [item["filename"] for item in batch],
-        "filepath": [item["filepath"] for item in batch],
-        "original_class": [item.get("original_class", -1) for item in batch]
-    }
 
 
-def create_binary_labels(urbansound_csv="data/urbansound8k/UrbanSound8K.csv",
+
+def create_binary_labels(urbansound_file="data/urbansound8k/UrbanSound8K.csv",
                         positive_class_id=8,
                         output_csv="outputs/binary_labels.csv",
                         positive_class_name="positive",
@@ -76,7 +34,7 @@ def create_binary_labels(urbansound_csv="data/urbansound8k/UrbanSound8K.csv",
     Create binary labels from UrbanSound8K dataset for any specified class.
 
     Args:
-        urbansound_csv: Path to UrbanSound8K.csv metadata file
+        urbansound_file: Path to UrbanSound8K.csv metadata file
         positive_class_id: UrbanSound8K class ID to treat as positive (1)
         output_csv: Path for output binary labels CSV
         positive_class_name: Name for positive class (for logging)
@@ -89,7 +47,7 @@ def create_binary_labels(urbansound_csv="data/urbansound8k/UrbanSound8K.csv",
     positive_count = 0
     negative_count = 0
 
-    with open(urbansound_csv, 'r') as f:
+    with open(urbansound_file, 'r') as f:
         csv_reader = csv.DictReader(f)
         for row in csv_reader:
             filename = row['slice_file_name']
@@ -129,7 +87,7 @@ def create_binary_labels(urbansound_csv="data/urbansound8k/UrbanSound8K.csv",
 
 def run_binary_inference(model_path,
                         labels_file="outputs/binary_labels.csv",
-                        output_csv="outputs/predictions.csv",
+                        predictions_csv="outputs/predictions.csv",
                         positive_class_name="positive",
                         negative_class_name="negative"):
     """
@@ -138,14 +96,14 @@ def run_binary_inference(model_path,
     Args:
         model_path: Path to trained binary model
         labels_file: CSV file with binary labels (filename,is_positive,original_class)
-        output_csv: Path for output predictions CSV
+        predictions_csv: Path for output predictions CSV
         positive_class_name: Name for positive class (for logging and output)
         negative_class_name: Name for negative class (for logging and output)
 
     Returns:
         list: Inference results with predictions and confidences
     """
-    device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+    device = get_device()
     print(f"Using device: {device}")
 
     # Load dataset
@@ -167,10 +125,10 @@ def run_binary_inference(model_path,
     data_loader = DataLoader(
         dataset,
         batch_size=32,
-        shuffle=False,  # Keep original order for analysis
+        shuffle=False,
         num_workers=0,
         pin_memory=False,
-        collate_fn=collate_fn
+        collate_fn=variable_length_collate_fn
     )
 
     # Run inference and collect results
@@ -266,19 +224,19 @@ def run_binary_inference(model_path,
         "correct", "original_class", "filepath"
     ]
 
-    with open(output_csv, 'w', newline='') as csvfile:
+    with open(predictions_csv, 'w', newline='') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(results)
 
-    print(f"\nResults saved to: {output_csv}")
+    print(f"\nResults saved to: {predictions_csv}")
     return results
 
 
-def select_candidates_for_labeling(predictions_csv="outputs/predictions.csv",
+def select_candidates_for_labeling(predictions_file="outputs/predictions.csv",
                                  num_positive=10, num_negative=10,
                                  min_confidence=0.8,
-                                 output_csv="outputs/labeling_candidates.csv",
+                                 candidates_csv="outputs/labeling_candidates.csv",
                                  positive_class_name="positive",
                                  negative_class_name="negative"):
     """
@@ -286,11 +244,11 @@ def select_candidates_for_labeling(predictions_csv="outputs/predictions.csv",
     Uses adaptive thresholds to ensure both positive and negative examples.
 
     Args:
-        predictions_csv: CSV file with model predictions
+        predictions_file: CSV file with model predictions
         num_positive: Number of positive predictions to select
         num_negative: Number of negative predictions to select
         min_confidence: Initial minimum confidence threshold
-        output_csv: Output file for candidates
+        candidates_csv: Output file for candidates
         positive_class_name: Name for positive class
         negative_class_name: Name for negative class
 
@@ -300,7 +258,7 @@ def select_candidates_for_labeling(predictions_csv="outputs/predictions.csv",
 
     # Read predictions
     predictions = []
-    with open(predictions_csv, 'r') as f:
+    with open(predictions_file, 'r') as f:
         reader = csv.DictReader(f)
         for row in reader:
             row['confidence'] = float(row['confidence'])
@@ -357,12 +315,12 @@ def select_candidates_for_labeling(predictions_csv="outputs/predictions.csv",
 
         # Save candidates
         fieldnames = list(all_candidates[0].keys())
-        with open(output_csv, 'w', newline='') as f:
+        with open(candidates_csv, 'w', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=fieldnames)
             writer.writeheader()
             writer.writerows(all_candidates)
 
-        print(f"Candidates saved to: {output_csv}")
+        print(f"Candidates saved to: {candidates_csv}")
         if positive_candidates:
             print(f"{positive_class_name} confidence range: {min(p['confidence'] for p in positive_candidates):.3f} - {max(p['confidence'] for p in positive_candidates):.3f}")
         if negative_candidates:
@@ -377,7 +335,7 @@ def run_active_learning_cycle(positive_class_id=8,
                              positive_class_name="siren",
                              negative_class_name="not_siren",
                              model_path="outputs/model_100pct_seed_42.pt",
-                             urbansound_csv="data/urbansound8k/UrbanSound8K.csv",
+                             urbansound_file="data/urbansound8k/UrbanSound8K.csv",
                              run_number=1):
     """
     Run a complete active learning cycle for binary classification.
@@ -387,7 +345,7 @@ def run_active_learning_cycle(positive_class_id=8,
         positive_class_name: Human-readable name for positive class
         negative_class_name: Human-readable name for negative class
         model_path: Path to trained model
-        urbansound_csv: Path to UrbanSound8K metadata
+        urbansound_file: Path to UrbanSound8K metadata
         run_number: Version number for output files (e.g., 1 creates v1 files)
 
     Returns:
@@ -397,7 +355,7 @@ def run_active_learning_cycle(positive_class_id=8,
     # Step 1: Create binary labels for the specified class
     print(f"Step 1: Creating binary labels for {positive_class_name} vs {negative_class_name}...")
     binary_labels_file = create_binary_labels(
-        urbansound_csv=urbansound_csv,
+        urbansound_file=urbansound_file,
         positive_class_id=positive_class_id,
         output_csv=f"outputs/binary_labels_v{run_number}.csv",
         positive_class_name=positive_class_name,
@@ -411,7 +369,7 @@ def run_active_learning_cycle(positive_class_id=8,
     _ = run_binary_inference(
         model_path=model_path,
         labels_file=binary_labels_file,
-        output_csv=predictions_file,
+        predictions_csv=predictions_file,
         positive_class_name=positive_class_name,
         negative_class_name=negative_class_name
     )
@@ -421,11 +379,11 @@ def run_active_learning_cycle(positive_class_id=8,
     candidates_file = f"outputs/labeling_candidates_v{run_number}.csv"
 
     _ = select_candidates_for_labeling(
-        predictions_csv=predictions_file,
+        predictions_file=predictions_file,
         num_positive=10,
         num_negative=10,
         min_confidence=0.8,
-        output_csv=candidates_file,
+        candidates_csv=candidates_file,
         positive_class_name=positive_class_name,
         negative_class_name=negative_class_name
     )
@@ -441,10 +399,10 @@ def run_active_learning_cycle(positive_class_id=8,
 
 
 def run_active_learning_for_class(positive_class_name,
-                                 model_path="outputs/model_100pct_seed_42.pt",
-                                 negative_class_name=None,
-                                 urbansound_csv="data/urbansound8k/UrbanSound8K.csv",
-                                 run_number=1):
+                                model_path,
+                                negative_class_name=None,
+                                urbansound_file="data/urbansound8k/UrbanSound8K.csv",
+                                run_number=1):
     """
     Simplified active learning cycle - just provide the class name.
 
@@ -452,7 +410,7 @@ def run_active_learning_for_class(positive_class_name,
         positive_class_name: UrbanSound8K class name (e.g., "dog_bark", "siren")
         model_path: Path to trained model
         negative_class_name: Name for negative class (auto-generated if None)
-        urbansound_csv: Path to UrbanSound8K metadata
+        urbansound_file: Path to UrbanSound8K metadata
         run_number: Version number for output files
 
     Returns:
@@ -475,7 +433,7 @@ def run_active_learning_for_class(positive_class_name,
         positive_class_name=positive_class_name,
         negative_class_name=negative_class_name,
         model_path=model_path,
-        urbansound_csv=urbansound_csv,
+        urbansound_file=urbansound_file,
         run_number=run_number
     )
 

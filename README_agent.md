@@ -28,7 +28,6 @@ audioloop/
 │   ├── run_active_learning.py   # Command-line interface for active learning
 │   ├── urbansound_classes.py    # UrbanSound8K class definitions
 │   ├── create_all_specs.py      # Spectrogram generation for full dataset
-│   ├── inference.py             # General inference utilities
 │   ├── models/                  # Model architectures
 │   │   ├── simple_cnn.py        # Lightweight 2-layer CNN (SimpleCNN)
 │   │   └── cnn_5layer.py        # 5-layer CNN architecture (SoundCNN)
@@ -200,7 +199,7 @@ python -m audioloop.merge_labels merge training_sets/training_set_v1.csv outputs
 ## Configuration and Paths
 
 ### Key Directories
-- Spectrograms: `data/all_specs/` (not `data/specs/`)
+- Spectrograms: `data/specs/` (default) or `data/all_specs/` (full dataset)
 - Models: `outputs/model_*.pt`
 - Predictions: `outputs/*_predictions.csv`
 - Candidates: `outputs/*_labeling_candidates.csv`

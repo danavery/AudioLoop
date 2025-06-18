@@ -18,7 +18,11 @@ class SpectrogramDataset(torch.utils.data.Dataset):
 
         with open(labels_file, 'r') as f:
             csv_reader = csv.reader(f)
-            for row in csv_reader:
+            for i, row in enumerate(csv_reader):
+                # Skip header row if it exists
+                if i == 0 and len(row) > 0 and row[0].lower() in ['filepath', 'filename']:
+                    continue
+
                 if len(row) >= 2:  # At minimum need filepath and label
                     filepath, label = row[0], row[1]
                     run = row[2] if len(row) > 2 else "1"

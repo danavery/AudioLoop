@@ -39,9 +39,12 @@ def create_training_set(n=10, classname="siren", output_path="training_sets/trai
     random.shuffle(all_entries)
 
     # Create output directory if needed
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    output_dir = os.path.dirname(output_path)
+    if output_dir:  # Only create directory if path has a directory component
+        os.makedirs(output_dir, exist_ok=True)
 
     with open(output_path, "w") as f:
+        f.write("filepath,label,run\n")
         f.write("\n".join(all_entries))
 
     print(f"Created training set: {output_path}")

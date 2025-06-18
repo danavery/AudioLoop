@@ -9,6 +9,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from .models.simple_cnn import SimpleCNN
+from .utils.data_utils import get_device, simple_collate_fn
 from .utils.spec_dataset import SpectrogramDataset
 
 
@@ -21,30 +22,7 @@ def set_seed(seed):
     torch.backends.cudnn.benchmark = False
 
 
-def collate_fn(batch):
-    """Simple collate function for fixed-length spectrograms."""
-    # Extract data and other fields
-    data_list = [item["data"] for item in batch]
-    labels = torch.tensor([item["label"] for item in batch])
 
-    # Convert to mono by averaging channels if stereo
-    mono_data = []
-    for spec in data_list:
-        if spec.shape[0] > 1:
-            spec = spec.mean(dim=0, keepdim=True)  # Average channels, keep dimension
-        mono_data.append(spec)
-
-    # Stack the spectrograms (they should all be the same size now)
-    data_tensor = torch.stack(mono_data)
-
-    # Return in the same format as the original batch
-    return {
-        "data": data_tensor,
-        "label": labels,
-        "filename": [item["filename"] for item in batch],
-        "filepath": [item["filepath"] for item in batch],
-        "run": [item["run"] for item in batch]
-    }
 
 
 def train_epoch(model, train_loader, optimizer, criterion, device):
@@ -86,7 +64,7 @@ def train_epoch(model, train_loader, optimizer, criterion, device):
 
 
 def run_training(labels_file="labels.csv", max_epochs=1000, seed=42):
-    device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+    device = get_device()
     print(f"Using device: {device}")
 
     set_seed(seed)
@@ -108,7 +86,7 @@ def run_training(labels_file="labels.csv", max_epochs=1000, seed=42):
         shuffle=True,
         num_workers=0,
         pin_memory=False,
-        collate_fn=collate_fn
+        collate_fn=simple_collate_fn
     )
 
     # Create simpler model for debugging

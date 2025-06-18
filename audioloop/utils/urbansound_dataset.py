@@ -26,15 +26,11 @@ class UrbanSoundDataset(torch.utils.data.Dataset):
                     # Binary labels format (generalized)
                     label = int(row['is_positive'])
                     original_class = int(row['original_class'])
-                elif 'is_siren' in row:
-                    # Legacy binary siren format (for backward compatibility)
-                    label = int(row['is_siren'])
-                    original_class = int(row['original_class'])
                 else:
                     # Original UrbanSound8K format
                     class_id = int(row['class_id'])
-                    # Convert to binary: siren (class 8) = 1, everything else = 0
-                    label = 1 if class_id == 8 else 0
+                    # For original format, we need binary labels to be set by the active learning system
+                    label = 0  # Default to negative, will be overridden by binary labels file
                     original_class = class_id
 
                 # Convert audio filename to spectrogram filepath

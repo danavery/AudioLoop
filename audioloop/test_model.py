@@ -3,14 +3,14 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from .models.simple_cnn import SimpleCNN
-from .simple_train import collate_fn
+from .utils.data_utils import get_device, simple_collate_fn
 from .utils.spec_dataset import SpectrogramDataset
 
 
 def test_model_on_training_data(model_path="outputs/model_100pct_seed_42.pt", labels_file="labels.csv"):
     """Test the trained model on its original training data to verify it works."""
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+    device = get_device()
     print(f"Using device: {device}")
 
     # Load the dataset (same as training)
@@ -18,7 +18,7 @@ def test_model_on_training_data(model_path="outputs/model_100pct_seed_42.pt", la
     print(f"Training dataset size: {len(dataset)}")
 
     # Create data loader (same as training)
-    loader = DataLoader(dataset, batch_size=4, shuffle=False, collate_fn=collate_fn)
+    loader = DataLoader(dataset, batch_size=4, shuffle=False, collate_fn=simple_collate_fn)
 
     # Load the model (using SimpleCNN now)
     model = SimpleCNN(num_classes=2)
