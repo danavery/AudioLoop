@@ -46,7 +46,7 @@ def simulate_human_labeling(candidates_file, error_rate=0.1):
         for row in reader:
             # Simulate human decision-making
             # In real life, human would listen to audio and decide
-            predicted_label = int(row['predicted_is_positive'])
+            predicted_label = int(row['predicted_label'])
             confidence = float(row['confidence'])
 
             # Simulate human labeling with occasional errors

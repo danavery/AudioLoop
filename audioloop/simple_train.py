@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 
 from .models.simple_cnn import SimpleCNN
 from .utils.data_utils import get_device, simple_collate_fn
-from .utils.spec_dataset import SpectrogramDataset
+from .utils.spectrogram_dataset import SpectrogramDataset
 
 
 def set_seed(seed):
@@ -72,7 +72,7 @@ def run_training(labels_file="labels.csv", max_epochs=1000, seed=42):
 
     # Create dataset from precomputed spectrograms
     # Note: This assumes you've run create_all_specs.py first to generate .pt files
-    train_dataset = SpectrogramDataset(labels_file=labels_file)
+    train_dataset = SpectrogramDataset(csv_file=labels_file)
     print(f"Dataset size: {len(train_dataset)}")
 
     # Determine number of classes from the dataset

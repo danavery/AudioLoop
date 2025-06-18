@@ -10,7 +10,7 @@ from .merge_labels import merge_training_sets
 from .models.simple_cnn import SimpleCNN
 from .urbansound_classes import CLASS_NAME_TO_ID, create_negative_class_name
 from .utils.data_utils import entropy, get_device, variable_length_collate_fn
-from .utils.urbansound_dataset import UrbanSoundDataset
+from .utils.spectrogram_dataset import SpectrogramDataset
 
 
 def load_model(model_path, num_classes, device):
@@ -63,7 +63,7 @@ def create_binary_labels(urbansound_file="data/urbansound8k/UrbanSound8K.csv",
 
             binary_data.append({
                 'filename': filename,
-                'is_positive': is_positive,
+                'label': is_positive,
                 'original_class': class_id
             })
 
@@ -72,7 +72,7 @@ def create_binary_labels(urbansound_file="data/urbansound8k/UrbanSound8K.csv",
 
     # Write binary labels CSV
     with open(output_csv, 'w', newline='') as f:
-        fieldnames = ['filename', 'is_positive', 'original_class']
+        fieldnames = ['filename', 'label', 'original_class']
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(binary_data)
@@ -95,7 +95,7 @@ def run_binary_inference(model_path,
 
     Args:
         model_path: Path to trained binary model
-        labels_file: CSV file with binary labels (filename,is_positive,original_class)
+        labels_file: CSV file with binary labels (filename,label,original_class)
         predictions_csv: Path for output predictions CSV
         positive_class_name: Name for positive class (for logging and output)
         negative_class_name: Name for negative class (for logging and output)
@@ -107,7 +107,7 @@ def run_binary_inference(model_path,
     print(f"Using device: {device}")
 
     # Load dataset
-    dataset = UrbanSoundDataset(csv_file=labels_file)
+    dataset = SpectrogramDataset(csv_file=labels_file, specs_dir="data/all_specs")
     print(f"Dataset size: {len(dataset)}")
 
     # Binary classification
@@ -162,7 +162,7 @@ def run_binary_inference(model_path,
             # Process each sample in the batch
             for i in range(len(true_labels)):
                 audio_filename = batch["filename"][i]
-                true_is_positive = true_labels[i].item()
+                true_label = true_labels[i].item()
                 original_class = batch.get("original_class", [None] * len(true_labels))[i]
                 if original_class is not None:
                     original_class = original_class if isinstance(original_class, int) else original_class.item()
@@ -176,14 +176,14 @@ def run_binary_inference(model_path,
 
                 result = {
                     "filename": audio_filename,
-                    "true_is_positive": true_is_positive,
-                    "predicted_is_positive": predicted_class,
+                    "true_label": true_label,
+                    "predicted_label": predicted_class,
                     "prediction": prediction_name,
                     "confidence": confidences[i].item(),
                     "entropy": entropies[i].item(),
                     "prob_negative": prob_negative,
                     "prob_positive": prob_positive,
-                    "correct": (true_is_positive == predicted_class),
+                    "correct": (true_label == predicted_class),
                     "original_class": original_class if original_class is not None else -1,
                     "filepath": batch["filepath"][i]
                 }
@@ -197,7 +197,7 @@ def run_binary_inference(model_path,
     positive_predictions = sum(1 for r in results if r["prediction"] == positive_class_name)
     negative_predictions = total_samples - positive_predictions
 
-    true_positives = sum(1 for r in results if r["true_is_positive"] == 1)
+    true_positives = sum(1 for r in results if r["true_label"] == 1)
     true_negatives = total_samples - true_positives
 
     print("\nBinary Classification Results:")
@@ -219,7 +219,7 @@ def run_binary_inference(model_path,
 
     # Save results to CSV
     fieldnames = [
-        "filename", "true_is_positive", "predicted_is_positive", "prediction",
+        "filename", "true_label", "predicted_label", "prediction",
         "confidence", "entropy", "prob_negative", "prob_positive",
         "correct", "original_class", "filepath"
     ]
