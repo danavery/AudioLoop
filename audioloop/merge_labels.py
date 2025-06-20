@@ -4,15 +4,27 @@ import os
 from pathlib import Path
 
 
-def merge_training_sets(original_csv, new_labels_csv, output_csv):
+def merge_training_sets(original_csv, new_labels_csv, output_csv=None):
     """
     Merge original training set with newly labeled samples.
 
     Args:
         original_csv: Path to existing training set (e.g., training_set_v1.csv)
         new_labels_csv: Path to newly labeled samples (candidates CSV with human labels)
-        output_csv: Path for merged training set (e.g., training_set_v2.csv)
+        output_csv: Path for merged training set (auto-generated if None)
+
+    Returns:
+        str: Path to the created output file
     """
+    # Auto-generate output filename if not provided
+    if output_csv is None:
+        base = os.path.splitext(os.path.basename(original_csv))[0]
+        if 'v' in base:
+            version = int(base.split('_v')[1]) + 1
+        else:
+            version = 2
+        output_csv = f"training_sets/training_set_v{version}.csv"
+
     all_data = []
 
     # Read original training set
@@ -106,18 +118,6 @@ def main():
     parser.add_argument('-o', '--output', help='Output merged training set CSV')
 
     args = parser.parse_args()
-
-    if not args.output:
-        # Auto-generate version number
-        base = Path(args.original_csv).stem
-        if base.startswith('training_set_v'):
-            version = int(base.split('_v')[1]) if '_v' in base else 1
-            new_version = version + 1
-        else:
-            new_version = 2
-        output_dir = "training_sets"
-        os.makedirs(output_dir, exist_ok=True)
-        args.output = f"{output_dir}/training_set_v{new_version}.csv"
 
     merge_training_sets(args.original_csv, args.candidates_csv, args.output)
 
