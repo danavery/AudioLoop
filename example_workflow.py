@@ -152,7 +152,7 @@ def run_complete_workflow(class_name, initial_model, num_cycles=2, simulate_huma
 
             if not os.path.exists(next_model):
                 print(f"   ⚠️ Model {next_model} not found")
-                print(f"   💡 Train it with: python -m audioloop.simple_train {new_training_set} {next_model}")
+                print(f"   💡 Train it with: python -m audioloop.simple_train {new_training_set} -v {cycle + 1}")
                 if not simulate_human:
                     input("   Press Enter when model training is complete...")
 
@@ -175,14 +175,14 @@ Examples:
   # Run 3 cycles with manual human labeling
   python example_workflow.py --class-name dog_bark --cycles 3 --no-simulate
 
-  # Use custom model
+  # Use custom initial model
   python example_workflow.py --class-name gun_shot --model outputs/custom_model.pt
         """
     )
 
     parser.add_argument('--class-name', required=True,
                        help='Target class name (e.g., siren, dog_bark, gun_shot)')
-    parser.add_argument('--model', default='outputs/model_v1.pt',
+    parser.add_argument('--model', default=None,
                        help='Initial model path (default: outputs/model_v1.pt)')
     parser.add_argument('--cycles', type=int, default=2,
                        help='Number of active learning cycles (default: 2)')

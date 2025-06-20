@@ -10,16 +10,16 @@ AudioLoop is a generalized active learning framework for binary audio classifica
 
 ```bash
 # List available sound classes
-python -m audioloop.run_active_learning --list-classes
+python -m audioloop.active_learning --list-classes
 
 # Run siren detection with class name
-python -m audioloop.run_active_learning --class-name siren --model outputs/model_v1.pt
+python -m audioloop.active_learning --class-name siren --model outputs/model_v1.pt
 
 # Run dog bark detection with class name
-python -m audioloop.run_active_learning --class-name dog_bark --model outputs/model_v1.pt
+python -m audioloop.active_learning --class-name dog_bark --model outputs/model_v1.pt
 
 # Run gunshot detection with class ID
-python -m audioloop.run_active_learning --class-id 6 --model outputs/model_v1.pt
+python -m audioloop.active_learning --class-id 6 --model outputs/model_v1.pt
 ```
 
 ### Option 2: Python API
@@ -105,6 +105,20 @@ create_training_set(classname="gun_shot", output_path="training_sets/gunshot_v1.
 ```
 
 ### 3. Train Initial Model
+
+**CLI (Command Line):**
+```bash
+# Train on your initial training set
+uv run python -m audioloop.simple_train training_sets/training_set_v1.csv
+
+# With custom options
+uv run python -m audioloop.simple_train training_sets/training_set_v1.csv \
+    --output outputs/model_v1.pt \
+    --epochs 500 \
+    --learning-rate 0.001
+```
+
+**Python API:**
 ```python
 from audioloop.simple_train import run_training
 
@@ -117,8 +131,41 @@ accuracy = run_training(
 ```
 
 ### 4. Run Active Learning Cycle
+
+**CLI (Command Line):**
+```bash
+# Run siren detection
+uv run python -m audioloop.active_learning --class-name siren --model outputs/model_v1.pt
+
+# Run with custom parameters
+uv run python -m audioloop.active_learning \
+    --class-name dog_bark \
+    --model outputs/model_v1.pt \
+    --run-number 2 \
+    --num-positive 15 \
+    --num-negative 5 \
+    --min-confidence 0.85
+
+# Run with class ID instead of name
+uv run python -m audioloop.active_learning --class-id 3 --model outputs/model_v1.pt
+
+# List all available classes
+uv run python -m audioloop.active_learning --list-classes
+```
+
+Available options:
+- `--class-name`: Specify class by name (e.g., siren, dog_bark)
+- `--class-id`: Specify class by ID (0-9)
+- `--model`: Path to trained model (required)
+- `--run-number`: Version number for output files (default: 1)
+- `--negative-name`: Custom name for negative class
+- `--num-positive`: Number of positive candidates (default: 10)
+- `--num-negative`: Number of negative candidates (default: 10)
+- `--min-confidence`: Minimum confidence threshold (default: 0.8)
+
+**Python API:**
 ```python
-from audioloop.active_learning import run_active_learning_cycle
+from audioloop.active_learning import run_active_learning_for_class
 
 # Complete active learning cycle
 predictions_file, candidates_file = run_active_learning_for_class(
@@ -132,6 +179,26 @@ print(f"Candidates for labeling: {candidates_file}")
 ```
 
 ### 5. Human Labeling
+
+AudioLoop includes a simple terminal-based audio labeling tool to streamline this process:
+
+```bash
+# Use the interactive labeling tool
+python -m audioloop.label_audio outputs/labeling_candidates_v1.csv
+
+# If audio files are in a different directory
+python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --audio-dir data/audio
+```
+
+The tool will:
+- Play each audio file automatically
+- Show prediction info (filename, confidence, etc.)
+- Accept simple keyboard commands: `1` for positive, `0` for negative
+- Track your progress and auto-save when you quit
+
+For detailed usage, see `LABELING_GUIDE.md`.
+
+**Manual option:** If you prefer, you can still manually:
 1. Open `outputs/labeling_candidates_v1.csv`
 2. Review the high-confidence predictions
 3. Fill in the `needs_human_label` column with `0` (negative) or `1` (positive)
@@ -227,10 +294,17 @@ for class_name in classes:
 ```bash
 # Process multiple classes via command line
 for class_id in {0..9}; do
-    python -m audioloop.run_active_learning \
+    python -m audioloop.active_learning \
         --class-id $class_id \
         --model outputs/model.pt \
         --run-number 1
+done
+
+# Or process specific classes by name
+for class_name in siren dog_bark gun_shot; do
+    python -m audioloop.active_learning \
+        --class-name $class_name \
+        --model outputs/model.pt
 done
 ```
 
@@ -253,17 +327,17 @@ The complete active learning workflow includes merging human labels back into tr
 
 ```bash
 # 1. Run initial active learning cycle
-python -m audioloop.run_active_learning --class-name siren --model outputs/model_v1.pt
+python -m audioloop.active_learning --class-name siren --model outputs/model_v1.pt
 
 # 2. Human fills in 'needs_human_label' column in outputs/labeling_candidates_v1.csv
 
 # 3. Merge human labels back into training set
-python -m audioloop.merge_labels merge training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv
+python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv
 
 # 4. Train new model with expanded training set (training_sets/training_set_v2.csv)
 
 # 5. Run next cycle with new model
-python -m audioloop.run_active_learning --class-name siren --model outputs/model_v2.pt --run-number 2
+python -m audioloop.active_learning --class-name siren --model outputs/model_v2.pt --run-number 2
 ```
 
 ### Step-by-Step Example
@@ -275,7 +349,7 @@ Here's a complete example of running two active learning cycles for siren detect
 uv run python -m audioloop.create_all_specs
 
 # Cycle 1: Start with initial training set
-python -m audioloop.run_active_learning --class-name siren --model outputs/model_v1.pt --run-number 1
+python -m audioloop.active_learning --class-name siren --model outputs/model_v1.pt --run-number 1
 # → Generates outputs/labeling_candidates_v1.csv
 
 # Human reviews outputs/labeling_candidates_v1.csv and fills in needs_human_label column:
@@ -292,7 +366,7 @@ python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/label
 python -m audioloop.simple_train training_sets/training_set_v2.csv outputs/model_v2.pt
 
 # Cycle 2: Use improved model
-python -m audioloop.run_active_learning --class-name siren --model outputs/model_v2.pt --run-number 2
+python -m audioloop.active_learning --class-name siren --model outputs/model_v2.pt --run-number 2
 # → Generates outputs/labeling_candidates_v2.csv with better predictions
 
 # Continue the process...

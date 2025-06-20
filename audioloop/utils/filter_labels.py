@@ -2,7 +2,7 @@ import argparse
 import csv
 import os
 
-DEFAULT_CSV_PATH = "data/urbansound8k/UrbanSound8k.csv"
+DEFAULT_CSV_PATH = "data/urbansound8k/UrbanSound8K.csv"
 DEFAULT_DATA_DIR = "data/urbansound8k"
 
 def parse_args():

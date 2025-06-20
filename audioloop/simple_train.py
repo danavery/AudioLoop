@@ -1,3 +1,4 @@
+import argparse
 import os
 import random
 import time
@@ -8,7 +9,7 @@ import torch.optim as optim
 from torch import nn
 from torch.utils.data import DataLoader
 
-from .models.simple_cnn import SimpleCNN
+from .models.cnn_5layer import SoundCNN
 from .utils.data_utils import get_device, simple_collate_fn
 from .utils.spectrogram_dataset import SpectrogramDataset
 
@@ -49,8 +50,8 @@ def train_epoch(model, train_loader, optimizer, criterion, device):
 
         running_loss += loss.item()
 
-        # Calculate accuracy
-        _, predicted = torch.max(outputs, dim=1)
+        # Calculate accuracy inline to avoid extra operations
+        _, predicted = torch.max(outputs.detach(), dim=1)
         total += labels.size(0)
         correct += (predicted == labels).sum().item()
 
@@ -63,16 +64,15 @@ def train_epoch(model, train_loader, optimizer, criterion, device):
 
 
 
-def run_training(labels_file="labels.csv", max_epochs=1000, seed=42):
+def run_training(labels_file="labels.csv", max_epochs=1000, seed=43, batch_size=32, learning_rate=1e-3, specs_dir="data/all_specs", model_path=None, version=None, use_batchnorm=None):
     device = get_device()
     print(f"Using device: {device}")
 
     set_seed(seed)
-    accuracy = 0.0  # Initialize accuracy
 
     # Create dataset from precomputed spectrograms
     # Note: This assumes you've run create_all_specs.py first to generate .pt files
-    train_dataset = SpectrogramDataset(csv_file=labels_file)
+    train_dataset = SpectrogramDataset(csv_file=labels_file, specs_dir=specs_dir)
     print(f"Dataset size: {len(train_dataset)}")
 
     # Determine number of classes from the dataset
@@ -80,17 +80,35 @@ def run_training(labels_file="labels.csv", max_epochs=1000, seed=42):
     num_classes = len(set(labels))
     print(f"Number of classes: {num_classes}")
 
+    # Optimize data loader for better performance
+    # num_workers=2 enables parallel data loading
+    # pin_memory=True speeds up GPU transfer
+    # persistent_workers=True avoids worker recreation overhead
     train_loader = DataLoader(
         train_dataset,
-        batch_size=32,
+        batch_size=batch_size,
         shuffle=True,
-        num_workers=0,
-        pin_memory=False,
+        num_workers=0,  # Set to 0 to avoid hanging with persistent workers
+        pin_memory=torch.cuda.is_available(),
         collate_fn=simple_collate_fn
     )
 
-    # Create simpler model for debugging
-    model = SimpleCNN(num_classes=num_classes).to(device)
+    # Decide whether to use BatchNorm based on dataset size
+    if use_batchnorm is None:
+        # Auto-decide: BatchNorm works well with larger datasets but can be problematic
+        # with very small datasets due to poor running statistics estimation
+        use_batchnorm = len(train_dataset) >= 100
+        if len(train_dataset) < 100:
+            print(f"⚠️  Small dataset ({len(train_dataset)} samples) detected - disabling BatchNorm")
+            print("   BatchNorm running statistics are unreliable with <100 samples")
+            print("   This ensures consistent train/eval behavior but may limit performance scaling")
+
+    # Create 5-layer CNN model with appropriate architecture
+    model = SoundCNN(num_classes=num_classes, kernel_size=(3, 3), use_batchnorm=use_batchnorm).to(device)
+    if use_batchnorm:
+        print("Using model WITH BatchNorm (recommended for larger datasets)")
+    else:
+        print("Using model WITHOUT BatchNorm (consistent train/eval behavior)")
 
     # Print basic model info
     sample = train_dataset[0]
@@ -99,7 +117,7 @@ def run_training(labels_file="labels.csv", max_epochs=1000, seed=42):
     print(f"Model created with {sum(p.numel() for p in model.parameters())} parameters")
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-5)
+    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
 
     print("Model parameters:")
     for name, param in model.named_parameters():
@@ -109,36 +127,22 @@ def run_training(labels_file="labels.csv", max_epochs=1000, seed=42):
     print("Target: 100% training accuracy")
     print("-" * 50)
 
+    # Pre-allocate timing list to avoid memory allocation during training
+    epoch_times = []
+
     for epoch in range(max_epochs):
         epoch_start_time = time.time()
         avg_loss, accuracy = train_epoch(model, train_loader, optimizer, criterion, device)
 
         epoch_time = time.time() - epoch_start_time
+        epoch_times.append(epoch_time)
 
-        if epoch % 5 == 0 or accuracy >= 1.0:
+        # Print progress periodically
+        if epoch % 10 == 0 or accuracy >= 1.0 or epoch < 5:
             print(
                 f"Epoch {epoch + 1:4d}/{max_epochs} ({epoch_time:.2f}s) - "
                 f"Loss: {avg_loss:.4f} - Accuracy: {accuracy:.4f} ({accuracy*100:.2f}%)"
             )
-
-            # Debug: print a few predictions
-            if epoch % 10 == 0:
-                model.eval()
-                with torch.no_grad():
-                    sample_batch = next(iter(train_loader))
-                    features = sample_batch["data"].to(device)
-                    labels = sample_batch["label"].to(device)
-                    if features.ndim == 3:
-                        features = features.unsqueeze(1)
-
-                    outputs = model(features)
-                    probs = F.softmax(outputs, dim=-1)
-                    preds = torch.argmax(probs, dim=-1)
-
-                    for i in range(min(3, len(labels))):
-                        print(f"    Sample {i}: True={labels[i].item()}, Pred={preds[i].item()}, "
-                              f"Conf={torch.max(probs[i]).item():.3f}")
-                model.train()
 
         # Check if we've reached 100% accuracy
         if accuracy >= 1.0:
@@ -147,29 +151,62 @@ def run_training(labels_file="labels.csv", max_epochs=1000, seed=42):
             print("🎉 Reached 100% training accuracy!")
             print(f"Training completed in {epoch + 1} epochs")
             print("=" * 60)
-
-            # Save the final model
-            os.makedirs("outputs", exist_ok=True)
-            model_path = f"outputs/model_100pct_seed_{seed}.pt"
-            torch.save(model.state_dict(), model_path)
-            print(f"Model saved to: {model_path}")
             break
     else:
         print(f"\nTraining completed {max_epochs} epochs. Final accuracy: {accuracy:.4f}")
-        # Save the final model even if we didn't reach 100%
-        os.makedirs("outputs", exist_ok=True)
-        model_path = f"outputs/model_final_seed_{seed}.pt"
-        torch.save(model.state_dict(), model_path)
-        print(f"Model saved to: {model_path}")
+
+    # Always save the final model regardless of how training ended
+    os.makedirs("outputs", exist_ok=True)
+    if model_path is None:
+        # Always use version number (defaults to 1)
+        model_path = f"outputs/model_v{version}.pt"
+    torch.save(model.state_dict(), model_path)
+    print(f"Model saved to: {model_path}")
+
+    # Clean up and return
+    del train_loader
+    del model
+    torch.cuda.empty_cache() if torch.cuda.is_available() else None
 
     return accuracy
 
 
 if __name__ == "__main__":
-    # Simple training run
-    final_accuracy = run_training(
-        labels_file="labels.csv",
-        max_epochs=1000,
-        seed=42
+    parser = argparse.ArgumentParser(description="Train a binary audio classification model")
+    parser.add_argument("labels_file", help="Path to CSV file with training labels")
+    parser.add_argument("-o", "--output", help="Path to save trained model (default: auto-generated in outputs/)")
+    parser.add_argument("-v", "--version", type=int, help="Model version number (default: auto-detected from training set filename)")
+    parser.add_argument("-e", "--epochs", type=int, default=1000, help="Maximum training epochs (default: 1000)")
+    parser.add_argument("-s", "--seed", type=int, default=42, help="Random seed (default: 42)")
+    parser.add_argument("-b", "--batch-size", type=int, default=32, help="Batch size (default: 32)")
+    parser.add_argument("-lr", "--learning-rate", type=float, default=0.001, help="Learning rate (default: 0.001)")
+    parser.add_argument("--specs-dir", default="data/all_specs", help="Directory containing spectrogram files (default: data/all_specs)")
+    parser.add_argument("--no-batchnorm", action="store_true", help="Disable BatchNorm (auto-disabled for <100 samples)")
+
+    args = parser.parse_args()
+
+    # Auto-detect version from training set filename if not specified
+    if args.version is None:
+        import re
+        # Try to extract version from filename like training_set_v2.csv
+        match = re.search(r'_v(\d+)\.csv$', args.labels_file)
+        if match:
+            args.version = int(match.group(1))
+            print(f"Auto-detected version {args.version} from training set filename")
+        else:
+            args.version = 1
+            print(f"Could not detect version from filename, defaulting to version 1")
+
+    # Run training with CLI arguments
+    accuracy = run_training(
+        labels_file=args.labels_file,
+        max_epochs=args.epochs,
+        seed=args.seed,
+        batch_size=args.batch_size,
+        learning_rate=args.learning_rate,
+        specs_dir=args.specs_dir,
+        model_path=args.output,
+        version=args.version,
+        use_batchnorm=False if args.no_batchnorm else None
     )
-    print(f"\nFinal training accuracy: {final_accuracy:.4f}")
+    print(f"\nFinal training accuracy: {accuracy:.4f}")

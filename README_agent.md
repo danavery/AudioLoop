@@ -16,6 +16,10 @@ Traditional supervised learning requires large labeled datasets. Active learning
 4. **Human feedback**: Get labels for these carefully selected samples
 5. **Repeat**: Add new labels to training set and iterate
 
+## Quick Start
+
+For a complete guide to the versioned workflow, see [WORKFLOW_GUIDE.md](WORKFLOW_GUIDE.md).
+
 ## Project Structure
 
 ```
@@ -25,7 +29,6 @@ audioloop/
 │   ├── merge_labels.py          # Label management utilities for active learning cycles
 │   ├── simple_train.py          # Model training logic
 │   ├── test_model.py            # Model validation on training data
-│   ├── run_active_learning.py   # Command-line interface for active learning
 │   ├── urbansound_classes.py    # UrbanSound8K class definitions
 │   ├── create_all_specs.py      # Spectrogram generation for full dataset
 │   ├── models/                  # Model architectures
@@ -112,24 +115,23 @@ predictions_file, candidates_file = run_active_learning_cycle(
 )
 ```
 
-### 6. Command Line Interface
+### Command-Line Interface
 
 ```bash
 # Run siren detection with class name
-python -m audioloop.run_active_learning --class-name siren --model outputs/model_v1.pt
+python -m audioloop.active_learning --class-name siren --model outputs/model_v1.pt
 
 # Run dog bark detection with class ID
-python -m audioloop.run_active_learning --class-id 3 --model outputs/model_v1.pt
+python -m audioloop.active_learning --class-id 3 --model outputs/model_v1.pt
 
 # List all UrbanSound8K classes
-python -m audioloop.run_active_learning --list-classes
+python -m audioloop.active_learning --list-classes
 ```
 
 ## Key Files and Scripts
 
 ### Core Workflow
-- **`active_learning.py`**: Generalized active learning pipeline for any binary classification
-- **`run_active_learning.py`**: Command-line interface for running cycles
+- **`active_learning.py`**: Generalized active learning pipeline for any binary classification (includes CLI)
 - **`urbansound_classes.py`**: Class definitions and utility functions
 - **`simple_train.py`**: Training loop with early stopping at 100% accuracy
 - **`test_model.py`**: Validates model performance on training data
