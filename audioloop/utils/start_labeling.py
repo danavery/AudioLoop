@@ -1,34 +1,40 @@
 import os
 import random
+import argparse
 
 from .filter_labels import get_matching_paths_from_csv
 
 
-def write_starting_labels(n=10, classname="siren"):
+def write_starting_labels(n_positive=10, n_negative=10, classname="siren"):
     """Create initial training set for any class.
 
     Args:
-        n: Number of positive and negative samples each
+        n_positive: Number of positive samples
+        n_negative: Number of negative samples
         classname: UrbanSound8K class name for positive class
 
     Returns:
         (positives, negatives): Lists of file paths
     """
-    positives = random.sample(get_matching_paths_from_csv(classnames=[classname]), k=n)
-    negatives = random.sample(get_matching_paths_from_csv(classnames=[classname], invert=True), k=n)
+    positives = random.sample(get_matching_paths_from_csv(classnames=[classname]), k=n_positive)
+    negatives = random.sample(get_matching_paths_from_csv(classnames=[classname], invert=True), k=n_negative)
     return positives, negatives
 
 
-def create_training_set(n=10, classname="siren", output_path="training_sets/training_set_v1.csv", run=1):
+def create_training_set(n=10, classname="siren", output_path="training_sets/training_set_v1.csv", run=1, positive_percentage=0.5):
     """Create training set CSV file for any class.
 
     Args:
-        n: Number of positive and negative samples each
+        n: Total number of samples
         classname: UrbanSound8K class name for positive class
         output_path: Path to save training set CSV
         run: Run number for training set versioning
+        positive_percentage: Percentage of samples that should be positive (0.0-1.0)
     """
-    positives, negatives = write_starting_labels(n, classname)
+    n_positive = int(n * positive_percentage)
+    n_negative = n - n_positive
+
+    positives, negatives = write_starting_labels(n_positive, n_negative, classname)
 
     # Format entries
     positive_entries = [f"{p},1,{run}" for p in positives]
@@ -49,9 +55,24 @@ def create_training_set(n=10, classname="siren", output_path="training_sets/trai
 
     print(f"Created training set: {output_path}")
     print(f"  {len(positives)} {classname} samples, {len(negatives)} non-{classname} samples")
+    print(f"  Positive percentage: {len(positives)/(len(positives)+len(negatives)):.1%}")
 
     return positives, negatives
 
+
 if __name__ == "__main__":
-    # Default behavior - create siren training set
-    create_training_set()
+    import argparse
+    parser = argparse.ArgumentParser(description="Create initial training sets")
+    parser.add_argument("--classname", default="siren", help="UrbanSound8K class name")
+    parser.add_argument("--n", type=int, default=40, help="Total number of samples")
+    parser.add_argument("--positive-pct", type=float, default=0.75, help="Percentage positive (0.0-1.0, default 0.6 for imbalanced)")
+    parser.add_argument("--output", default="training_sets/training_set_v1.csv", help="Output path")
+
+    args = parser.parse_args()
+
+    create_training_set(
+        n=args.n,
+        classname=args.classname,
+        output_path=args.output,
+        positive_percentage=args.positive_pct
+    )

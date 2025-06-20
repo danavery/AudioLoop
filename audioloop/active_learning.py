@@ -261,7 +261,8 @@ def run_binary_inference(model_path,
 
 
 def select_candidates_for_labeling(predictions_file="outputs/predictions.csv",
-                                 num_positive=10, num_negative=10,
+                                 total_candidates=20,
+                                 positive_percentage=0.80,
                                  min_confidence=0.8,
                                  candidates_csv="outputs/labeling_candidates.csv",
                                  positive_class_name="positive",
@@ -269,12 +270,12 @@ def select_candidates_for_labeling(predictions_file="outputs/predictions.csv",
                                  candidate_pool_multiplier=5):
     """
     Select predictions for human labeling in active learning.
-    Uses adaptive thresholds to ensure both positive and negative examples.
+    Uses percentage-based selection to focus on positive predictions for imbalanced datasets.
 
     Args:
         predictions_file: CSV file with model predictions
-        num_positive: Number of positive predictions to select
-        num_negative: Number of negative predictions to select
+        total_candidates: Total number of candidates to select
+        positive_percentage: Percentage of candidates that should be positive predictions (0.0-1.0)
         min_confidence: Initial minimum confidence threshold
         candidates_csv: Output file for candidates
         positive_class_name: Name for positive class
@@ -293,6 +294,10 @@ def select_candidates_for_labeling(predictions_file="outputs/predictions.csv",
             row['confidence'] = float(row['confidence'])
             row['entropy'] = float(row['entropy'])
             predictions.append(row)
+
+    # Calculate numbers based on percentage
+    num_positive = int(total_candidates * positive_percentage)
+    num_negative = total_candidates - num_positive
 
     # Separate positive and negative predictions
     positive_preds = [p for p in predictions if p['prediction'] == positive_class_name]
@@ -572,8 +577,8 @@ def run_active_learning_cycle(positive_class_id=8,
                              model_path=None,
                              urbansound_file="data/urbansound8k/UrbanSound8K.csv",
                              run_number=1,
-                             num_positive=10,
-                             num_negative=10,
+                             total_candidates=20,
+                             positive_percentage=0.75,
                              min_confidence=0.8):
     """
     Run a complete active learning cycle for binary classification.
@@ -585,6 +590,8 @@ def run_active_learning_cycle(positive_class_id=8,
         model_path: Path to trained model (default: outputs/model_v{run_number}.pt)
         urbansound_file: Path to UrbanSound8K metadata
         run_number: Version number for output files (e.g., 1 creates v1 files)
+        total_candidates: Total number of candidates to select
+        positive_percentage: Percentage of candidates that should be positive predictions
 
     Returns:
         tuple: (predictions_file, candidates_file)
@@ -624,8 +631,8 @@ def run_active_learning_cycle(positive_class_id=8,
 
     _ = select_candidates_for_labeling(
         predictions_file=predictions_file,
-        num_positive=num_positive,
-        num_negative=num_negative,
+        total_candidates=total_candidates,
+        positive_percentage=positive_percentage,
         min_confidence=min_confidence,
         candidates_csv=candidates_file,
         positive_class_name=positive_class_name,
@@ -647,8 +654,8 @@ def run_active_learning_for_class(positive_class_name,
                                 negative_class_name=None,
                                 urbansound_file="data/urbansound8k/UrbanSound8K.csv",
                                 run_number=1,
-                                num_positive=10,
-                                num_negative=10,
+                                total_candidates=20,
+                                positive_percentage=0.75,
                                 min_confidence=0.8):
     """
     Simplified active learning cycle - just provide the class name.
@@ -659,8 +666,8 @@ def run_active_learning_for_class(positive_class_name,
         negative_class_name: Name for negative class (auto-generated if None)
         urbansound_file: Path to UrbanSound8K metadata
         run_number: Version number for output files
-        num_positive: Number of positive candidates to select
-        num_negative: Number of negative candidates to select
+        total_candidates: Total number of candidates to select
+        positive_percentage: Percentage of candidates that should be positive predictions (0.0-1.0)
         min_confidence: Minimum confidence threshold for candidate selection
 
     Returns:
@@ -685,8 +692,8 @@ def run_active_learning_for_class(positive_class_name,
         model_path=model_path,
         urbansound_file=urbansound_file,
         run_number=run_number,
-        num_positive=num_positive,
-        num_negative=num_negative,
+        total_candidates=total_candidates,
+        positive_percentage=positive_percentage,
         min_confidence=min_confidence
     )
 
@@ -770,10 +777,10 @@ Examples:
                        help='Version number for output files (default: 1)')
     parser.add_argument('--negative-name', type=str,
                        help='Custom name for negative class (default: not_<positive_class_name>)')
-    parser.add_argument('--num-positive', type=int, default=10,
-                       help='Number of positive candidates to select (default: 10)')
-    parser.add_argument('--num-negative', type=int, default=10,
-                       help='Number of negative candidates to select (default: 10)')
+    parser.add_argument('--total-candidates', type=int, default=20,
+                       help='Total number of candidates to select (default: 20)')
+    parser.add_argument('--positive-pct', type=float, default=0.75,
+                       help='Percentage of candidates that should be positive predictions (default: 0.75 for imbalanced)')
     parser.add_argument('--min-confidence', type=float, default=0.8,
                        help='Minimum confidence threshold for candidate selection (default: 0.8)')
     parser.add_argument('--urbansound-file', type=str, default="data/urbansound8k/UrbanSound8K.csv",
@@ -825,7 +832,9 @@ Examples:
     print(f"Negative class: {negative_class_name}")
     print(f"Model: {args.model}")
     print(f"Run number: {args.run_number}")
-    print(f"Candidates: {args.num_positive} positive, {args.num_negative} negative")
+    num_positive = int(args.total_candidates * args.positive_pct)
+    num_negative = args.total_candidates - num_positive
+    print(f"Candidates: {num_positive} positive, {num_negative} negative ({args.positive_pct:.0%} positive)")
     print(f"Min confidence: {args.min_confidence}")
     print("-" * 60)
 
@@ -837,8 +846,8 @@ Examples:
         model_path=args.model,
         urbansound_file=args.urbansound_file,
         run_number=args.run_number,
-        num_positive=args.num_positive,
-        num_negative=args.num_negative,
+        total_candidates=args.total_candidates,
+        positive_percentage=args.positive_pct,
         min_confidence=args.min_confidence
     )
 
