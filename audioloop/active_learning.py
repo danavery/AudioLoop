@@ -8,7 +8,6 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from .merge_labels import merge_training_sets
 from .models.cnn_5layer import SoundCNN
 from .urbansound_classes import (
     CLASS_NAME_TO_ID,
@@ -18,6 +17,131 @@ from .urbansound_classes import (
 )
 from .utils.data_utils import entropy, get_device, variable_length_collate_fn
 from .utils.spectrogram_dataset import SpectrogramDataset
+
+
+def calculate_percentiles(values, percentiles=[10, 25, 50, 75, 90, 95]):
+    """Calculate percentiles for a list of values."""
+    if not values:
+        return {p: 0 for p in percentiles}
+    sorted_values = sorted(values)
+    n = len(sorted_values)
+    result = {}
+    for p in percentiles:
+        index = int((p / 100) * (n - 1))
+        result[p] = sorted_values[index]
+    return result
+
+
+def print_confidence_distribution(predictions, class_name):
+    """Print detailed confidence distribution for a class."""
+    if not predictions:
+        print(f"No {class_name} predictions to analyze")
+        return
+
+    confidences = [p['confidence'] for p in predictions]
+    percentiles = calculate_percentiles(confidences)
+
+    print(f"\n{class_name.title()} Prediction Confidence Distribution ({len(predictions)} samples):")
+    print(f"  Mean: {sum(confidences)/len(confidences):.3f}")
+    print(f"  Min:  {min(confidences):.3f}")
+    print(f"  10th: {percentiles[10]:.3f}")
+    print(f"  25th: {percentiles[25]:.3f}")
+    print(f"  50th: {percentiles[50]:.3f}")
+    print(f"  75th: {percentiles[75]:.3f}")
+    print(f"  90th: {percentiles[90]:.3f}")
+    print(f"  95th: {percentiles[95]:.3f}")
+    print(f"  Max:  {max(confidences):.3f}")
+
+    # Confidence ranges
+    high_conf = sum(1 for c in confidences if c >= 0.8)
+    very_high_conf = sum(1 for c in confidences if c >= 0.9)
+    ultra_high_conf = sum(1 for c in confidences if c >= 0.95)
+
+    print(f"  High confidence (≥0.8):  {high_conf}/{len(confidences)} ({high_conf/len(confidences):.1%})")
+    print(f"  Very high conf (≥0.9):   {very_high_conf}/{len(confidences)} ({very_high_conf/len(confidences):.1%})")
+    print(f"  Ultra high conf (≥0.95): {ultra_high_conf}/{len(confidences)} ({ultra_high_conf/len(confidences):.1%})")
+
+
+def save_confidence_stats(predictions_file, positive_preds, negative_preds,
+                         positive_class_name, negative_class_name,
+                         overall_accuracy, positive_accuracy, negative_accuracy,
+                         avg_confidence, min_conf, max_conf, high_conf_percentage):
+    """Save detailed confidence distribution statistics to a file."""
+    import re
+
+    # Extract version/run number from predictions filename for stats filename
+    version_match = re.search(r'_v(\d+)', predictions_file)
+    version_suffix = f"_v{version_match.group(1)}" if version_match else ""
+
+    stats_file = f"outputs/confidence_stats{version_suffix}.txt"
+
+    with open(stats_file, 'w') as f:
+        f.write(f"Confidence Distribution Statistics{version_suffix}\n")
+        f.write("=" * 50 + "\n\n")
+
+        # Overall model performance
+        f.write("Model Performance Summary:\n")
+        f.write(f"Overall Accuracy: {overall_accuracy:.3f}\n")
+        f.write(f"True {positive_class_name} Accuracy: {positive_accuracy:.3f}\n")
+        f.write(f"True {negative_class_name} Accuracy: {negative_accuracy:.3f}\n")
+        f.write(f"Overall Confidence: avg={avg_confidence:.3f}, range={min_conf:.3f}-{max_conf:.3f}\n")
+        f.write(f"High confidence samples (≥0.8): {high_conf_percentage:.1%}\n\n")
+
+        # Predicted positive class distribution
+        if positive_preds:
+            pos_confidences = [p['confidence'] for p in positive_preds]
+            pos_percentiles = calculate_percentiles(pos_confidences)
+
+            f.write(f"Predicted {positive_class_name.title()} Distribution ({len(positive_preds)} samples):\n")
+            f.write(f"  Mean: {sum(pos_confidences)/len(pos_confidences):.3f}\n")
+            f.write(f"  Min:  {min(pos_confidences):.3f}\n")
+            f.write(f"  10th: {pos_percentiles[10]:.3f}\n")
+            f.write(f"  25th: {pos_percentiles[25]:.3f}\n")
+            f.write(f"  50th: {pos_percentiles[50]:.3f}\n")
+            f.write(f"  75th: {pos_percentiles[75]:.3f}\n")
+            f.write(f"  90th: {pos_percentiles[90]:.3f}\n")
+            f.write(f"  95th: {pos_percentiles[95]:.3f}\n")
+            f.write(f"  Max:  {max(pos_confidences):.3f}\n")
+
+            pos_high_conf = sum(1 for c in pos_confidences if c >= 0.8)
+            pos_very_high_conf = sum(1 for c in pos_confidences if c >= 0.9)
+            pos_ultra_high_conf = sum(1 for c in pos_confidences if c >= 0.95)
+
+            f.write(f"  High confidence (≥0.8):  {pos_high_conf}/{len(pos_confidences)} ({pos_high_conf/len(pos_confidences):.1%})\n")
+            f.write(f"  Very high conf (≥0.9):   {pos_very_high_conf}/{len(pos_confidences)} ({pos_very_high_conf/len(pos_confidences):.1%})\n")
+            f.write(f"  Ultra high conf (≥0.95): {pos_ultra_high_conf}/{len(pos_confidences)} ({pos_ultra_high_conf/len(pos_confidences):.1%})\n\n")
+
+        # Predicted negative class distribution
+        if negative_preds:
+            neg_confidences = [p['confidence'] for p in negative_preds]
+            neg_percentiles = calculate_percentiles(neg_confidences)
+
+            f.write(f"Predicted {negative_class_name.title()} Distribution ({len(negative_preds)} samples):\n")
+            f.write(f"  Mean: {sum(neg_confidences)/len(neg_confidences):.3f}\n")
+            f.write(f"  Min:  {min(neg_confidences):.3f}\n")
+            f.write(f"  10th: {neg_percentiles[10]:.3f}\n")
+            f.write(f"  25th: {neg_percentiles[25]:.3f}\n")
+            f.write(f"  50th: {neg_percentiles[50]:.3f}\n")
+            f.write(f"  75th: {neg_percentiles[75]:.3f}\n")
+            f.write(f"  90th: {neg_percentiles[90]:.3f}\n")
+            f.write(f"  95th: {neg_percentiles[95]:.3f}\n")
+            f.write(f"  Max:  {max(neg_confidences):.3f}\n")
+
+            neg_high_conf = sum(1 for c in neg_confidences if c >= 0.8)
+            neg_very_high_conf = sum(1 for c in neg_confidences if c >= 0.9)
+            neg_ultra_high_conf = sum(1 for c in neg_confidences if c >= 0.95)
+
+            f.write(f"  High confidence (≥0.8):  {neg_high_conf}/{len(neg_confidences)} ({neg_high_conf/len(neg_confidences):.1%})\n")
+            f.write(f"  Very high conf (≥0.9):   {neg_very_high_conf}/{len(neg_confidences)} ({neg_very_high_conf/len(neg_confidences):.1%})\n")
+            f.write(f"  Ultra high conf (≥0.95): {neg_ultra_high_conf}/{len(neg_confidences)} ({neg_ultra_high_conf/len(neg_confidences):.1%})\n\n")
+
+        # Prediction counts
+        f.write("Prediction Counts:\n")
+        f.write(f"Predicted {positive_class_name}: {len(positive_preds)}\n")
+        f.write(f"Predicted {negative_class_name}: {len(negative_preds)}\n")
+        f.write(f"Total predictions: {len(positive_preds) + len(negative_preds)}\n")
+
+    print(f"Confidence statistics saved to: {stats_file}")
 
 
 def load_model(model_path, num_classes, device):
@@ -377,48 +501,6 @@ def select_candidates_for_labeling(predictions_file="outputs/predictions.csv",
     positive_accuracy = positive_correct / len(true_positive_samples) if len(true_positive_samples) > 0 else 0
     negative_accuracy = negative_correct / len(true_negative_samples) if len(true_negative_samples) > 0 else 0
 
-    # Calculate confidence distribution statistics
-    def calculate_percentiles(values, percentiles=[10, 25, 50, 75, 90, 95]):
-        """Calculate percentiles for a list of values."""
-        if not values:
-            return {p: 0 for p in percentiles}
-        sorted_values = sorted(values)
-        n = len(sorted_values)
-        result = {}
-        for p in percentiles:
-            index = int((p / 100) * (n - 1))
-            result[p] = sorted_values[index]
-        return result
-
-    def print_confidence_distribution(predictions, class_name):
-        """Print detailed confidence distribution for a class."""
-        if not predictions:
-            print(f"No {class_name} predictions to analyze")
-            return
-
-        confidences = [p['confidence'] for p in predictions]
-        percentiles = calculate_percentiles(confidences)
-
-        print(f"\n{class_name.title()} Prediction Confidence Distribution ({len(predictions)} samples):")
-        print(f"  Mean: {sum(confidences)/len(confidences):.3f}")
-        print(f"  Min:  {min(confidences):.3f}")
-        print(f"  10th: {percentiles[10]:.3f}")
-        print(f"  25th: {percentiles[25]:.3f}")
-        print(f"  50th: {percentiles[50]:.3f}")
-        print(f"  75th: {percentiles[75]:.3f}")
-        print(f"  90th: {percentiles[90]:.3f}")
-        print(f"  95th: {percentiles[95]:.3f}")
-        print(f"  Max:  {max(confidences):.3f}")
-
-        # Confidence ranges
-        high_conf = sum(1 for c in confidences if c >= 0.8)
-        very_high_conf = sum(1 for c in confidences if c >= 0.9)
-        ultra_high_conf = sum(1 for c in confidences if c >= 0.95)
-
-        print(f"  High confidence (≥0.8):  {high_conf}/{len(confidences)} ({high_conf/len(confidences):.1%})")
-        print(f"  Very high conf (≥0.9):   {very_high_conf}/{len(confidences)} ({very_high_conf/len(confidences):.1%})")
-        print(f"  Ultra high conf (≥0.95): {ultra_high_conf}/{len(confidences)} ({ultra_high_conf/len(confidences):.1%})")
-
     # Overall statistics
     all_confidences = [p['confidence'] for p in all_predictions]
     high_conf_count = sum(1 for conf in all_confidences if conf >= min_confidence)
@@ -429,98 +511,17 @@ def select_candidates_for_labeling(predictions_file="outputs/predictions.csv",
     max_conf = max(all_confidences) if all_confidences else 0
 
     print("\nModel Performance Summary:")
-    print(f"Overall Accuracy: {overall_accuracy:.3f} ({correct_predictions}/{total_samples})")
-    print(f"True {positive_class_name} Accuracy: {positive_accuracy:.3f} ({positive_correct}/{len(true_positive_samples)})")
-    print(f"True {negative_class_name} Accuracy: {negative_accuracy:.3f} ({negative_correct}/{len(true_negative_samples)})")
-    print(f"Confidence Stats: avg={avg_confidence:.3f}, range={min_conf:.3f}-{max_conf:.3f}")
-    print(f"High confidence samples (>={min_confidence}): {high_conf_count}/{total_samples} ({high_conf_percentage:.1%})")
+    print(f"Overall Accuracy: {overall_accuracy:.3f}")
+    print(f"True {positive_class_name} Accuracy: {positive_accuracy:.3f}")
+    print(f"True {negative_class_name} Accuracy: {negative_accuracy:.3f}")
+    print(f"Overall Confidence: avg={avg_confidence:.3f}, range={min_conf:.3f}-{max_conf:.3f}")
+    print(f"High confidence samples (≥{min_confidence}): {high_conf_count}/{total_samples} ({high_conf_percentage:.1%})")
 
-    # Detailed confidence distributions by predicted class
-    print_confidence_distribution(positive_preds, f"predicted {positive_class_name}")
-    print_confidence_distribution(negative_preds, f"predicted {negative_class_name}")
+    # Show confidence distribution for each class
+    print_confidence_distribution(positive_preds, positive_class_name)
+    print_confidence_distribution(negative_preds, negative_class_name)
 
     # Save detailed statistics to file
-    def save_confidence_stats(predictions_file, positive_preds, negative_preds,
-                            positive_class_name, negative_class_name,
-                            overall_accuracy, positive_accuracy, negative_accuracy,
-                            avg_confidence, min_conf, max_conf, high_conf_percentage):
-        """Save detailed confidence distribution statistics to a file."""
-        import re
-
-        # Extract version/run number from predictions filename for stats filename
-        version_match = re.search(r'_v(\d+)', predictions_file)
-        version_suffix = f"_v{version_match.group(1)}" if version_match else ""
-
-        stats_file = f"outputs/confidence_stats{version_suffix}.txt"
-
-        with open(stats_file, 'w') as f:
-            f.write(f"Confidence Distribution Statistics{version_suffix}\n")
-            f.write("=" * 50 + "\n\n")
-
-            # Overall model performance
-            f.write("Model Performance Summary:\n")
-            f.write(f"Overall Accuracy: {overall_accuracy:.3f}\n")
-            f.write(f"True {positive_class_name} Accuracy: {positive_accuracy:.3f}\n")
-            f.write(f"True {negative_class_name} Accuracy: {negative_accuracy:.3f}\n")
-            f.write(f"Overall Confidence: avg={avg_confidence:.3f}, range={min_conf:.3f}-{max_conf:.3f}\n")
-            f.write(f"High confidence samples (≥0.8): {high_conf_percentage:.1%}\n\n")
-
-            # Predicted positive class distribution
-            if positive_preds:
-                pos_confidences = [p['confidence'] for p in positive_preds]
-                pos_percentiles = calculate_percentiles(pos_confidences)
-
-                f.write(f"Predicted {positive_class_name.title()} Distribution ({len(positive_preds)} samples):\n")
-                f.write(f"  Mean: {sum(pos_confidences)/len(pos_confidences):.3f}\n")
-                f.write(f"  Min:  {min(pos_confidences):.3f}\n")
-                f.write(f"  10th: {pos_percentiles[10]:.3f}\n")
-                f.write(f"  25th: {pos_percentiles[25]:.3f}\n")
-                f.write(f"  50th: {pos_percentiles[50]:.3f}\n")
-                f.write(f"  75th: {pos_percentiles[75]:.3f}\n")
-                f.write(f"  90th: {pos_percentiles[90]:.3f}\n")
-                f.write(f"  95th: {pos_percentiles[95]:.3f}\n")
-                f.write(f"  Max:  {max(pos_confidences):.3f}\n")
-
-                pos_high_conf = sum(1 for c in pos_confidences if c >= 0.8)
-                pos_very_high_conf = sum(1 for c in pos_confidences if c >= 0.9)
-                pos_ultra_high_conf = sum(1 for c in pos_confidences if c >= 0.95)
-
-                f.write(f"  High confidence (≥0.8):  {pos_high_conf}/{len(pos_confidences)} ({pos_high_conf/len(pos_confidences):.1%})\n")
-                f.write(f"  Very high conf (≥0.9):   {pos_very_high_conf}/{len(pos_confidences)} ({pos_very_high_conf/len(pos_confidences):.1%})\n")
-                f.write(f"  Ultra high conf (≥0.95): {pos_ultra_high_conf}/{len(pos_confidences)} ({pos_ultra_high_conf/len(pos_confidences):.1%})\n\n")
-
-            # Predicted negative class distribution
-            if negative_preds:
-                neg_confidences = [p['confidence'] for p in negative_preds]
-                neg_percentiles = calculate_percentiles(neg_confidences)
-
-                f.write(f"Predicted {negative_class_name.title()} Distribution ({len(negative_preds)} samples):\n")
-                f.write(f"  Mean: {sum(neg_confidences)/len(neg_confidences):.3f}\n")
-                f.write(f"  Min:  {min(neg_confidences):.3f}\n")
-                f.write(f"  10th: {neg_percentiles[10]:.3f}\n")
-                f.write(f"  25th: {neg_percentiles[25]:.3f}\n")
-                f.write(f"  50th: {neg_percentiles[50]:.3f}\n")
-                f.write(f"  75th: {neg_percentiles[75]:.3f}\n")
-                f.write(f"  90th: {neg_percentiles[90]:.3f}\n")
-                f.write(f"  95th: {neg_percentiles[95]:.3f}\n")
-                f.write(f"  Max:  {max(neg_confidences):.3f}\n")
-
-                neg_high_conf = sum(1 for c in neg_confidences if c >= 0.8)
-                neg_very_high_conf = sum(1 for c in neg_confidences if c >= 0.9)
-                neg_ultra_high_conf = sum(1 for c in neg_confidences if c >= 0.95)
-
-                f.write(f"  High confidence (≥0.8):  {neg_high_conf}/{len(neg_confidences)} ({neg_high_conf/len(neg_confidences):.1%})\n")
-                f.write(f"  Very high conf (≥0.9):   {neg_very_high_conf}/{len(neg_confidences)} ({neg_very_high_conf/len(neg_confidences):.1%})\n")
-                f.write(f"  Ultra high conf (≥0.95): {neg_ultra_high_conf}/{len(neg_confidences)} ({neg_ultra_high_conf/len(neg_confidences):.1%})\n\n")
-
-            # Prediction counts
-            f.write("Prediction Counts:\n")
-            f.write(f"Predicted {positive_class_name}: {len(positive_preds)}\n")
-            f.write(f"Predicted {negative_class_name}: {len(negative_preds)}\n")
-            f.write(f"Total predictions: {len(positive_preds) + len(negative_preds)}\n")
-
-        print(f"Confidence statistics saved to: {stats_file}")
-
     save_confidence_stats(predictions_file, positive_preds, negative_preds,
                          positive_class_name, negative_class_name,
                          overall_accuracy, positive_accuracy, negative_accuracy,
