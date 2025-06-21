@@ -65,11 +65,6 @@ def list_classes():
         print(f"{class_id}: {name}")
 
 
-
-
-
-
-
 if __name__ == "__main__":
     # Demo the module
     print("UrbanSound8K Classes Demo")

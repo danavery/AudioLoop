@@ -129,7 +129,7 @@ def run_training(labels_file="labels.csv", max_epochs=1000, seed=43, batch_size=
 
     # Pre-allocate timing list to avoid memory allocation during training
     epoch_times = []
-
+    accuracy = 0.0
     for epoch in range(max_epochs):
         epoch_start_time = time.time()
         avg_loss, accuracy = train_epoch(model, train_loader, optimizer, criterion, device)

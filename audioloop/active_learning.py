@@ -10,9 +10,9 @@ from tqdm import tqdm
 
 from .models.cnn_5layer import SoundCNN
 from .urbansound_classes import (
-    CLASS_NAME_TO_ID,
-    URBANSOUND8K_CLASSES,
     get_class_id,
+    get_class_name,
+    list_classes,
 )
 from .utils.data_utils import entropy, get_device, variable_length_collate_fn
 from .utils.spectrogram_dataset import SpectrogramDataset
@@ -31,34 +31,53 @@ def calculate_percentiles(values, percentiles=[10, 25, 50, 75, 90, 95]):
     return result
 
 
-def print_confidence_distribution(predictions, class_name):
-    """Print detailed confidence distribution for a class."""
+def analyze_confidence_distribution(predictions, class_name):
+    """Analyze confidence distribution and return statistics."""
     if not predictions:
-        print(f"No {class_name} predictions to analyze")
-        return
+        return None
 
     confidences = [p['confidence'] for p in predictions]
     percentiles = calculate_percentiles(confidences)
 
-    print(f"\n{class_name.title()} Prediction Confidence Distribution ({len(predictions)} samples):")
-    print(f"  Mean: {sum(confidences)/len(confidences):.3f}")
-    print(f"  Min:  {min(confidences):.3f}")
-    print(f"  10th: {percentiles[10]:.3f}")
-    print(f"  25th: {percentiles[25]:.3f}")
-    print(f"  50th: {percentiles[50]:.3f}")
-    print(f"  75th: {percentiles[75]:.3f}")
-    print(f"  90th: {percentiles[90]:.3f}")
-    print(f"  95th: {percentiles[95]:.3f}")
-    print(f"  Max:  {max(confidences):.3f}")
-
-    # Confidence ranges
     high_conf = sum(1 for c in confidences if c >= 0.8)
     very_high_conf = sum(1 for c in confidences if c >= 0.9)
     ultra_high_conf = sum(1 for c in confidences if c >= 0.95)
 
-    print(f"  High confidence (≥0.8):  {high_conf}/{len(confidences)} ({high_conf/len(confidences):.1%})")
-    print(f"  Very high conf (≥0.9):   {very_high_conf}/{len(confidences)} ({very_high_conf/len(confidences):.1%})")
-    print(f"  Ultra high conf (≥0.95): {ultra_high_conf}/{len(confidences)} ({ultra_high_conf/len(confidences):.1%})")
+    return {
+        'class_name': class_name,
+        'count': len(predictions),
+        'confidences': confidences,
+        'percentiles': percentiles,
+        'mean': sum(confidences) / len(confidences),
+        'min': min(confidences),
+        'max': max(confidences),
+        'high_conf': high_conf,
+        'very_high_conf': very_high_conf,
+        'ultra_high_conf': ultra_high_conf
+    }
+
+
+def print_confidence_distribution(predictions, class_name):
+    """Print detailed confidence distribution for a class."""
+    stats = analyze_confidence_distribution(predictions, class_name)
+    if not stats:
+        print(f"No {class_name} predictions to analyze")
+        return
+
+    print(f"\n{stats['class_name'].title()} Prediction Confidence Distribution ({stats['count']} samples):")
+    print(f"  Mean: {stats['mean']:.3f}")
+    print(f"  Min:  {stats['min']:.3f}")
+    print(f"  10th: {stats['percentiles'][10]:.3f}")
+    print(f"  25th: {stats['percentiles'][25]:.3f}")
+    print(f"  50th: {stats['percentiles'][50]:.3f}")
+    print(f"  75th: {stats['percentiles'][75]:.3f}")
+    print(f"  90th: {stats['percentiles'][90]:.3f}")
+    print(f"  95th: {stats['percentiles'][95]:.3f}")
+    print(f"  Max:  {stats['max']:.3f}")
+
+    print(f"  High confidence (≥0.8):  {stats['high_conf']}/{stats['count']} ({stats['high_conf']/stats['count']:.1%})")
+    print(f"  Very high conf (≥0.9):   {stats['very_high_conf']}/{stats['count']} ({stats['very_high_conf']/stats['count']:.1%})")
+    print(f"  Ultra high conf (≥0.95): {stats['ultra_high_conf']}/{stats['count']} ({stats['ultra_high_conf']/stats['count']:.1%})")
 
 
 def save_confidence_stats(predictions_file, positive_preds, negative_preds,
@@ -87,58 +106,46 @@ def save_confidence_stats(predictions_file, positive_preds, negative_preds,
         f.write(f"High confidence samples (≥0.8): {high_conf_percentage:.1%}\n\n")
 
         # Predicted positive class distribution
-        if positive_preds:
-            pos_confidences = [p['confidence'] for p in positive_preds]
-            pos_percentiles = calculate_percentiles(pos_confidences)
+        pos_stats = analyze_confidence_distribution(positive_preds, positive_class_name)
+        if pos_stats:
+            f.write(f"Predicted {pos_stats['class_name'].title()} Distribution ({pos_stats['count']} samples):\n")
+            f.write(f"  Mean: {pos_stats['mean']:.3f}\n")
+            f.write(f"  Min:  {pos_stats['min']:.3f}\n")
+            f.write(f"  10th: {pos_stats['percentiles'][10]:.3f}\n")
+            f.write(f"  25th: {pos_stats['percentiles'][25]:.3f}\n")
+            f.write(f"  50th: {pos_stats['percentiles'][50]:.3f}\n")
+            f.write(f"  75th: {pos_stats['percentiles'][75]:.3f}\n")
+            f.write(f"  90th: {pos_stats['percentiles'][90]:.3f}\n")
+            f.write(f"  95th: {pos_stats['percentiles'][95]:.3f}\n")
+            f.write(f"  Max:  {pos_stats['max']:.3f}\n")
 
-            f.write(f"Predicted {positive_class_name.title()} Distribution ({len(positive_preds)} samples):\n")
-            f.write(f"  Mean: {sum(pos_confidences)/len(pos_confidences):.3f}\n")
-            f.write(f"  Min:  {min(pos_confidences):.3f}\n")
-            f.write(f"  10th: {pos_percentiles[10]:.3f}\n")
-            f.write(f"  25th: {pos_percentiles[25]:.3f}\n")
-            f.write(f"  50th: {pos_percentiles[50]:.3f}\n")
-            f.write(f"  75th: {pos_percentiles[75]:.3f}\n")
-            f.write(f"  90th: {pos_percentiles[90]:.3f}\n")
-            f.write(f"  95th: {pos_percentiles[95]:.3f}\n")
-            f.write(f"  Max:  {max(pos_confidences):.3f}\n")
-
-            pos_high_conf = sum(1 for c in pos_confidences if c >= 0.8)
-            pos_very_high_conf = sum(1 for c in pos_confidences if c >= 0.9)
-            pos_ultra_high_conf = sum(1 for c in pos_confidences if c >= 0.95)
-
-            f.write(f"  High confidence (≥0.8):  {pos_high_conf}/{len(pos_confidences)} ({pos_high_conf/len(pos_confidences):.1%})\n")
-            f.write(f"  Very high conf (≥0.9):   {pos_very_high_conf}/{len(pos_confidences)} ({pos_very_high_conf/len(pos_confidences):.1%})\n")
-            f.write(f"  Ultra high conf (≥0.95): {pos_ultra_high_conf}/{len(pos_confidences)} ({pos_ultra_high_conf/len(pos_confidences):.1%})\n\n")
+            f.write(f"  High confidence (≥0.8):  {pos_stats['high_conf']}/{pos_stats['count']} ({pos_stats['high_conf']/pos_stats['count']:.1%})\n")
+            f.write(f"  Very high conf (≥0.9):   {pos_stats['very_high_conf']}/{pos_stats['count']} ({pos_stats['very_high_conf']/pos_stats['count']:.1%})\n")
+            f.write(f"  Ultra high conf (≥0.95): {pos_stats['ultra_high_conf']}/{pos_stats['count']} ({pos_stats['ultra_high_conf']/pos_stats['count']:.1%})\n\n")
 
         # Predicted negative class distribution
-        if negative_preds:
-            neg_confidences = [p['confidence'] for p in negative_preds]
-            neg_percentiles = calculate_percentiles(neg_confidences)
+        neg_stats = analyze_confidence_distribution(negative_preds, negative_class_name)
+        if neg_stats:
+            f.write(f"Predicted {neg_stats['class_name'].title()} Distribution ({neg_stats['count']} samples):\n")
+            f.write(f"  Mean: {neg_stats['mean']:.3f}\n")
+            f.write(f"  Min:  {neg_stats['min']:.3f}\n")
+            f.write(f"  10th: {neg_stats['percentiles'][10]:.3f}\n")
+            f.write(f"  25th: {neg_stats['percentiles'][25]:.3f}\n")
+            f.write(f"  50th: {neg_stats['percentiles'][50]:.3f}\n")
+            f.write(f"  75th: {neg_stats['percentiles'][75]:.3f}\n")
+            f.write(f"  90th: {neg_stats['percentiles'][90]:.3f}\n")
+            f.write(f"  95th: {neg_stats['percentiles'][95]:.3f}\n")
+            f.write(f"  Max:  {neg_stats['max']:.3f}\n")
 
-            f.write(f"Predicted {negative_class_name.title()} Distribution ({len(negative_preds)} samples):\n")
-            f.write(f"  Mean: {sum(neg_confidences)/len(neg_confidences):.3f}\n")
-            f.write(f"  Min:  {min(neg_confidences):.3f}\n")
-            f.write(f"  10th: {neg_percentiles[10]:.3f}\n")
-            f.write(f"  25th: {neg_percentiles[25]:.3f}\n")
-            f.write(f"  50th: {neg_percentiles[50]:.3f}\n")
-            f.write(f"  75th: {neg_percentiles[75]:.3f}\n")
-            f.write(f"  90th: {neg_percentiles[90]:.3f}\n")
-            f.write(f"  95th: {neg_percentiles[95]:.3f}\n")
-            f.write(f"  Max:  {max(neg_confidences):.3f}\n")
-
-            neg_high_conf = sum(1 for c in neg_confidences if c >= 0.8)
-            neg_very_high_conf = sum(1 for c in neg_confidences if c >= 0.9)
-            neg_ultra_high_conf = sum(1 for c in neg_confidences if c >= 0.95)
-
-            f.write(f"  High confidence (≥0.8):  {neg_high_conf}/{len(neg_confidences)} ({neg_high_conf/len(neg_confidences):.1%})\n")
-            f.write(f"  Very high conf (≥0.9):   {neg_very_high_conf}/{len(neg_confidences)} ({neg_very_high_conf/len(neg_confidences):.1%})\n")
-            f.write(f"  Ultra high conf (≥0.95): {neg_ultra_high_conf}/{len(neg_confidences)} ({neg_ultra_high_conf/len(neg_confidences):.1%})\n\n")
+            f.write(f"  High confidence (≥0.8):  {neg_stats['high_conf']}/{neg_stats['count']} ({neg_stats['high_conf']/neg_stats['count']:.1%})\n")
+            f.write(f"  Very high conf (≥0.9):   {neg_stats['very_high_conf']}/{neg_stats['count']} ({neg_stats['very_high_conf']/neg_stats['count']:.1%})\n")
+            f.write(f"  Ultra high conf (≥0.95): {neg_stats['ultra_high_conf']}/{neg_stats['count']} ({neg_stats['ultra_high_conf']/neg_stats['count']:.1%})\n\n")
 
         # Prediction counts
         f.write("Prediction Counts:\n")
-        f.write(f"Predicted {positive_class_name}: {len(positive_preds)}\n")
-        f.write(f"Predicted {negative_class_name}: {len(negative_preds)}\n")
-        f.write(f"Total predictions: {len(positive_preds) + len(negative_preds)}\n")
+        f.write(f"Predicted {positive_class_name}: {pos_stats['count'] if pos_stats else 0}\n")
+        f.write(f"Predicted {negative_class_name}: {neg_stats['count'] if neg_stats else 0}\n")
+        f.write(f"Total predictions: {(pos_stats['count'] if pos_stats else 0) + (neg_stats['count'] if neg_stats else 0)}\n")
 
     print(f"Confidence statistics saved to: {stats_file}")
 
@@ -163,9 +170,6 @@ def load_model(model_path, num_classes, device):
     model.to(device)
     model.eval()
     return model
-
-
-
 
 
 def create_binary_labels(urbansound_file="data/urbansound8k/UrbanSound8K.csv",
@@ -674,11 +678,7 @@ def run_active_learning_for_class(positive_class_name,
         tuple: (predictions_file, candidates_file)
     """
     # Validate class name and get class ID
-    if positive_class_name not in CLASS_NAME_TO_ID:
-        valid_names = list(CLASS_NAME_TO_ID.keys())
-        raise ValueError(f"Invalid class name: '{positive_class_name}'. Valid names: {valid_names}")
-
-    positive_class_id = CLASS_NAME_TO_ID[positive_class_name]
+    positive_class_id = get_class_id(positive_class_name)
 
     # Auto-generate negative class name if not provided
     if negative_class_name is None:
@@ -758,10 +758,7 @@ Examples:
 
     # Handle list classes
     if args.list_classes:
-        print("UrbanSound8K Classes:")
-        print("=" * 40)
-        for class_id, name in URBANSOUND8K_CLASSES.items():
-            print(f"  {class_id}: {name}")
+        list_classes()
         exit(0)
 
     # Default model path based on run_number if not specified
@@ -783,12 +780,13 @@ Examples:
     # Determine class name and ID
     if args.class_name:
         positive_class_name = args.class_name
-        positive_class_id = get_class_id(args.class_name)
-        if positive_class_id is None:
-            parser.error(f"Unknown class name: {args.class_name}")
+        try:
+            positive_class_id = get_class_id(args.class_name)
+        except ValueError as e:
+            parser.error(str(e))
     else:  # args.class_id is not None
         positive_class_id = args.class_id
-        positive_class_name = URBANSOUND8K_CLASSES[positive_class_id]
+        positive_class_name = get_class_name(positive_class_id)
 
     # Determine negative class name
     negative_class_name = args.negative_name or f"not_{positive_class_name}"
