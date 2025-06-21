@@ -12,7 +12,6 @@ from .models.cnn_5layer import SoundCNN
 from .urbansound_classes import (
     CLASS_NAME_TO_ID,
     URBANSOUND8K_CLASSES,
-    create_negative_class_name,
     get_class_id,
 )
 from .utils.data_utils import entropy, get_device, variable_length_collate_fn
@@ -683,7 +682,7 @@ def run_active_learning_for_class(positive_class_name,
 
     # Auto-generate negative class name if not provided
     if negative_class_name is None:
-        negative_class_name = create_negative_class_name(positive_class_name)
+        negative_class_name = f"not_{positive_class_name}"
 
     # Call the main function
     return run_active_learning_cycle(

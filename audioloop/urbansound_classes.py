@@ -65,16 +65,6 @@ def list_classes():
         print(f"{class_id}: {name}")
 
 
-def create_negative_class_name(positive_class_name):
-    """Create a sensible negative class name for binary classification.
-
-    Args:
-        positive_class_name (str): Name of the positive class
-
-    Returns:
-        str: Suggested negative class name
-    """
-    return f"not_{positive_class_name}"
 
 
 
@@ -97,5 +87,5 @@ if __name__ == "__main__":
     class_id = get_class_id("dog_bark")
     print(f"'dog_bark' is class: {class_id}")
 
-    negative_name = create_negative_class_name("siren")
+    negative_name = f"not_siren"
     print(f"Negative class for 'siren': {negative_name}")
