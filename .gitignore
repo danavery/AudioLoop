@@ -13,3 +13,6 @@ wheels/
 data/
 outputs/
 training_sets/
+
+.claude/
+CLAUDE.md
