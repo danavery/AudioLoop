@@ -1,164 +1,188 @@
 import csv
-import os
+import logging
+import time
+from collections import defaultdict
+from pathlib import Path
+from typing import Optional, Tuple
 
-import torch
 import torchaudio
-from torch import nn
 from tqdm import tqdm
 
-from .utils.log_normalize import LogNormalize
+from .datasets import UrbanSound8KConfig, UrbanSound8KProcessor
 
-# Your transform
-spec_transform = nn.Sequential(
-    torchaudio.transforms.MelSpectrogram(
-        sample_rate=44100, n_fft=1024, hop_length=256, n_mels=128
-    ),
-    LogNormalize(top_db=80),
-)
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Fixed length for all spectrograms (in time frames)
-FIXED_LENGTH = 993  # Max length from training data analysis
 
-def fix_spectrogram_length(spec, target_length=FIXED_LENGTH):
-    """Fix spectrogram to target length by padding or cropping."""
-    current_length = spec.shape[-1]  # Time dimension is last
 
-    if current_length < target_length:
-        # Pad with zeros on the right
-        pad_size = target_length - current_length
-        spec = torch.nn.functional.pad(spec, (0, pad_size), mode='constant', value=0)
-    elif current_length > target_length:
-        # Crop from the center
-        start_idx = (current_length - target_length) // 2
-        spec = spec[..., start_idx:start_idx + target_length]
 
-    return spec
+class ProcessingStats:
+    """Track processing statistics."""
 
-def create_specs_from_urbansound8k(
-    metadata_csv="data/urbansound8k/UrbanSound8K.csv",
-    audio_root="data/urbansound8k",
-    output_dir="data/all_specs"
-):
+    def __init__(self):
+        self.successful = 0
+        self.failed = 0
+        self.errors_by_type = defaultdict(int)
+        self.processing_times = []
+        self.start_time = time.time()
+
+    def record_success(self, processing_time: Optional[float] = None):
+        """Record a successful processing."""
+        self.successful += 1
+        if processing_time:
+            self.processing_times.append(processing_time)
+
+    def record_failure(self, error_type: str = "unknown"):
+        """Record a failed processing."""
+        self.failed += 1
+        self.errors_by_type[error_type] += 1
+
+    def summary(self) -> str:
+        """Get processing summary."""
+        total_time = time.time() - self.start_time
+        avg_time = sum(self.processing_times) / len(self.processing_times) if self.processing_times else 0
+
+        summary = [
+            f"Processing complete in {total_time:.2f}s",
+            f"Successful: {self.successful}",
+            f"Failed: {self.failed}",
+        ]
+
+        if self.processing_times:
+            summary.append(f"Average processing time: {avg_time:.3f}s per file")
+
+        if self.errors_by_type:
+            summary.append("Error breakdown:")
+            for error_type, count in self.errors_by_type.items():
+                summary.append(f"  {error_type}: {count}")
+
+        return "\n".join(summary)
+
+
+def create_specs(
+    processor,
+    config = None
+) -> Tuple[int, int]:
     """
-    Create spectrograms for the entire UrbanSound8K dataset.
+    Create spectrograms for any dataset using the provided processor.
 
     Args:
-        metadata_csv: Path to UrbanSound8K.csv metadata file
-        audio_root: Root directory containing fold1/, fold2/, etc.
-        output_dir: Directory to save .pt spectrogram files
+        processor: Dataset processor that handles dataset-specific operations
+        config: Dataset configuration. If None, uses processor's config.
+
+    Returns:
+        Tuple of (successful_count, failed_count)
     """
+    if config is None:
+        config = processor.config
 
-    os.makedirs(output_dir, exist_ok=True)
+    # Validate inputs
+    if not config.metadata_csv.exists():
+        raise FileNotFoundError(f"Metadata CSV not found: {config.metadata_csv}")
 
-    # Read the metadata CSV
-    audio_files = []
-    with open(metadata_csv, 'r') as f:
-        csv_reader = csv.DictReader(f)
-        for row in csv_reader:
-            filename = row['slice_file_name']
-            fold = row['fold']
-            class_id = int(row['classID'])
-            class_name = row['class']
+    if not config.audio_root.exists():
+        raise FileNotFoundError(f"Audio root directory not found: {config.audio_root}")
 
-            # Construct full path: audio_root/fold{fold}/{filename}
-            audio_path = os.path.join(audio_root, f"fold{fold}", filename)
+    # Create output directory
+    config.output_dir.mkdir(parents=True, exist_ok=True)
 
-            audio_files.append({
-                'filename': filename,
-                'audio_path': audio_path,
-                'fold': fold,
-                'class_id': class_id,
-                'class_name': class_name
-            })
+    # Load metadata
+    logger.info(f"Loading {processor.__class__.__name__} metadata...")
+    audio_files = processor.load_metadata()
+    logger.info(f"Found {len(audio_files)} audio files in dataset")
 
-    print(f"Found {len(audio_files)} audio files in UrbanSound8K dataset")
+    # Dataset-specific validation (e.g., fold directories for UrbanSound8K)
+    if hasattr(config, 'audio_root'):
+        fold_dirs = list(config.audio_root.glob("fold*"))
+        if fold_dirs:
+            logger.info(f"Found {len(fold_dirs)} fold directories")
 
-    # Process each file
-    successful = 0
-    failed = 0
+    # Process files
+    stats = ProcessingStats()
 
     for i, file_info in enumerate(tqdm(audio_files, desc="Creating spectrograms")):
-        try:
-            audio_path = file_info['audio_path']
-            filename = file_info['filename']
+        start_time = time.time()
 
-            # Check if audio file exists
-            if not os.path.exists(audio_path):
-                print(f"Audio file not found: {audio_path}")
-                failed += 1
-                continue
+        success = processor.process_single_file(file_info, config.output_dir)
 
-            # Load audio
-            waveform, sample_rate = torchaudio.load(audio_path)
+        processing_time = time.time() - start_time
 
-            # Create spectrogram
-            spec = spec_transform(waveform)
+        if success:
+            stats.record_success(processing_time)
 
-            # Fix spectrogram length
-            spec = fix_spectrogram_length(spec, FIXED_LENGTH)
-
-            # Save spectrogram
-            output_filename = filename.replace(".wav", ".pt")
-            output_path = os.path.join(output_dir, output_filename)
-            torch.save(spec, output_path)
-
+            # Log sample info for first file
             if i == 0:
-                print(f"Sample audio shape: {waveform.shape}")
-                print(f"Sample spectrogram shape (before fixing): {spec_transform(waveform).shape}")
-                print(f"Sample spectrogram shape (after fixing): {spec.shape}")
+                try:
+                    waveform, _ = torchaudio.load(file_info['audio_path'])
+                    sample_spec = processor.spec_transform(waveform)
+                    fixed_spec = processor.fix_spectrogram_length(sample_spec)
 
-            successful += 1
+                    logger.info(f"Sample audio shape: {waveform.shape}")
+                    logger.info(f"Sample spectrogram shape (before fixing): {sample_spec.shape}")
+                    logger.info(f"Sample spectrogram shape (after fixing): {fixed_spec.shape}")
+                except Exception as e:
+                    logger.warning(f"Could not log sample info: {e}")
+        else:
+            stats.record_failure()
 
-        except Exception as e:
-            print(f"Error processing {file_info['filename']}: {e}")
-            failed += 1
-            continue
+    # Print summary
+    logger.info("\n" + stats.summary())
+    logger.info(f"Output directory: {config.output_dir}")
 
-    print("\nSpectrogram creation complete!")
-    print(f"Successful: {successful}")
-    print(f"Failed: {failed}")
-    print(f"Output directory: {output_dir}")
+    return stats.successful, stats.failed
 
-    return successful, failed
 
 def create_inference_csv(
-    metadata_csv="data/urbansound8k/UrbanSound8K.csv",
-    output_csv="outputs/urbansound8k_files.csv"
-):
+    processor,
+    config = None
+) -> Path:
     """
-    Create a CSV file listing all UrbanSound8K files for inference.
+    Create a CSV file listing all dataset files for inference.
     Format: filename,class_id
+
+    Args:
+        processor: Dataset processor that handles dataset-specific operations
+        config: Dataset configuration. If None, uses processor's config.
+
+    Returns:
+        Path to created inference CSV
     """
+    if config is None:
+        config = processor.config
 
+    # Load metadata
+    audio_files = processor.load_metadata()
+
+    # Prepare data for CSV
     files_data = []
-    with open(metadata_csv, 'r') as f:
-        csv_reader = csv.DictReader(f)
-        for row in csv_reader:
-            filename = row['slice_file_name']
-            class_id = int(row['classID'])
+    for file_info in audio_files:
+        files_data.append({
+            'filename': file_info['filename'],
+            'class_id': file_info['class_id']
+        })
 
-            files_data.append({
-                'filename': filename,
-                'class_id': class_id
-            })
+    # Ensure output directory exists
+    config.inference_csv.parent.mkdir(parents=True, exist_ok=True)
 
-    # Write to new CSV
-    with open(output_csv, 'w', newline='') as f:
+    # Write to CSV
+    with config.inference_csv.open('w', newline='') as f:
         fieldnames = ['filename', 'class_id']
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(files_data)
 
-    print(f"Created inference CSV with {len(files_data)} files: {output_csv}")
-    return output_csv
+    logger.info(f"Created inference CSV with {len(files_data)} files: {config.inference_csv}")
+    return config.inference_csv
+
 
 if __name__ == "__main__":
     # Create spectrograms for all UrbanSound8K files
-    successful, failed = create_specs_from_urbansound8k()
+    config = UrbanSound8KConfig()
+    processor = UrbanSound8KProcessor(config)
+    successful, failed = create_specs(processor)
 
     # Create CSV for inference
     if successful > 0:
-        # Ensure outputs directory exists
-        os.makedirs("outputs", exist_ok=True)
-        inference_csv = create_inference_csv()
-        print(f"Ready for inference! Use: {inference_csv}")
+        inference_csv = create_inference_csv(processor)
+        logger.info(f"Ready for inference! Use: {inference_csv}")
