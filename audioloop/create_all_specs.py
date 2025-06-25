@@ -3,7 +3,6 @@ import logging
 import time
 from collections import defaultdict
 from pathlib import Path
-from typing import Optional, Tuple
 
 import torchaudio
 from tqdm import tqdm
@@ -13,8 +12,6 @@ from .datasets import UrbanSound8KConfig, UrbanSound8KProcessor
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-
 
 
 class ProcessingStats:
@@ -27,7 +24,7 @@ class ProcessingStats:
         self.processing_times = []
         self.start_time = time.time()
 
-    def record_success(self, processing_time: Optional[float] = None):
+    def record_success(self, processing_time: float | None = None):
         """Record a successful processing."""
         self.successful += 1
         if processing_time:
@@ -41,7 +38,9 @@ class ProcessingStats:
     def summary(self) -> str:
         """Get processing summary."""
         total_time = time.time() - self.start_time
-        avg_time = sum(self.processing_times) / len(self.processing_times) if self.processing_times else 0
+        avg_time = (
+            sum(self.processing_times) / len(self.processing_times) if self.processing_times else 0
+        )
 
         summary = [
             f"Processing complete in {total_time:.2f}s",
@@ -60,10 +59,7 @@ class ProcessingStats:
         return "\n".join(summary)
 
 
-def create_specs(
-    processor,
-    config = None
-) -> Tuple[int, int]:
+def create_specs(processor, config=None) -> tuple[int, int]:
     """
     Create spectrograms for any dataset using the provided processor.
 
@@ -92,12 +88,6 @@ def create_specs(
     audio_files = processor.load_metadata()
     logger.info(f"Found {len(audio_files)} audio files in dataset")
 
-    # Dataset-specific validation (e.g., fold directories for UrbanSound8K)
-    if hasattr(config, 'audio_root'):
-        fold_dirs = list(config.audio_root.glob("fold*"))
-        if fold_dirs:
-            logger.info(f"Found {len(fold_dirs)} fold directories")
-
     # Process files
     stats = ProcessingStats()
 
@@ -114,7 +104,7 @@ def create_specs(
             # Log sample info for first file
             if i == 0:
                 try:
-                    waveform, _ = torchaudio.load(file_info['audio_path'])
+                    waveform, _ = torchaudio.load(file_info["audio_path"])
                     sample_spec = processor.spec_transform(waveform)
                     fixed_spec = processor.fix_spectrogram_length(sample_spec)
 
@@ -133,10 +123,7 @@ def create_specs(
     return stats.successful, stats.failed
 
 
-def create_inference_csv(
-    processor,
-    config = None
-) -> Path:
+def create_inference_csv(processor, config=None) -> Path:
     """
     Create a CSV file listing all dataset files for inference.
     Format: filename,class_id
@@ -157,17 +144,14 @@ def create_inference_csv(
     # Prepare data for CSV
     files_data = []
     for file_info in audio_files:
-        files_data.append({
-            'filename': file_info['filename'],
-            'class_id': file_info['class_id']
-        })
+        files_data.append({"filename": file_info["filename"], "class_id": file_info["class_id"]})
 
     # Ensure output directory exists
     config.inference_csv.parent.mkdir(parents=True, exist_ok=True)
 
     # Write to CSV
-    with config.inference_csv.open('w', newline='') as f:
-        fieldnames = ['filename', 'class_id']
+    with config.inference_csv.open("w", newline="") as f:
+        fieldnames = ["filename", "class_id"]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(files_data)
