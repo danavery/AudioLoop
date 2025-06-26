@@ -30,11 +30,23 @@ URBANSOUND8K_CLASSES = {
 CLASS_NAME_TO_ID = {name: class_id for class_id, name in URBANSOUND8K_CLASSES.items()}
 
 
-def get_class_name(class_id: int) -> str:
+def load_urbansound8k_vocabulary() -> dict[int, str]:
+    """Load UrbanSound8K vocabulary mapping.
+
+    Returns hardcoded mapping since UrbanSound8K doesn't provide a vocabulary file.
+
+    Returns:
+        Dictionary mapping class_id to class_name
+    """
+    return URBANSOUND8K_CLASSES.copy()
+
+
+def get_class_name(class_id: int, vocab_path: Path | None = None) -> str:
     """Get human-readable class name from UrbanSound8K class ID.
 
     Args:
         class_id: UrbanSound8K class ID (0-9)
+        vocab_path: Ignored for UrbanSound8K (kept for interface consistency)
 
     Returns:
         Human-readable class name
@@ -42,16 +54,18 @@ def get_class_name(class_id: int) -> str:
     Raises:
         ValueError: If class_id is not valid
     """
-    if class_id not in URBANSOUND8K_CLASSES:
+    vocabulary = load_urbansound8k_vocabulary()
+    if class_id not in vocabulary:
         raise ValueError(f"Invalid class ID: {class_id}. Must be 0-9.")
-    return URBANSOUND8K_CLASSES[class_id]
+    return vocabulary[class_id]
 
 
-def get_class_id(class_name: str) -> int:
+def get_class_id(class_name: str, vocab_path: Path | None = None) -> int:
     """Get UrbanSound8K class ID from human-readable class name.
 
     Args:
         class_name: Human-readable class name
+        vocab_path: Ignored for UrbanSound8K (kept for interface consistency)
 
     Returns:
         UrbanSound8K class ID (0-9)
@@ -59,17 +73,26 @@ def get_class_id(class_name: str) -> int:
     Raises:
         ValueError: If class_name is not valid
     """
-    if class_name not in CLASS_NAME_TO_ID:
-        valid_names = list(CLASS_NAME_TO_ID.keys())
+    vocabulary = load_urbansound8k_vocabulary()
+    name_to_id = {name: class_id for class_id, name in vocabulary.items()}
+
+    if class_name not in name_to_id:
+        valid_names = list(name_to_id.keys())
         raise ValueError(f"Invalid class name: '{class_name}'. Valid names: {valid_names}")
-    return CLASS_NAME_TO_ID[class_name]
+    return name_to_id[class_name]
 
 
-def list_classes() -> None:
-    """Print all available UrbanSound8K classes."""
+def list_classes(vocab_path: Path | None = None) -> None:
+    """Print all available UrbanSound8K classes.
+
+    Args:
+        vocab_path: Ignored for UrbanSound8K (kept for interface consistency)
+    """
+    vocabulary = load_urbansound8k_vocabulary()
     print("UrbanSound8K Classes:")
     print("=" * 30)
-    for class_id, name in URBANSOUND8K_CLASSES.items():
+    for class_id in sorted(vocabulary.keys()):
+        name = vocabulary[class_id]
         print(f"{class_id}: {name}")
 
 
@@ -102,6 +125,10 @@ class UrbanSound8KProcessor:
     def __init__(self, config: UrbanSound8KConfig):
         self.config = config
         self.spec_transform = self._create_transform()
+
+        # Load vocabulary for class name/ID conversion (consistent with FSD50K interface)
+        self.vocabulary = load_urbansound8k_vocabulary()
+        self.name_to_id = {name: class_id for class_id, name in self.vocabulary.items()}
 
     def _create_transform(self) -> nn.Sequential:
         """Create the spectrogram transform pipeline."""
