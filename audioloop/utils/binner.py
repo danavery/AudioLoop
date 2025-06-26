@@ -1,7 +1,7 @@
 items = [("dog", 0.97), ("cat", 0.51)]
 
-HIGH_LEVEL = .95
-MED_LEVEL = .85
+HIGH_LEVEL = 0.95
+MED_LEVEL = 0.85
 
 
 bins = {"high": [], "med": [], "low": []}

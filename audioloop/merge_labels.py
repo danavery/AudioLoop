@@ -18,7 +18,7 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None):
     # Auto-generate output filename if not provided
     if output_csv is None:
         base = os.path.splitext(os.path.basename(original_csv))[0]
-        version = int(base.split('_v')[1]) + 1 if 'v' in base else 2
+        version = int(base.split("_v")[1]) + 1 if "v" in base else 2
         output_csv = f"training_sets/training_set_v{version}.csv"
 
     all_data = []
@@ -28,18 +28,20 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None):
         with open(original_csv) as f:
             reader = csv.reader(f)
             for i, row in enumerate(reader):
-                if i == 0 and row[0].lower() in ['filename', 'filepath']:
+                if i == 0 and row[0].lower() in ["filename", "filepath"]:
                     continue
                 if len(row) >= 2:
                     # Handle both filename and full filepath
                     filepath = row[0]
-                    filename = os.path.basename(filepath) if filepath.startswith('/') else filepath
+                    filename = os.path.basename(filepath) if filepath.startswith("/") else filepath
 
-                    all_data.append({
-                        'filename': filename,
-                        'label': int(row[1]),
-                        'run': row[2] if len(row) > 2 else '1'
-                    })
+                    all_data.append(
+                        {
+                            "filename": filename,
+                            "label": int(row[1]),
+                            "run": row[2] if len(row) > 2 else "1",
+                        }
+                    )
         print(f"Loaded {len(all_data)} samples from {original_csv}")
     else:
         print(f"Warning: {original_csv} not found, starting fresh")
@@ -51,15 +53,17 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None):
 
         for row in reader:
             # Handle candidates CSV format (with needs_human_label column)
-            if 'needs_human_label' not in row or 'filename' not in row:
-                print("Error: Expected candidates CSV format with 'needs_human_label' and 'filename' columns")
+            if "needs_human_label" not in row or "filename" not in row:
+                print(
+                    "Error: Expected candidates CSV format with 'needs_human_label' and 'filename' columns"
+                )
                 print(f"Found columns: {list(row.keys())}")
                 continue
 
-            filename = os.path.basename(row['filename']) if row['filename'] else ''
-            label = row['needs_human_label'].strip()
+            filename = os.path.basename(row["filename"]) if row["filename"] else ""
+            label = row["needs_human_label"].strip()
 
-            if not filename or label == '':
+            if not filename or label == "":
                 continue  # Skip unlabeled samples
 
             try:
@@ -69,13 +73,9 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None):
                     continue
 
                 # Get run number from row if available
-                run = row.get('run', '1')
+                run = row.get("run", "1")
 
-                all_data.append({
-                    'filename': filename,
-                    'label': label_int,
-                    'run': run
-                })
+                all_data.append({"filename": filename, "label": label_int, "run": run})
                 new_count += 1
             except ValueError:
                 print(f"Warning: Invalid label '{label}' for {filename}, skipping")
@@ -84,22 +84,24 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None):
     print(f"Added {new_count} new labeled samples")
 
     # Ensure output directory exists
-    os.makedirs(os.path.dirname(output_csv) if os.path.dirname(output_csv) else '.', exist_ok=True)
+    os.makedirs(os.path.dirname(output_csv) if os.path.dirname(output_csv) else ".", exist_ok=True)
 
     # Write merged training set
-    with open(output_csv, 'w', newline='') as f:
-        fieldnames = ['filename', 'label', 'run']
+    with open(output_csv, "w", newline="") as f:
+        fieldnames = ["filename", "label", "run"]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(all_data)
 
     print(f"Created merged training set: {output_csv}")
-    print(f"Total samples: {len(all_data)} (original: {len(all_data)-new_count}, new: {new_count})")
+    print(
+        f"Total samples: {len(all_data)} (original: {len(all_data) - new_count}, new: {new_count})"
+    )
 
     # Show label distribution
     label_counts = {0: 0, 1: 0}
     for item in all_data:
-        label_counts[item['label']] += 1
+        label_counts[item["label"]] += 1
 
     print(f"Label distribution: {label_counts[0]} negative class, {label_counts[1]} positive class")
 
@@ -107,10 +109,14 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Merge human labels from active learning candidates into training sets')
-    parser.add_argument('original_csv', help='Original training set CSV')
-    parser.add_argument('candidates_csv', help='Candidates CSV with filled needs_human_label column')
-    parser.add_argument('-o', '--output', help='Output merged training set CSV')
+    parser = argparse.ArgumentParser(
+        description="Merge human labels from active learning candidates into training sets"
+    )
+    parser.add_argument("original_csv", help="Original training set CSV")
+    parser.add_argument(
+        "candidates_csv", help="Candidates CSV with filled needs_human_label column"
+    )
+    parser.add_argument("-o", "--output", help="Output merged training set CSV")
 
     args = parser.parse_args()
 
@@ -120,7 +126,7 @@ def main():
 if __name__ == "__main__":
     # Example usage
     print("Active Learning Label Management")
-    print("="*40)
+    print("=" * 40)
     print("\nWorkflow:")
     print("1. Run active learning cycle to generate candidates:")
     print("   python -m audioloop.active_learning --class-name siren --run-number 1")
@@ -132,7 +138,9 @@ if __name__ == "__main__":
     print("   - Save the file")
     print()
     print("3. Merge human labels back into training set:")
-    print("   python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv")
+    print(
+        "   python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv"
+    )
     print("   → Creates training_sets/training_set_v2.csv with combined data")
     print()
     print("4. Train model and run next cycle:")

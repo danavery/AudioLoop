@@ -23,7 +23,7 @@ URBANSOUND8K_CLASSES = {
     6: "gun_shot",
     7: "jackhammer",
     8: "siren",
-    9: "street_music"
+    9: "street_music",
 }
 
 # Reverse mapping for convenience

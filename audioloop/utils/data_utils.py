@@ -41,7 +41,7 @@ def simple_collate_fn(batch):
         "label": labels,
         "filename": [item["filename"] for item in batch],
         "filepath": [item["filepath"] for item in batch],
-        "run": [item.get("run", "1") for item in batch]
+        "run": [item.get("run", "1") for item in batch],
     }
 
 
@@ -76,7 +76,7 @@ def variable_length_collate_fn(batch):
         if pad_size > 0:
             # Pad with zeros on the right side of the time dimension
             pad_tuple = (0, pad_size)  # (left_pad, right_pad) for last dimension
-            padded_spec = torch.nn.functional.pad(spec, pad_tuple, mode='constant', value=0)
+            padded_spec = torch.nn.functional.pad(spec, pad_tuple, mode="constant", value=0)
         else:
             padded_spec = spec
         padded_data.append(padded_spec)
@@ -89,7 +89,7 @@ def variable_length_collate_fn(batch):
         "data": data_tensor,
         "label": labels,
         "filename": [item["filename"] for item in batch],
-        "filepath": [item["filepath"] for item in batch]
+        "filepath": [item["filepath"] for item in batch],
     }
 
 

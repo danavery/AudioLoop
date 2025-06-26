@@ -17,11 +17,19 @@ def write_starting_labels(n_positive=10, n_negative=10, classname="siren"):
         (positives, negatives): Lists of file paths
     """
     positives = random.sample(get_matching_paths_from_csv(classnames=[classname]), k=n_positive)
-    negatives = random.sample(get_matching_paths_from_csv(classnames=[classname], invert=True), k=n_negative)
+    negatives = random.sample(
+        get_matching_paths_from_csv(classnames=[classname], invert=True), k=n_negative
+    )
     return positives, negatives
 
 
-def create_training_set(n=10, classname="siren", output_path="training_sets/training_set_v1.csv", run=1, positive_percentage=0.5):
+def create_training_set(
+    n=10,
+    classname="siren",
+    output_path="training_sets/training_set_v1.csv",
+    run=1,
+    positive_percentage=0.5,
+):
     """Create training set CSV file for any class.
 
     Args:
@@ -55,17 +63,23 @@ def create_training_set(n=10, classname="siren", output_path="training_sets/trai
 
     print(f"Created training set: {output_path}")
     print(f"  {len(positives)} {classname} samples, {len(negatives)} non-{classname} samples")
-    print(f"  Positive percentage: {len(positives)/(len(positives)+len(negatives)):.1%}")
+    print(f"  Positive percentage: {len(positives) / (len(positives) + len(negatives)):.1%}")
 
     return positives, negatives
 
 
 if __name__ == "__main__":
     import argparse
+
     parser = argparse.ArgumentParser(description="Create initial training sets")
     parser.add_argument("--classname", default="siren", help="UrbanSound8K class name")
     parser.add_argument("--n", type=int, default=40, help="Total number of samples")
-    parser.add_argument("--positive-pct", type=float, default=0.75, help="Percentage positive (0.0-1.0, default 0.6 for imbalanced)")
+    parser.add_argument(
+        "--positive-pct",
+        type=float,
+        default=0.75,
+        help="Percentage positive (0.0-1.0, default 0.6 for imbalanced)",
+    )
     parser.add_argument("--output", default="training_sets/training_set_v1.csv", help="Output path")
 
     args = parser.parse_args()
@@ -74,5 +88,5 @@ if __name__ == "__main__":
         n=args.n,
         classname=args.classname,
         output_path=args.output,
-        positive_percentage=args.positive_pct
+        positive_percentage=args.positive_pct,
     )

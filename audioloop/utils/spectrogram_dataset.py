@@ -27,14 +27,23 @@ class SpectrogramDataset(torch.utils.data.Dataset):
         self.specs_dir = specs_dir
         self.samples = []
 
-        with open(csv_file, 'r') as f:
+        with open(csv_file) as f:
             # Peek at first line to detect format
             first_line = f.readline().strip()
             f.seek(0)  # Reset to beginning
 
             # Check if file has headers
-            has_headers = any(header in first_line.lower() for header in
-                            ['filename', 'filepath', 'label', 'run', 'original_class', 'is_positive'])
+            has_headers = any(
+                header in first_line.lower()
+                for header in [
+                    "filename",
+                    "filepath",
+                    "label",
+                    "run",
+                    "original_class",
+                    "is_positive",
+                ]
+            )
 
             if has_headers:
                 # Use DictReader for files with headers
@@ -54,35 +63,35 @@ class SpectrogramDataset(torch.utils.data.Dataset):
     def _parse_dict_row(self, row):
         """Parse a row from a CSV with headers."""
         # Get filename - handle both 'filename' and 'filepath' columns
-        if 'filename' in row:
-            filename = os.path.basename(row['filename'])
-        elif 'filepath' in row:
-            filename = os.path.basename(row['filepath'])
+        if "filename" in row:
+            filename = os.path.basename(row["filename"])
+        elif "filepath" in row:
+            filename = os.path.basename(row["filepath"])
         else:
             return None
 
         # Get label - handle both 'label' and 'is_positive' columns
-        if 'label' in row:
-            label = int(row['label'])
-        elif 'is_positive' in row:
-            label = int(row['is_positive'])
+        if "label" in row:
+            label = int(row["label"])
+        elif "is_positive" in row:
+            label = int(row["is_positive"])
         else:
             return None
 
         # Optional fields
-        run = row.get('run', '1')
-        original_class = int(row['original_class']) if 'original_class' in row else None
+        run = row.get("run", "1")
+        original_class = int(row["original_class"]) if "original_class" in row else None
 
         # Build spectrogram path
-        spec_filename = filename.replace('.wav', '.pt')
+        spec_filename = filename.replace(".wav", ".pt")
         spec_filepath = os.path.join(self.specs_dir, spec_filename)
 
         return {
-            'filename': filename,
-            'spec_filepath': spec_filepath,
-            'label': label,
-            'run': run,
-            'original_class': original_class
+            "filename": filename,
+            "spec_filepath": spec_filepath,
+            "label": label,
+            "run": run,
+            "original_class": original_class,
         }
 
     def _parse_list_row(self, row):
@@ -93,18 +102,18 @@ class SpectrogramDataset(torch.utils.data.Dataset):
         # Legacy format: filepath,label,run
         filepath = row[0]
         label = int(row[1])
-        run = row[2] if len(row) > 2 else '1'
+        run = row[2] if len(row) > 2 else "1"
 
         filename = os.path.basename(filepath)
-        spec_filename = filename.replace('.wav', '.pt')
+        spec_filename = filename.replace(".wav", ".pt")
         spec_filepath = os.path.join(self.specs_dir, spec_filename)
 
         return {
-            'filename': filename,
-            'spec_filepath': spec_filepath,
-            'label': label,
-            'run': run,
-            'original_class': None
+            "filename": filename,
+            "spec_filepath": spec_filepath,
+            "label": label,
+            "run": run,
+            "original_class": None,
         }
 
     def __len__(self):
@@ -112,7 +121,7 @@ class SpectrogramDataset(torch.utils.data.Dataset):
 
     def __getitem__(self, idx):
         sample = self.samples[idx]
-        spec_filepath = sample['spec_filepath']
+        spec_filepath = sample["spec_filepath"]
 
         # Load precomputed spectrogram
         if not os.path.exists(spec_filepath):
@@ -122,16 +131,16 @@ class SpectrogramDataset(torch.utils.data.Dataset):
 
         # Build return dictionary with all available fields
         result = {
-            'data': data,
-            'label': sample['label'],
-            'filename': sample['filename'],
-            'filepath': spec_filepath,
-            'run': sample['run']
+            "data": data,
+            "label": sample["label"],
+            "filename": sample["filename"],
+            "filepath": spec_filepath,
+            "run": sample["run"],
         }
 
         # Only include original_class if it exists
-        if sample['original_class'] is not None:
-            result['original_class'] = sample['original_class']
+        if sample["original_class"] is not None:
+            result["original_class"] = sample["original_class"]
 
         return result
 
@@ -153,12 +162,14 @@ if __name__ == "__main__":
             sample = dataset[0]
             print("\nFirst sample:")
             for key, value in sample.items():
-                if key != 'data':
+                if key != "data":
                     print(f"  {key}: {value}")
                 else:
                     print(f"  data: tensor with shape {value.shape}")
 
             # Check consistency
-            print(f"All samples have consistent keys: {all(set(dataset[i].keys()) == set(sample.keys()) for i in range(min(5, len(dataset))))}")
+            print(
+                f"All samples have consistent keys: {all(set(dataset[i].keys()) == set(sample.keys()) for i in range(min(5, len(dataset))))}"
+            )
     else:
         print("Usage: python spectrogram_dataset.py <csv_file> [specs_dir]")

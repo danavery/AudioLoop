@@ -5,11 +5,10 @@ import os
 DEFAULT_CSV_PATH = "data/urbansound8k/UrbanSound8K.csv"
 DEFAULT_DATA_DIR = "data/urbansound8k"
 
+
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "--csv", help="path to csv metadata file", default=DEFAULT_CSV_PATH
-    )
+    parser.add_argument("--csv", help="path to csv metadata file", default=DEFAULT_CSV_PATH)
     parser.add_argument("--data-dir", help="path to data directory", default=DEFAULT_DATA_DIR)
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--classID", help="class ID to return", nargs="*", type=int)
@@ -41,13 +40,17 @@ def get_matching_paths(args):
             if match:
                 filename = row["slice_file_name"]
                 fold = row["fold"]
-                paths.append(
-                    os.path.join(os.getcwd(), args.data_dir, f"fold{fold}", filename)
-                )
+                paths.append(os.path.join(os.getcwd(), args.data_dir, f"fold{fold}", filename))
     return paths
 
 
-def get_matching_paths_from_csv(csv_path=DEFAULT_CSV_PATH, data_dir=DEFAULT_DATA_DIR, classnames=None, classIDs=None, invert=False):
+def get_matching_paths_from_csv(
+    csv_path=DEFAULT_CSV_PATH,
+    data_dir=DEFAULT_DATA_DIR,
+    classnames=None,
+    classIDs=None,
+    invert=False,
+):
     args = argparse.Namespace(
         csv=csv_path, data_dir=data_dir, classname=classnames, classID=classIDs, invert=invert
     )

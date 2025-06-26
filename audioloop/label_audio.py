@@ -61,27 +61,31 @@ class SimpleAudioLabeler:
         print(f"\nLoaded {len(self.candidates)} candidates for labeling")
 
         # Find already labeled samples
-        labeled_count = sum(1 for c in self.candidates if c.get('needs_human_label', '').strip() != '')
+        labeled_count = sum(
+            1 for c in self.candidates if c.get("needs_human_label", "").strip() != ""
+        )
         if labeled_count > 0:
             print(f"{labeled_count} samples already labeled")
 
             # Find first unlabeled sample
             for i, candidate in enumerate(self.candidates):
-                if candidate.get('needs_human_label', '').strip() == '':
+                if candidate.get("needs_human_label", "").strip() == "":
                     self.current_index = i
                     break
 
     def _get_audio_path(self, candidate):
         """Get the full path to the audio file from the filepath column."""
         # Get filepath from predictions CSV (required)
-        filepath = candidate.get('filepath', '')
+        filepath = candidate.get("filepath", "")
         if not filepath:
-            print("ERROR: No 'filepath' column found in candidate. This tool requires candidates from active learning workflow.")
+            print(
+                "ERROR: No 'filepath' column found in candidate. This tool requires candidates from active learning workflow."
+            )
             print(f"Candidate columns: {list(candidate.keys())}")
             return None
 
         # The filepath is to a spectrogram (.pt), convert to audio (.wav)
-        audio_filepath = filepath.replace('.pt', '.wav')
+        audio_filepath = filepath.replace(".pt", ".wav")
         filename = os.path.basename(audio_filepath)
 
         # For UrbanSound8K: search through all fold directories
@@ -107,8 +111,12 @@ class SimpleAudioLabeler:
             elif sys.platform.startswith("linux"):
                 # Try multiple Linux audio players
                 for player in ["aplay", "play", "cvlc --play-and-exit", "ffplay -nodisp -autoexit"]:
-                    if subprocess.run(f"which {player.split()[0]}", shell=True,
-                                    capture_output=True).returncode == 0:
+                    if (
+                        subprocess.run(
+                            f"which {player.split()[0]}", shell=True, capture_output=True
+                        ).returncode
+                        == 0
+                    ):
                         subprocess.run(f"{player} '{audio_path}'", shell=True, check=False)
                         break
             elif sys.platform == "win32":  # Windows
@@ -130,7 +138,7 @@ class SimpleAudioLabeler:
             print("Error: No fieldnames available for CSV writing")
             return
 
-        with open(self.candidates_csv, 'w', newline='') as f:
+        with open(self.candidates_csv, "w", newline="") as f:
             writer = csv.DictWriter(f, fieldnames=self.fieldnames)
             writer.writeheader()
             writer.writerows(self.candidates)
@@ -155,7 +163,7 @@ class SimpleAudioLabeler:
     def _label_and_advance(self, label: str, message: str):
         """Label current sample and advance to next with auto-play."""
         if self.current_index < len(self.candidates):
-            self.candidates[self.current_index]['needs_human_label'] = label
+            self.candidates[self.current_index]["needs_human_label"] = label
             self.changes_made = True
             print(f"✓ {message}")
             self._advance_and_play()
@@ -176,9 +184,9 @@ class SimpleAudioLabeler:
 
         candidate = self.candidates[self.current_index]
 
-        print("\n" + "="*60)
+        print("\n" + "=" * 60)
         print(f"Sample {self.current_index + 1} of {len(self.candidates)}")
-        print("="*60)
+        print("=" * 60)
 
         # Display candidate info
         print(f"Filename: {candidate.get('filename', 'Unknown')}")
@@ -187,18 +195,18 @@ class SimpleAudioLabeler:
         print(f"Confidence: {candidate.get('confidence', 'Unknown')}")
         print(f"Original Class: {candidate.get('original_class', 'Unknown')}")
 
-        current_label = candidate.get('needs_human_label', '').strip()
+        current_label = candidate.get("needs_human_label", "").strip()
         if current_label:
             print(f"Current Label: {current_label}")
         else:
             print("Current Label: [Not yet labeled]")
 
         # Progress bar
-        labeled = sum(1 for c in self.candidates if c.get('needs_human_label', '').strip() != '')
+        labeled = sum(1 for c in self.candidates if c.get("needs_human_label", "").strip() != "")
         progress = labeled / len(self.candidates) * 100
         bar_length = 40
         filled = int(bar_length * labeled / len(self.candidates))
-        bar = '█' * filled + '░' * (bar_length - filled)
+        bar = "█" * filled + "░" * (bar_length - filled)
         print(f"\nProgress: [{bar}] {labeled}/{len(self.candidates)} ({progress:.1f}%)")
 
     def _show_help(self):
@@ -233,39 +241,39 @@ class SimpleAudioLabeler:
                 if not command:
                     continue
 
-                if command in ['q', 'quit']:
+                if command in ["q", "quit"]:
                     if self.changes_made:
                         save = input("Save changes before quitting? (y/n): ").strip().lower()
-                        if save in ['y', 'yes']:
+                        if save in ["y", "yes"]:
                             self._save_candidates()
                     print("Goodbye!")
                     break
 
-                elif command in ['h', 'help', '?']:
+                elif command in ["h", "help", "?"]:
                     self._show_help()
 
-                elif command in ['1', 'y']:
-                    self._label_and_advance('1', 'Labeled as POSITIVE (1)')
+                elif command in ["1", "y"]:
+                    self._label_and_advance("1", "Labeled as POSITIVE (1)")
 
-                elif command in ['0', 'n']:
-                    self._label_and_advance('0', 'Labeled as NEGATIVE (0)')
+                elif command in ["0", "n"]:
+                    self._label_and_advance("0", "Labeled as NEGATIVE (0)")
 
-                elif command == 'p':
+                elif command == "p":
                     self._auto_play_current()
                     if not self._get_audio_path(self.candidates[self.current_index]):
                         print("ERROR: No valid audio file path found")
 
-                elif command == 'n':  # Next without labeling
+                elif command == "n":  # Next without labeling
                     if self.current_index < len(self.candidates) - 1:
                         self.current_index += 1
                         self._display_current()
 
-                elif command == 'b':  # Back/previous
+                elif command == "b":  # Back/previous
                     if self.current_index > 0:
                         self.current_index -= 1
                         self._display_current()
 
-                elif command == 'j':
+                elif command == "j":
                     try:
                         jump_to = int(input("Jump to sample number (1-based): ")) - 1
                         if not self._jump_to_sample(jump_to):
@@ -273,11 +281,11 @@ class SimpleAudioLabeler:
                     except ValueError:
                         print("Invalid number!")
 
-                elif command == 'u':
+                elif command == "u":
                     # Jump to next unlabeled
                     found = False
                     for i in range(self.current_index + 1, len(self.candidates)):
-                        if self.candidates[i].get('needs_human_label', '').strip() == '':
+                        if self.candidates[i].get("needs_human_label", "").strip() == "":
                             self.current_index = i
                             found = True
                             break
@@ -285,7 +293,7 @@ class SimpleAudioLabeler:
                     if not found:
                         # Wrap around to beginning
                         for i in range(0, self.current_index):
-                            if self.candidates[i].get('needs_human_label', '').strip() == '':
+                            if self.candidates[i].get("needs_human_label", "").strip() == "":
                                 self.current_index = i
                                 found = True
                                 break
@@ -296,7 +304,7 @@ class SimpleAudioLabeler:
                     else:
                         print("No unlabeled samples found!")
 
-                elif command == 's':
+                elif command == "s":
                     self._save_candidates()
 
                 else:
@@ -306,7 +314,7 @@ class SimpleAudioLabeler:
                 print("\n\nInterrupted!")
                 if self.changes_made:
                     save = input("\nSave changes before quitting? (y/n): ").strip().lower()
-                    if save in ['y', 'yes']:
+                    if save in ["y", "yes"]:
                         self._save_candidates()
                 break
 
@@ -332,7 +340,7 @@ def test_audio_playback(audio_file):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Audio labeling tool for active learning with UrbanSound8K',
+        description="Audio labeling tool for active learning with UrbanSound8K",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Example workflow:
@@ -358,12 +366,20 @@ Audio playback:
   - macOS: uses built-in afplay
   - Linux: install sox ('sudo apt-get install sox') for play command
   - Windows: uses default audio player
-        """
+        """,
     )
 
-    parser.add_argument('candidates_csv', help='Path to labeling candidates CSV from active learning')
-    parser.add_argument('--audio-dir', help='Parent directory containing fold1-fold10 directories', default='data/urbansound8k')
-    parser.add_argument('--test-audio', help='Test audio playback with a specific file', metavar='FILE')
+    parser.add_argument(
+        "candidates_csv", help="Path to labeling candidates CSV from active learning"
+    )
+    parser.add_argument(
+        "--audio-dir",
+        help="Parent directory containing fold1-fold10 directories",
+        default="data/urbansound8k",
+    )
+    parser.add_argument(
+        "--test-audio", help="Test audio playback with a specific file", metavar="FILE"
+    )
 
     args = parser.parse_args()
 
@@ -380,7 +396,7 @@ Audio playback:
     with open(args.candidates_csv) as f:
         reader = csv.DictReader(f)
         first_row = next(reader, None)
-        if first_row and 'filepath' not in first_row:
+        if first_row and "filepath" not in first_row:
             print("Error: This tool requires a candidates CSV from the active learning workflow.")
             print("The CSV must have a 'filepath' column.")
             print(f"Found columns: {list(first_row.keys())}")

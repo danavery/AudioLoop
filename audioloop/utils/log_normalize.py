@@ -12,5 +12,5 @@ class LogNormalize(nn.Module):
         x = x.clamp(min=1e-10)  # Avoid log(0)
         x = self.db_transform(x)  # Convert to decibels (0, top_db]
         x = x - x.max()  # shift to max 0 (-top_db, 0]
-        x = 2 * (x / self.top_db) + 1 #  normalize to [-1, 1]
+        x = 2 * (x / self.top_db) + 1  #  normalize to [-1, 1]
         return x

@@ -25,7 +25,7 @@ class LabeledDataset(torch.utils.data.Dataset):
         if csv_file is None:
             raise ValueError("Either labels_file or meta_csv must be provided")
 
-        with open(csv_file, 'r') as f:
+        with open(csv_file) as f:
             csv_reader = csv.reader(f)
             for row in csv_reader:
                 if len(row) >= 2:  # At minimum need filepath and label
@@ -57,7 +57,7 @@ class LabeledDataset(torch.utils.data.Dataset):
             "label": label,
             "filename": filename,
             "filepath": filepath,
-            "run": run
+            "run": run,
         }
 
 
