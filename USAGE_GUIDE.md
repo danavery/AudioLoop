@@ -503,5 +503,5 @@ This script demonstrates:
 ### Getting Help
 
 - `README_agent.md` - Complete framework documentation
-- `audioloop/urbansound_classes.py` - Class definitions
+- `audioloop/datasets/urbansound8k.py` - Dataset handling and class definitions
 - `audioloop/active_learning.py` - Core functions with docstrings

@@ -29,7 +29,8 @@ audioloop/
 │   ├── merge_labels.py          # Label management utilities for active learning cycles
 │   ├── simple_train.py          # Model training logic
 │   ├── test_model.py            # Model validation on training data
-│   ├── urbansound_classes.py    # UrbanSound8K class definitions
+│   ├── datasets/                # Dataset handling modules
+│   │   └── urbansound8k.py      # UrbanSound8K dataset and class definitions
 │   ├── create_all_specs.py      # Spectrogram generation for full dataset
 │   ├── models/                  # Model architectures
 │   │   ├── simple_cnn.py        # Lightweight 2-layer CNN (SimpleCNN)
@@ -132,7 +133,7 @@ python -m audioloop.active_learning --list-classes
 
 ### Core Workflow
 - **`active_learning.py`**: Generalized active learning pipeline for any binary classification (includes CLI)
-- **`urbansound_classes.py`**: Class definitions and utility functions
+- **`datasets/urbansound8k.py`**: UrbanSound8K dataset handling and class definitions
 - **`simple_train.py`**: Training loop with early stopping at 100% accuracy
 - **`test_model.py`**: Validates model performance on training data
 
@@ -216,7 +217,7 @@ python -m audioloop.merge_labels merge training_sets/training_set_v1.csv outputs
 ### New Audio Domains
 1. Replace UrbanSound8K with domain-specific dataset
 2. Adjust spectrogram parameters for audio characteristics
-3. Modify class mappings in `urbansound_classes.py`
+3. Modify class mappings in `datasets/urbansound8k.py`
 4. Update binary label creation logic in `active_learning.py`
 
 ### Multi-class Classification

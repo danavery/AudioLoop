@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from .models.cnn_5layer import SoundCNN
-from .urbansound_classes import (
+from .datasets.urbansound8k import (
     get_class_id,
     get_class_name,
     list_classes,
