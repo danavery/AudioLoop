@@ -1,7 +1,6 @@
 import argparse
 import csv
 import os
-from pathlib import Path
 
 
 def merge_training_sets(original_csv, new_labels_csv, output_csv=None):
@@ -19,10 +18,7 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None):
     # Auto-generate output filename if not provided
     if output_csv is None:
         base = os.path.splitext(os.path.basename(original_csv))[0]
-        if 'v' in base:
-            version = int(base.split('_v')[1]) + 1
-        else:
-            version = 2
+        version = int(base.split('_v')[1]) + 1 if 'v' in base else 2
         output_csv = f"training_sets/training_set_v{version}.csv"
 
     all_data = []
@@ -32,9 +28,8 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None):
         with open(original_csv, 'r') as f:
             reader = csv.reader(f)
             for i, row in enumerate(reader):
-                if i == 0:  # Skip header if it exists
-                    if row[0].lower() in ['filename', 'filepath']:
-                        continue
+                if i == 0 and row[0].lower() in ['filename', 'filepath']:
+                    continue
                 if len(row) >= 2:
                     # Handle both filename and full filepath
                     filepath = row[0]

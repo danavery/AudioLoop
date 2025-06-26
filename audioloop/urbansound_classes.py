@@ -82,5 +82,5 @@ if __name__ == "__main__":
     class_id = get_class_id("dog_bark")
     print(f"'dog_bark' is class: {class_id}")
 
-    negative_name = f"not_siren"
+    negative_name = "not_siren"
     print(f"Negative class for 'siren': {negative_name}")

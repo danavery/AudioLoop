@@ -1,6 +1,6 @@
+import argparse
 import os
 import random
-import argparse
 
 from .filter_labels import get_matching_paths_from_csv
 

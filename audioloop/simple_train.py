@@ -1,10 +1,10 @@
 import argparse
 import os
 import random
+import re
 import time
 
 import torch
-import torch.nn.functional as F
 import torch.optim as optim
 from torch import nn
 from torch.utils.data import DataLoader
@@ -21,9 +21,6 @@ def set_seed(seed):
     torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
-
-
-
 
 
 def train_epoch(model, train_loader, optimizer, criterion, device):
@@ -55,16 +52,22 @@ def train_epoch(model, train_loader, optimizer, criterion, device):
         total += labels.size(0)
         correct += (predicted == labels).sum().item()
 
-
-
     avg_loss = running_loss / len(train_loader)
     accuracy = correct / total
     return avg_loss, accuracy
 
 
-
-
-def run_training(labels_file="labels.csv", max_epochs=1000, seed=43, batch_size=32, learning_rate=1e-3, specs_dir="data/all_specs", model_path=None, version=None, use_batchnorm=None):
+def run_training(
+    labels_file="labels.csv",
+    max_epochs=1000,
+    seed=43,
+    batch_size=32,
+    learning_rate=1e-3,
+    specs_dir="data/all_specs",
+    model_path=None,
+    version=None,
+    use_batchnorm=None,
+):
     device = get_device()
     print(f"Using device: {device}")
 
@@ -90,7 +93,7 @@ def run_training(labels_file="labels.csv", max_epochs=1000, seed=43, batch_size=
         shuffle=True,
         num_workers=0,  # Set to 0 to avoid hanging with persistent workers
         pin_memory=torch.cuda.is_available(),
-        collate_fn=simple_collate_fn
+        collate_fn=simple_collate_fn,
     )
 
     # Decide whether to use BatchNorm based on dataset size
@@ -101,10 +104,14 @@ def run_training(labels_file="labels.csv", max_epochs=1000, seed=43, batch_size=
         if len(train_dataset) < 100:
             print(f"⚠️  Small dataset ({len(train_dataset)} samples) detected - disabling BatchNorm")
             print("   BatchNorm running statistics are unreliable with <100 samples")
-            print("   This ensures consistent train/eval behavior but may limit performance scaling")
+            print(
+                "   This ensures consistent train/eval behavior but may limit performance scaling"
+            )
 
     # Create 5-layer CNN model with appropriate architecture
-    model = SoundCNN(num_classes=num_classes, kernel_size=(3, 3), use_batchnorm=use_batchnorm).to(device)
+    model = SoundCNN(num_classes=num_classes, kernel_size=(3, 3), use_batchnorm=use_batchnorm).to(
+        device
+    )
     if use_batchnorm:
         print("Using model WITH BatchNorm (recommended for larger datasets)")
     else:
@@ -141,7 +148,7 @@ def run_training(labels_file="labels.csv", max_epochs=1000, seed=43, batch_size=
         if epoch % 10 == 0 or accuracy >= 1.0 or epoch < 5:
             print(
                 f"Epoch {epoch + 1:4d}/{max_epochs} ({epoch_time:.2f}s) - "
-                f"Loss: {avg_loss:.4f} - Accuracy: {accuracy:.4f} ({accuracy*100:.2f}%)"
+                f"Loss: {avg_loss:.4f} - Accuracy: {accuracy:.4f} ({accuracy * 100:.2f}%)"
             )
 
         # Check if we've reached 100% accuracy
@@ -174,28 +181,46 @@ def run_training(labels_file="labels.csv", max_epochs=1000, seed=43, batch_size=
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Train a binary audio classification model")
     parser.add_argument("labels_file", help="Path to CSV file with training labels")
-    parser.add_argument("-o", "--output", help="Path to save trained model (default: auto-generated in outputs/)")
-    parser.add_argument("-v", "--version", type=int, help="Model version number (default: auto-detected from training set filename)")
-    parser.add_argument("-e", "--epochs", type=int, default=1000, help="Maximum training epochs (default: 1000)")
+    parser.add_argument(
+        "-o", "--output", help="Path to save trained model (default: auto-generated in outputs/)"
+    )
+    parser.add_argument(
+        "-v",
+        "--version",
+        type=int,
+        help="Model version number (default: auto-detected from training set filename)",
+    )
+    parser.add_argument(
+        "-e", "--epochs", type=int, default=1000, help="Maximum training epochs (default: 1000)"
+    )
     parser.add_argument("-s", "--seed", type=int, default=42, help="Random seed (default: 42)")
     parser.add_argument("-b", "--batch-size", type=int, default=32, help="Batch size (default: 32)")
-    parser.add_argument("-lr", "--learning-rate", type=float, default=0.001, help="Learning rate (default: 0.001)")
-    parser.add_argument("--specs-dir", default="data/all_specs", help="Directory containing spectrogram files (default: data/all_specs)")
-    parser.add_argument("--no-batchnorm", action="store_true", help="Disable BatchNorm (auto-disabled for <100 samples)")
+    parser.add_argument(
+        "-lr", "--learning-rate", type=float, default=0.001, help="Learning rate (default: 0.001)"
+    )
+    parser.add_argument(
+        "--specs-dir",
+        default="data/all_specs",
+        help="Directory containing spectrogram files (default: data/all_specs)",
+    )
+    parser.add_argument(
+        "--no-batchnorm",
+        action="store_true",
+        help="Disable BatchNorm (auto-disabled for <100 samples)",
+    )
 
     args = parser.parse_args()
 
     # Auto-detect version from training set filename if not specified
     if args.version is None:
-        import re
         # Try to extract version from filename like training_set_v2.csv
-        match = re.search(r'_v(\d+)\.csv$', args.labels_file)
+        match = re.search(r"_v(\d+)\.csv$", args.labels_file)
         if match:
             args.version = int(match.group(1))
             print(f"Auto-detected version {args.version} from training set filename")
         else:
             args.version = 1
-            print(f"Could not detect version from filename, defaulting to version 1")
+            print("Could not detect version from filename, defaulting to version 1")
 
     # Run training with CLI arguments
     accuracy = run_training(
@@ -207,6 +232,6 @@ if __name__ == "__main__":
         specs_dir=args.specs_dir,
         model_path=args.output,
         version=args.version,
-        use_batchnorm=False if args.no_batchnorm else None
+        use_batchnorm=False if args.no_batchnorm else None,
     )
     print(f"\nFinal training accuracy: {accuracy:.4f}")

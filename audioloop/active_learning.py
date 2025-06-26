@@ -2,6 +2,7 @@ import argparse
 import csv
 import os
 import random
+import time
 
 import torch
 import torch.nn.functional as F
@@ -18,8 +19,10 @@ from .utils.data_utils import entropy, get_device, variable_length_collate_fn
 from .utils.spectrogram_dataset import SpectrogramDataset
 
 
-def calculate_percentiles(values, percentiles=[10, 25, 50, 75, 90, 95]):
+def calculate_percentiles(values, percentiles=None):
     """Calculate percentiles for a list of values."""
+    if percentiles is None:
+        percentiles = [10, 25, 50, 75, 90, 95]
     if not values:
         return {p: 0 for p in percentiles}
     sorted_values = sorted(values)
@@ -156,7 +159,7 @@ def load_model(model_path, num_classes, device):
     state_dict = torch.load(model_path, map_location=device)
 
     # Check if the model has BatchNorm layers by looking for 'bn' keys
-    has_batchnorm = any('bn' in key for key in state_dict.keys())
+    has_batchnorm = any('bn' in key for key in state_dict)
 
     # Create model with appropriate BatchNorm setting
     model = SoundCNN(num_classes=num_classes, kernel_size=(3, 3), use_batchnorm=has_batchnorm)
@@ -442,8 +445,6 @@ def select_candidates_for_labeling(predictions_file="outputs/predictions.csv",
     negative_pool = negative_preds[:negative_pool_size]
 
     # Randomly sample from the pools to improve diversity
-    import time
-    import random
     random.seed(int(time.time()))
 
     positive_candidates = random.sample(positive_pool, min(num_positive, len(positive_pool)))
@@ -473,10 +474,7 @@ def select_candidates_for_labeling(predictions_file="outputs/predictions.csv",
     true_negative_samples = []
 
     for p in all_predictions:
-        if isinstance(p['true_label'], str):
-            true_label = int(p['true_label'])
-        else:
-            true_label = p['true_label']
+        true_label = int(p['true_label']) if isinstance(p['true_label'], str) else p['true_label']
 
         if true_label == 1:
             true_positive_samples.append(p)
@@ -792,7 +790,7 @@ Examples:
     negative_class_name = args.negative_name or f"not_{positive_class_name}"
 
     # Print configuration
-    print(f"Running active learning cycle")
+    print("Running active learning cycle")
     print("-" * 60)
     print(f"Positive class: {positive_class_name} (ID: {positive_class_id})")
     print(f"Negative class: {negative_class_name}")
