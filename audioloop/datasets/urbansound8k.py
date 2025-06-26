@@ -121,10 +121,12 @@ class UrbanSound8KProcessor:
 
     def parse_metadata_row(self, row: dict[str, str]) -> dict:
         """Parse a metadata CSV row into standardized format."""
+        class_name = row["class"]
         return {
             "filename": row["slice_file_name"],
             "class_id": int(row["classID"]),
-            "class_name": row["class"],
+            "class_name": class_name,
+            "labels": [class_name],  # Convert single label to array for consistency
             "fold": int(row["fold"]),
         }
 

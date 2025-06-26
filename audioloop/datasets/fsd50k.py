@@ -167,6 +167,7 @@ class FSD50KConfig:
     vocabulary_csv: Path = Path("data/FSD50K/FSD50K.ground_truth/vocabulary.csv")
     dev_csv: Path = Path("data/FSD50K/FSD50K.ground_truth/dev.csv")
     eval_csv: Path = Path("data/FSD50K/FSD50K.ground_truth/eval.csv")
+    inference_csv: Path = Path("outputs/fsd50k_files.csv")
 
 
 class FSD50KProcessor:

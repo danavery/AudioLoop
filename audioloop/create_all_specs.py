@@ -141,7 +141,7 @@ def create_specs(processor, config=None, clear_output=True) -> tuple[int, int]:
 def create_inference_csv(processor, config=None) -> Path:
     """
     Create a CSV file listing all dataset files for inference.
-    Format: filename,class_id
+    Format: filename,labels (labels as comma-separated string)
 
     Args:
         processor: Dataset processor that handles dataset-specific operations
@@ -156,17 +156,20 @@ def create_inference_csv(processor, config=None) -> Path:
     # Load metadata
     audio_files = processor.load_metadata()
 
-    # Prepare data for CSV
+    # Prepare data for CSV - use labels arrays consistently
     files_data = []
     for file_info in audio_files:
-        files_data.append({"filename": file_info["filename"], "class_id": file_info["class_id"]})
+        files_data.append({
+            "filename": file_info["filename"],
+            "labels": ",".join(file_info["labels"])
+        })
 
     # Ensure output directory exists
     config.inference_csv.parent.mkdir(parents=True, exist_ok=True)
 
     # Write to CSV
     with config.inference_csv.open("w", newline="") as f:
-        fieldnames = ["filename", "class_id"]
+        fieldnames = ["filename", "labels"]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(files_data)
