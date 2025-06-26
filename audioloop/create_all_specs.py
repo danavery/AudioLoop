@@ -1,5 +1,7 @@
+import argparse
 import csv
 import logging
+import shutil
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -8,6 +10,7 @@ import torchaudio
 from tqdm import tqdm
 
 from .datasets import UrbanSound8KConfig, UrbanSound8KProcessor
+from .datasets.fsd50k import FSD50KConfig, FSD50KProcessor
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -59,13 +62,14 @@ class ProcessingStats:
         return "\n".join(summary)
 
 
-def create_specs(processor, config=None) -> tuple[int, int]:
+def create_specs(processor, config=None, clear_output=True) -> tuple[int, int]:
     """
     Create spectrograms for any dataset using the provided processor.
 
     Args:
         processor: Dataset processor that handles dataset-specific operations
         config: Dataset configuration. If None, uses processor's config.
+        clear_output: Whether to clear existing spectrograms before processing
 
     Returns:
         Tuple of (successful_count, failed_count)
@@ -74,13 +78,24 @@ def create_specs(processor, config=None) -> tuple[int, int]:
         config = processor.config
 
     # Validate inputs
-    if not config.metadata_csv.exists():
-        raise FileNotFoundError(f"Metadata CSV not found: {config.metadata_csv}")
+    # Check for metadata file - different datasets have different attribute names
+    metadata_file = None
+    if hasattr(config, "metadata_csv"):
+        metadata_file = config.metadata_csv
+    elif hasattr(config, "dev_csv"):
+        metadata_file = config.dev_csv
+
+    if metadata_file and not metadata_file.exists():
+        raise FileNotFoundError(f"Metadata file not found: {metadata_file}")
 
     if not config.audio_root.exists():
         raise FileNotFoundError(f"Audio root directory not found: {config.audio_root}")
 
-    # Create output directory
+    # Clear and create output directory
+    if clear_output and config.output_dir.exists():
+        logger.info(f"Clearing existing spectrograms in {config.output_dir}")
+        shutil.rmtree(config.output_dir)
+
     config.output_dir.mkdir(parents=True, exist_ok=True)
 
     # Load metadata
@@ -107,7 +122,7 @@ def create_specs(processor, config=None) -> tuple[int, int]:
                     waveform, _ = torchaudio.load(file_info["audio_path"])
                     sample_spec = processor.spec_transform(waveform)
                     fixed_spec = processor.fix_spectrogram_length(sample_spec)
-
+                    logger.info(f"Sample audio_path: {file_info['audio_path']}")
                     logger.info(f"Sample audio shape: {waveform.shape}")
                     logger.info(f"Sample spectrogram shape (before fixing): {sample_spec.shape}")
                     logger.info(f"Sample spectrogram shape (after fixing): {fixed_spec.shape}")
@@ -161,12 +176,53 @@ def create_inference_csv(processor, config=None) -> Path:
 
 
 if __name__ == "__main__":
-    # Create spectrograms for all UrbanSound8K files
-    config = UrbanSound8KConfig()
-    processor = UrbanSound8KProcessor(config)
-    successful, failed = create_specs(processor)
+    parser = argparse.ArgumentParser(
+        description="Create spectrograms for audio datasets",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Process UrbanSound8K dataset (default)
+  python -m audioloop.create_all_specs
+
+  # Process FSD50K dataset
+  python -m audioloop.create_all_specs --dataset fsd50k
+
+  # Process without clearing existing spectrograms
+  python -m audioloop.create_all_specs --no-clear
+        """,
+    )
+
+    parser.add_argument(
+        "--dataset",
+        choices=["urbansound8k", "fsd50k"],
+        default="urbansound8k",
+        help="Dataset to process (default: urbansound8k)",
+    )
+
+    parser.add_argument(
+        "--no-clear",
+        action="store_true",
+        help="Do not clear existing spectrograms before processing",
+    )
+
+    args = parser.parse_args()
+
+    # Set up dataset processor
+    if args.dataset == "fsd50k":
+        config = FSD50KConfig()
+        processor = FSD50KProcessor(config)
+        logger.info("Processing FSD50K dataset (dev split)")
+    else:
+        config = UrbanSound8KConfig()
+        processor = UrbanSound8KProcessor(config)
+        logger.info("Processing UrbanSound8K dataset")
+
+    # Create spectrograms
+    successful, failed = create_specs(processor, clear_output=not args.no_clear)
 
     # Create CSV for inference
     if successful > 0:
         inference_csv = create_inference_csv(processor)
         logger.info(f"Ready for inference! Use: {inference_csv}")
+    else:
+        logger.error("No spectrograms were created successfully")

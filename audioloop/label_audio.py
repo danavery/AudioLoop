@@ -89,9 +89,9 @@ class SimpleAudioLabeler:
         filename = os.path.basename(audio_filepath)
 
         # For UrbanSound8K: search through all fold directories
-        if '-' in filename and filename.endswith('.wav'):
+        if "-" in filename and filename.endswith(".wav"):
             for fold_num in range(1, 11):  # fold1 through fold10
-                fold_path = os.path.join(self.audio_dir, f'fold{fold_num}', filename)
+                fold_path = os.path.join(self.audio_dir, f"fold{fold_num}", filename)
                 if os.path.exists(fold_path):
                     return fold_path
 
