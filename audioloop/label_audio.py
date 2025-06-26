@@ -28,7 +28,6 @@ import csv
 import os
 import subprocess
 import sys
-from pathlib import Path
 
 
 class SimpleAudioLabeler:
@@ -127,12 +126,47 @@ class SimpleAudioLabeler:
 
     def _save_candidates(self):
         """Save candidates back to CSV file."""
+        if not self.fieldnames:
+            print("Error: No fieldnames available for CSV writing")
+            return
+
         with open(self.candidates_csv, 'w', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=self.fieldnames)
             writer.writeheader()
             writer.writerows(self.candidates)
         self.changes_made = False
         print(f"\nSaved labels to {self.candidates_csv}")
+
+    def _auto_play_current(self):
+        """Auto-play current sample's audio."""
+        if self.current_index < len(self.candidates):
+            audio_path = self._get_audio_path(self.candidates[self.current_index])
+            if audio_path:
+                print("\nPlaying audio...")
+                self._play_audio(audio_path)
+
+    def _advance_and_play(self):
+        """Advance to next sample and auto-play audio."""
+        if self.current_index < len(self.candidates) - 1:
+            self.current_index += 1
+            self._display_current()
+            self._auto_play_current()
+
+    def _label_and_advance(self, label: str, message: str):
+        """Label current sample and advance to next with auto-play."""
+        if self.current_index < len(self.candidates):
+            self.candidates[self.current_index]['needs_human_label'] = label
+            self.changes_made = True
+            print(f"✓ {message}")
+            self._advance_and_play()
+
+    def _jump_to_sample(self, index: int):
+        """Jump to a specific sample and display it."""
+        if 0 <= index < len(self.candidates):
+            self.current_index = index
+            self._display_current()
+            return True
+        return False
 
     def _display_current(self):
         """Display current candidate information."""
@@ -188,25 +222,17 @@ class SimpleAudioLabeler:
         print("Type 'h' for help")
         print("Commands: 1=positive, 0=negative, u=next unlabeled, q=quit\n")
 
-        # Display first candidate
+        # Display first candidate and auto-play
         self._display_current()
-
-        # Auto-play first audio
-        if self.current_index < len(self.candidates):
-            audio_path = self._get_audio_path(self.candidates[self.current_index])
-            if audio_path:
-                print("\nPlaying audio...")
-                self._play_audio(audio_path)
+        self._auto_play_current()
 
         while True:
             try:
-                # Get user input
                 command = input("\nCommand: ").strip().lower()
 
                 if not command:
                     continue
 
-                # Process commands
                 if command in ['q', 'quit']:
                     if self.changes_made:
                         save = input("Save changes before quitting? (y/n): ").strip().lower()
@@ -219,43 +245,15 @@ class SimpleAudioLabeler:
                     self._show_help()
 
                 elif command in ['1', 'y']:
-                    if self.current_index < len(self.candidates):
-                        self.candidates[self.current_index]['needs_human_label'] = '1'
-                        self.changes_made = True
-                        print("✓ Labeled as POSITIVE (1)")
-                        # Auto-advance to next
-                        if self.current_index < len(self.candidates) - 1:
-                            self.current_index += 1
-                            self._display_current()
-                            # Auto-play next audio
-                            audio_path = self._get_audio_path(self.candidates[self.current_index])
-                            if audio_path:
-                                print("\nPlaying audio...")
-                                self._play_audio(audio_path)
+                    self._label_and_advance('1', 'Labeled as POSITIVE (1)')
 
                 elif command in ['0', 'n']:
-                    if self.current_index < len(self.candidates):
-                        self.candidates[self.current_index]['needs_human_label'] = '0'
-                        self.changes_made = True
-                        print("✓ Labeled as NEGATIVE (0)")
-                        # Auto-advance to next
-                        if self.current_index < len(self.candidates) - 1:
-                            self.current_index += 1
-                            self._display_current()
-                            # Auto-play next audio
-                            audio_path = self._get_audio_path(self.candidates[self.current_index])
-                            if audio_path:
-                                print("\nPlaying audio...")
-                                self._play_audio(audio_path)
+                    self._label_and_advance('0', 'Labeled as NEGATIVE (0)')
 
                 elif command == 'p':
-                    if self.current_index < len(self.candidates):
-                        audio_path = self._get_audio_path(self.candidates[self.current_index])
-                        if audio_path:
-                            print("Playing audio...")
-                            self._play_audio(audio_path)
-                        else:
-                            print("ERROR: No valid audio file path found")
+                    self._auto_play_current()
+                    if not self._get_audio_path(self.candidates[self.current_index]):
+                        print("ERROR: No valid audio file path found")
 
                 elif command == 'n':  # Next without labeling
                     if self.current_index < len(self.candidates) - 1:
@@ -270,10 +268,7 @@ class SimpleAudioLabeler:
                 elif command == 'j':
                     try:
                         jump_to = int(input("Jump to sample number (1-based): ")) - 1
-                        if 0 <= jump_to < len(self.candidates):
-                            self.current_index = jump_to
-                            self._display_current()
-                        else:
+                        if not self._jump_to_sample(jump_to):
                             print("Invalid sample number!")
                     except ValueError:
                         print("Invalid number!")
@@ -297,11 +292,7 @@ class SimpleAudioLabeler:
 
                     if found:
                         self._display_current()
-                        # Auto-play
-                        audio_path = self._get_audio_path(self.candidates[self.current_index])
-                        if audio_path:
-                            print("\nPlaying audio...")
-                            self._play_audio(audio_path)
+                        self._auto_play_current()
                     else:
                         print("No unlabeled samples found!")
 
