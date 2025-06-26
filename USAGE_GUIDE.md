@@ -35,7 +35,7 @@ predictions_file, candidates_file = run_active_learning_for_class(
 )
 
 # Custom configuration with full control
-from audioloop.active_learning import run_active_learning_cycle
+from audioloop.active_learning_core import run_active_learning_cycle
 
 predictions_file, candidates_file = run_active_learning_cycle(
     positive_class_id=3,  # dog_bark
@@ -142,8 +142,8 @@ uv run python -m audioloop.active_learning \
     --class-name dog_bark \
     --model outputs/model_v1.pt \
     --run-number 2 \
-    --num-positive 15 \
-    --num-negative 5 \
+    --total-candidates 20 \
+    --positive-pct 0.75 \
     --min-confidence 0.85
 
 # Run with class ID instead of name
@@ -159,8 +159,8 @@ Available options:
 - `--model`: Path to trained model (required)
 - `--run-number`: Version number for output files (default: 1)
 - `--negative-name`: Custom name for negative class
-- `--num-positive`: Number of positive candidates (default: 10)
-- `--num-negative`: Number of negative candidates (default: 10)
+- `--total-candidates`: Total number of candidates to select (default: 20)
+- `--positive-pct`: Percentage of candidates that should be positive predictions (default: 0.75)
 - `--min-confidence`: Minimum confidence threshold (default: 0.8)
 
 **Python API:**
@@ -216,9 +216,9 @@ python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/label
 
 Or use the Python API:
 ```python
-from audioloop.active_learning import merge_human_labels
+from audioloop.merge_labels import merge_training_sets
 
-new_training_set = merge_human_labels(
+new_training_set = merge_training_sets(
     "training_sets/training_set_v1.csv",
     "outputs/labeling_candidates_v1.csv"  # With human labels filled in
 )
@@ -263,13 +263,13 @@ predictions_file, candidates_file = run_active_learning_for_class(
 
 ### Custom Selection Parameters
 ```python
-from audioloop.active_learning import select_candidates_for_labeling
+from audioloop.active_learning_core import select_candidates_for_labeling
 
 candidates = select_candidates_for_labeling(
     predictions_file="outputs/predictions.csv",
-    num_positive=15,        # More positive samples
-    num_negative=5,         # Fewer negative samples
-    min_confidence=0.9,     # Higher confidence threshold
+    total_candidates=20,     # Total number of candidates
+    positive_percentage=0.75, # 75% positive, 25% negative
+    min_confidence=0.9,      # Higher confidence threshold
     candidates_csv="outputs/high_conf_candidates.csv"
 )
 ```
@@ -384,10 +384,10 @@ python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/label
 ### Python API for Label Management
 
 ```python
-from audioloop.active_learning import merge_human_labels
+from audioloop.merge_labels import merge_training_sets
 
 # Simple merge with auto-versioning
-new_training_set = merge_human_labels(
+new_training_set = merge_training_sets(
     "training_sets/training_set_v1.csv",
     "outputs/labeling_candidates_v1.csv"
 )
@@ -395,7 +395,7 @@ print(f"Created: {new_training_set}")
 # Output: Created: training_sets/training_set_v2.csv
 
 # Custom output path
-new_training_set = merge_human_labels(
+new_training_set = merge_training_sets(
     "training_sets/training_set_v1.csv",
     "outputs/labeling_candidates_v1.csv",
     "training_sets/training_set_experimental.csv"
@@ -412,7 +412,7 @@ predictions, candidates = run_active_learning_for_class(
 )
 
 # After human labeling, merge and continue
-new_training_set = merge_human_labels(
+new_training_set = merge_training_sets(
     "training_sets/training_set_v1.csv", 
     candidates
 )

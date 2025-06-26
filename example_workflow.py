@@ -17,7 +17,8 @@ import csv
 import os
 import random
 
-from audioloop.active_learning import merge_human_labels, run_active_learning_for_class
+from audioloop.active_learning import run_active_learning_for_class
+from audioloop.merge_labels import merge_training_sets
 
 
 def simulate_human_labeling(candidates_file, error_rate=0.1):
@@ -133,7 +134,7 @@ def run_complete_workflow(class_name, initial_model, num_cycles=2, simulate_huma
             if not os.path.exists(current_training_set):
                 current_training_set = "training_sets/training_set_v1.csv"
 
-            new_training_set = merge_human_labels(
+            new_training_set = merge_training_sets(
                 current_training_set,
                 candidates_file
             )

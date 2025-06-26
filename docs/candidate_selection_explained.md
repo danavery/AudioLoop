@@ -90,9 +90,9 @@ You can adjust the selection strategy:
 ```bash
 python -m audioloop.active_learning \
     --class-name dog_bark \
-    --num-positive 20 \      # Select more positive samples
-    --num-negative 5 \       # Select fewer negative samples
-    --min-confidence 0.9     # Require higher confidence
+    --total-candidates 25 \     # Select 25 total candidates
+    --positive-pct 0.8 \        # 80% positive, 20% negative
+    --min-confidence 0.9        # Require higher confidence
 ```
 
 ## Why Randomization Matters

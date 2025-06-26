@@ -92,7 +92,7 @@ audio2.wav,0,2,1
 
 ```python
 # Using the active learning framework
-from audioloop.active_learning import run_active_learning_cycle
+from audioloop.active_learning_core import run_active_learning_cycle
 
 # Step 1-3: Complete cycle for any binary classification task
 # Simple approach - just provide class name
@@ -105,7 +105,7 @@ predictions_file, candidates_file = run_active_learning_for_class(
 )
 
 # Or use the full function with more control
-from audioloop.active_learning import run_active_learning_cycle
+from audioloop.active_learning_core import run_active_learning_cycle
 
 predictions_file, candidates_file = run_active_learning_cycle(
     positive_class_id=8,               # UrbanSound8K class ID (8=siren)
