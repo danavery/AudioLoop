@@ -25,7 +25,7 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None):
 
     # Read original training set
     if os.path.exists(original_csv):
-        with open(original_csv, 'r') as f:
+        with open(original_csv) as f:
             reader = csv.reader(f)
             for i, row in enumerate(reader):
                 if i == 0 and row[0].lower() in ['filename', 'filepath']:
@@ -46,7 +46,7 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None):
 
     # Read new labels from candidates CSV format
     new_count = 0
-    with open(new_labels_csv, 'r') as f:
+    with open(new_labels_csv) as f:
         reader = csv.DictReader(f)
 
         for row in reader:

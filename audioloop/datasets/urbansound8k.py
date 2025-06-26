@@ -7,7 +7,7 @@ import torch
 import torchaudio
 from torch import nn
 
-from ..utils.log_normalize import LogNormalize
+from audioloop.utils.log_normalize import LogNormalize
 
 logger = logging.getLogger(__name__)
 

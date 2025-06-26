@@ -9,12 +9,12 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from .models.cnn_5layer import SoundCNN
 from .datasets.urbansound8k import (
     get_class_id,
     get_class_name,
     list_classes,
 )
+from .models.cnn_5layer import SoundCNN
 from .utils.data_utils import entropy, get_device, variable_length_collate_fn
 from .utils.spectrogram_dataset import SpectrogramDataset
 
@@ -24,7 +24,7 @@ def calculate_percentiles(values, percentiles=None):
     if percentiles is None:
         percentiles = [10, 25, 50, 75, 90, 95]
     if not values:
-        return {p: 0 for p in percentiles}
+        return dict.fromkeys(percentiles, 0)
     sorted_values = sorted(values)
     n = len(sorted_values)
     result = {}
@@ -197,7 +197,7 @@ def create_binary_labels(urbansound_file="data/urbansound8k/UrbanSound8K.csv",
     positive_count = 0
     negative_count = 0
 
-    with open(urbansound_file, 'r') as f:
+    with open(urbansound_file) as f:
         csv_reader = csv.DictReader(f)
         for row in csv_reader:
             filename = row['slice_file_name']
@@ -418,7 +418,7 @@ def select_candidates_for_labeling(predictions_file="outputs/predictions.csv",
 
     # Read predictions
     predictions = []
-    with open(predictions_file, 'r') as f:
+    with open(predictions_file) as f:
         reader = csv.DictReader(f)
         for row in reader:
             row['confidence'] = float(row['confidence'])

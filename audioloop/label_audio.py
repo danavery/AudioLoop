@@ -53,7 +53,7 @@ class SimpleAudioLabeler:
 
     def _load_candidates(self):
         """Load candidates from CSV file."""
-        with open(self.candidates_csv, 'r') as f:
+        with open(self.candidates_csv) as f:
             reader = csv.DictReader(f)
             self.candidates = list(reader)
             self.fieldnames = reader.fieldnames
@@ -377,7 +377,7 @@ Audio playback:
         sys.exit(1)
 
     # Verify it's from active learning workflow
-    with open(args.candidates_csv, 'r') as f:
+    with open(args.candidates_csv) as f:
         reader = csv.DictReader(f)
         first_row = next(reader, None)
         if first_row and 'filepath' not in first_row:

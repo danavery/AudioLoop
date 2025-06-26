@@ -18,7 +18,8 @@ requires-python = ">=3.13"
 line-length = 100
 
 [tool.ruff.lint]
-extend-select = ["I", "B", "SIM", "RET"]
+# extend-select = ["I", "B", "SIM", "RET"]
+extend-select = ["I", "B", "SIM", "RET", "UP", "C4", "F", "RUF", "TID"]
 ignore = ["RET504"] # Unnecessary assignment before return
 
 [tool.ruff.lint.per-file-ignores]
