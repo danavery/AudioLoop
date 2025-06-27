@@ -1,202 +1,276 @@
-# AudioLoop Workflow Guide
+# AudioLoop Versioned Workflow Guide
 
-This guide explains the consistent versioned workflow for active learning with AudioLoop.
+Complete reference for AudioLoop's versioned active learning workflow patterns.
 
-## Overview
+## Version Naming Convention
 
-AudioLoop uses a versioned naming convention throughout the workflow:
-- Models: `model_v1.pt`, `model_v2.pt`, etc.
-- Training sets: `training_set_v1.csv`, `training_set_v2.csv`, etc.
-- Predictions: `predictions_v1.csv`, `predictions_v2.csv`, etc.
-- Candidates: `labeling_candidates_v1.csv`, `labeling_candidates_v2.csv`, etc.
+AudioLoop uses consistent versioning across all artifacts:
+- **Models**: `outputs/model_v{N}.pt`
+- **Training sets**: `training_sets/training_set_v{N}.csv`
+- **Predictions**: `outputs/predictions_v{N}.csv`
+- **Candidates**: `outputs/labeling_candidates_v{N}.csv`
+- **Binary labels**: `outputs/binary_labels_v{N}.csv`
 
-## Complete Workflow Example
+## Standard Workflow Pattern
 
-Here's a complete example for detecting "dog_bark" sounds:
+### Complete 3-Cycle Example (Dog Bark Detection)
 
-### Step 1: Prepare Initial Training Set
-
-Create your initial training set with binary labels:
 ```bash
-# Create binary labels from UrbanSound8K (dog_bark = class 3)
-python -m audioloop.active_learning create-binary-labels \
-    --class-id 3 \
-    --output training_sets/training_set_v1.csv
-```
-
-### Step 2: Train Initial Model
-
-Train your first model (version is auto-detected from filename):
-```bash
+# === CYCLE 1: Initial Training ===
+# 1. Train initial model (auto-detects v1 from filename)
 python -m audioloop.simple_train training_sets/training_set_v1.csv
-# Auto-detects version 1 from filename
-# Creates: outputs/model_v1.pt
-```
+# → Creates: outputs/model_v1.pt
 
-### Step 3: Run Active Learning Cycle
+# 2. Run active learning (auto-detects v1 from model)
+python -m audioloop.active_learning --class-name dog_bark --model outputs/model_v1.pt
+# → Creates: outputs/predictions_v1.csv, outputs/labeling_candidates_v1.csv
 
-Generate predictions and select candidates for labeling:
-```bash
-python -m audioloop.active_learning --class-name dog_bark --run-number 1
-# Automatically uses: outputs/model_v1.pt
-# Creates: outputs/predictions_v1.csv
-# Creates: outputs/labeling_candidates_v1.csv
-```
+# 3. Human labeling
+python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --audio-dir data/urbansound8k
 
-### Step 4: Label Candidates
+# 4. Merge labels (auto-creates v2)
+python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv
+# → Creates: training_sets/training_set_v2.csv
 
-Label the selected audio samples:
-```bash
-python -m audioloop.label_audio outputs/labeling_candidates_v1.csv \
-    --audio-dir data/urbansound8k
-```
-
-### Step 5: Merge Labels
-
-Merge the human-labeled data back into your training set:
-```bash
-python -m audioloop.merge_labels \
-    training_sets/training_set_v1.csv \
-    outputs/labeling_candidates_v1.csv
-# Creates: training_sets/training_set_v2.csv
-```
-
-### Step 6: Train Next Model
-
-Train the improved model:
-```bash
+# === CYCLE 2: Improved Model ===
+# 5. Train improved model
 python -m audioloop.simple_train training_sets/training_set_v2.csv
-# Auto-detects version 2 from filename
-# Creates: outputs/model_v2.pt
-```
+# → Creates: outputs/model_v2.pt
 
-### Step 7: Continue the Cycle
-
-Run the next active learning cycle:
-```bash
+# 6. Run active learning cycle 2
 python -m audioloop.active_learning --class-name dog_bark --model outputs/model_v2.pt
-# Auto-detects run number 2 from model filename
-# Creates: outputs/predictions_v2.csv
-# Creates: outputs/labeling_candidates_v2.csv
+# → Creates: outputs/predictions_v2.csv, outputs/labeling_candidates_v2.csv
+
+# 7. Human labeling cycle 2
+python -m audioloop.label_audio outputs/labeling_candidates_v2.csv --audio-dir data/urbansound8k
+
+# 8. Merge labels for cycle 3
+python -m audioloop.merge_labels training_sets/training_set_v2.csv outputs/labeling_candidates_v2.csv
+# → Creates: training_sets/training_set_v3.csv
+
+# === CYCLE 3: Final Iteration ===
+# 9. Train final model
+python -m audioloop.simple_train training_sets/training_set_v3.csv
+# → Creates: outputs/model_v3.pt
+
+# 10. Final active learning cycle
+python -m audioloop.active_learning --class-name dog_bark --model outputs/model_v3.pt
+# → Creates: outputs/predictions_v3.csv, outputs/labeling_candidates_v3.csv
 ```
 
-## Key Commands Reference
+## Version Auto-Detection
+
+AudioLoop automatically detects versions from filenames:
 
 ### Training Models
 ```bash
-# Train model (version auto-detected from training_set_v{N}.csv)
-python -m audioloop.simple_train training_sets/training_set_v{N}.csv
+# Version auto-detected from training_set_v{N}.csv
+python -m audioloop.simple_train training_sets/training_set_v1.csv
+# → Creates: outputs/model_v1.pt
 
-# Explicitly specify version (overrides auto-detection)
-python -m audioloop.simple_train training_sets/training_set_v{N}.csv -v {N}
+python -m audioloop.simple_train training_sets/training_set_v2.csv  
+# → Creates: outputs/model_v2.pt
 
-# Train with custom parameters
-python -m audioloop.simple_train training_sets/training_set_v1.csv \
-    --epochs 500 \
-    --batch-size 64 \
-    --learning-rate 0.0005
+# Override auto-detection
+python -m audioloop.simple_train training_sets/training_set_v1.csv -v 5
+# → Creates: outputs/model_v5.pt
 ```
 
-### Active Learning
+### Active Learning Cycles
 ```bash
-# Run active learning cycle (auto-detects version from model filename)
-python -m audioloop.active_learning --class-name {class} --model outputs/model_v2.pt
-# Auto-detects run number 2, creates predictions_v2.csv and labeling_candidates_v2.csv
+# Version auto-detected from model filename
+python -m audioloop.active_learning --class-name siren --model outputs/model_v2.pt
+# → Creates: outputs/predictions_v2.csv, outputs/labeling_candidates_v2.csv
 
-# Or specify run-number explicitly (automatically uses outputs/model_v{N}.pt)
-python -m audioloop.active_learning --class-name {class} --run-number {N}
-
-# With custom model path (version not auto-detected from non-standard names)
-python -m audioloop.active_learning --class-name {class} --run-number {N} \
-    --model path/to/custom_model.pt
+# Or specify run number explicitly
+python -m audioloop.active_learning --class-name siren --run-number 3
+# → Uses: outputs/model_v3.pt (must exist)
+# → Creates: outputs/predictions_v3.csv, outputs/labeling_candidates_v3.csv
 ```
 
-### Labeling Audio
+### Label Merging
 ```bash
-# Label candidates from active learning
-python -m audioloop.label_audio outputs/labeling_candidates_v{N}.csv \
-    --audio-dir data/urbansound8k
-```
-
-### Merging Labels
-```bash
-# Merge to create next version of training set
-python -m audioloop.merge_labels \
-    training_sets/training_set_v{N}.csv \
-    outputs/labeling_candidates_v{N}.csv
-# Creates: training_sets/training_set_v{N+1}.csv
-```
-
-## File Naming Convention
-
-| File Type | Pattern | Example |
-|-----------|---------|---------|
-| Model | `outputs/model_v{N}.pt` | `outputs/model_v1.pt` |
-| Training Set | `training_sets/training_set_v{N}.csv` | `training_sets/training_set_v1.csv` |
-| Predictions | `outputs/predictions_v{N}.csv` | `outputs/predictions_v1.csv` |
-| Candidates | `outputs/labeling_candidates_v{N}.csv` | `outputs/labeling_candidates_v1.csv` |
-| Binary Labels | `outputs/binary_labels_v{N}.csv` | `outputs/binary_labels_v1.csv` |
-
-## Tips for Effective Active Learning
-
-1. **Start Small**: Begin with a small, high-quality training set
-2. **Label Consistently**: When labeling, be consistent about edge cases
-3. **Monitor Progress**: Track model accuracy across versions
-4. **Focus on Errors**: The active learning selection prioritizes uncertain cases
-5. **Save Everything**: Keep all versioned files for reproducibility
-
-## Troubleshooting
-
-### Model Not Found
-If you see "Model outputs/model_v2.pt not found", make sure you've trained it:
-```bash
-python -m audioloop.simple_train training_sets/training_set_v2.csv -v 2
-```
-
-### Audio Not Playing
-Ensure your `--audio-dir` points to the parent of the fold directories:
-```bash
-# Correct
---audio-dir data/urbansound8k
-
-# Incorrect
---audio-dir data/urbansound8k/fold1
-```
-
-### Wrong Predictions File
-The predictions file version matches the run number:
-- `--run-number 1` creates `predictions_v1.csv`
-- `--run-number 2` creates `predictions_v2.csv`
-
-## Example: Complete 3-Cycle Workflow
-
-```bash
-# Initial setup
-python -m audioloop.active_learning create-binary-labels --class-id 8 \
-    --output training_sets/training_set_v1.csv
-
-# Cycle 1
-python -m audioloop.simple_train training_sets/training_set_v1.csv  # Creates model_v1.pt
-python -m audioloop.active_learning --class-name siren --model outputs/model_v1.pt  # Auto-detects v1
-python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --audio-dir data/urbansound8k
+# Next version auto-created
 python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv
+# → Creates: training_sets/training_set_v2.csv
 
-# Cycle 2
-python -m audioloop.simple_train training_sets/training_set_v2.csv  # Creates model_v2.pt
-python -m audioloop.active_learning --class-name siren --model outputs/model_v2.pt  # Auto-detects v2
-python -m audioloop.label_audio outputs/labeling_candidates_v2.csv --audio-dir data/urbansound8k
 python -m audioloop.merge_labels training_sets/training_set_v2.csv outputs/labeling_candidates_v2.csv
-
-# Cycle 3
-python -m audioloop.simple_train training_sets/training_set_v3.csv  # Creates model_v3.pt
-python -m audioloop.active_learning --class-name siren --model outputs/model_v3.pt  # Auto-detects v3
-python -m audioloop.label_audio outputs/labeling_candidates_v3.csv --audio-dir data/urbansound8k
-python -m audioloop.merge_labels training_sets/training_set_v3.csv outputs/labeling_candidates_v3.csv
+# → Creates: training_sets/training_set_v3.csv
 ```
 
-## Next Steps
+## Workflow Patterns
 
-- Review model performance metrics in the predictions files
-- Analyze which samples are being selected for labeling
-- Consider adjusting selection criteria (confidence thresholds, number of samples)
-- Export your final model for production use
+### Pattern 1: Sequential Versioning (Recommended)
+```bash
+# Always increment versions sequentially
+v1 → v2 → v3 → v4...
+
+# Training progression:
+training_set_v1.csv → model_v1.pt → predictions_v1.csv → training_set_v2.csv
+training_set_v2.csv → model_v2.pt → predictions_v2.csv → training_set_v3.csv
+training_set_v3.csv → model_v3.pt → predictions_v3.csv → training_set_v4.csv
+```
+
+### Pattern 2: Branching for Experiments
+```bash
+# Create experimental branches
+python -m audioloop.simple_train training_sets/training_set_v2.csv -v 2a
+python -m audioloop.simple_train training_sets/training_set_v2.csv -v 2b --epochs 1000
+
+# Compare results
+python -m audioloop.active_learning --model outputs/model_v2a.pt --run-number 2a
+python -m audioloop.active_learning --model outputs/model_v2b.pt --run-number 2b
+```
+
+### Pattern 3: Class-Specific Versioning
+```bash
+# Different version tracks for different classes
+python -m audioloop.active_learning --class-name siren --run-number 1
+# → outputs/labeling_candidates_v1.csv
+
+python -m audioloop.active_learning --class-name dog_bark --run-number 1  
+# → outputs/labeling_candidates_v1.csv (overwrites!)
+
+# Better: Use class-specific naming
+python -m audioloop.active_learning --class-name siren --run-number 1
+# Manual rename: mv outputs/labeling_candidates_v1.csv outputs/siren_candidates_v1.csv
+```
+
+## File Naming Reference
+
+| File Type | Pattern | Auto-Generated | Example |
+|-----------|---------|----------------|---------|
+| Training Set | `training_sets/training_set_v{N}.csv` | By merge_labels | `training_sets/training_set_v1.csv` |
+| Model | `outputs/model_v{N}.pt` | By simple_train | `outputs/model_v1.pt` |
+| Predictions | `outputs/predictions_v{N}.csv` | By active_learning | `outputs/predictions_v1.csv` |
+| Candidates | `outputs/labeling_candidates_v{N}.csv` | By active_learning | `outputs/labeling_candidates_v1.csv` |
+| Binary Labels | `outputs/binary_labels_v{N}.csv` | By active_learning | `outputs/binary_labels_v1.csv` |
+
+## Version Tracking Best Practices
+
+### 1. Keep All Versions
+```bash
+# Don't delete intermediate versions
+ls outputs/
+model_v1.pt  model_v2.pt  model_v3.pt  # Keep all for comparison
+
+ls training_sets/
+training_set_v1.csv  training_set_v2.csv  training_set_v3.csv  # Track progression
+```
+
+### 2. Document Changes
+```bash
+# Add notes about what changed between versions
+# training_set_v1.csv: Initial 20 samples
+# training_set_v2.csv: Added 15 high-confidence corrections
+# training_set_v3.csv: Added 20 boundary cases
+```
+
+### 3. Performance Tracking
+```bash
+# Compare model performance across versions
+python -c "
+import pandas as pd
+v1 = pd.read_csv('outputs/predictions_v1.csv')
+v2 = pd.read_csv('outputs/predictions_v2.csv')
+print(f'V1 accuracy: {v1.correct.mean():.3f}')
+print(f'V2 accuracy: {v2.correct.mean():.3f}')
+"
+```
+
+## Advanced Workflow Options
+
+### Custom Training Parameters
+```bash
+# Version with specific hyperparameters
+python -m audioloop.simple_train training_sets/training_set_v1.csv \
+    -v 1_lr001 --learning-rate 0.001 --epochs 500
+# → Creates: outputs/model_v1_lr001.pt
+
+python -m audioloop.simple_train training_sets/training_set_v1.csv \
+    -v 1_lr0001 --learning-rate 0.0001 --epochs 1000
+# → Creates: outputs/model_v1_lr0001.pt
+```
+
+### Custom Selection Criteria
+```bash
+# High-confidence selection
+python -m audioloop.active_learning --class-name siren \
+    --model outputs/model_v1.pt --run-number 1_highconf \
+    --min-confidence 0.95 --total-candidates 10
+
+# Balanced selection
+python -m audioloop.active_learning --class-name siren \
+    --model outputs/model_v1.pt --run-number 1_balanced \
+    --min-confidence 0.8 --positive-pct 0.5 --total-candidates 30
+```
+
+### Multi-Class Workflows
+```bash
+# Track separate workflows for different classes
+mkdir -p outputs/siren outputs/dog_bark outputs/gun_shot
+
+# Siren workflow
+python -m audioloop.active_learning --class-name siren --run-number 1
+mv outputs/predictions_v1.csv outputs/siren/
+mv outputs/labeling_candidates_v1.csv outputs/siren/
+
+# Dog bark workflow  
+python -m audioloop.active_learning --class-name dog_bark --run-number 1
+mv outputs/predictions_v1.csv outputs/dog_bark/
+mv outputs/labeling_candidates_v1.csv outputs/dog_bark/
+```
+
+## Troubleshooting Version Issues
+
+### Version Mismatch
+```bash
+# Error: Model outputs/model_v2.pt not found
+# Solution: Train the model first
+python -m audioloop.simple_train training_sets/training_set_v2.csv
+
+# Error: No training_set_v3.csv after merge
+# Solution: Check that merge completed successfully
+python -m audioloop.merge_labels training_sets/training_set_v2.csv outputs/labeling_candidates_v2.csv
+```
+
+### File Conflicts
+```bash
+# Error: File already exists
+# Solution: Use explicit versioning
+python -m audioloop.active_learning --class-name siren --run-number 1b --model outputs/model_v1.pt
+```
+
+### Lost Track of Versions
+```bash
+# List all versions
+ls -la outputs/model_*.pt | sort -V
+ls -la training_sets/training_set_*.csv | sort -V  
+ls -la outputs/predictions_*.csv | sort -V
+
+# Find latest version
+ls outputs/model_*.pt | sort -V | tail -n 1
+```
+
+## Integration with External Tools
+
+### Git Version Control
+```bash
+# Tag major versions
+git add training_sets/training_set_v1.csv outputs/model_v1.pt
+git commit -m "Initial model v1 - 95% training accuracy"
+git tag v1.0
+
+git add training_sets/training_set_v2.csv outputs/model_v2.pt  
+git commit -m "Model v2 - improved with 20 new labels"
+git tag v2.0
+```
+
+### Experiment Tracking
+```bash
+# Log version progression
+echo "$(date): Created model_v1.pt with 95% accuracy" >> experiment_log.txt
+echo "$(date): Model_v2.pt improved to 97% accuracy" >> experiment_log.txt
+```
+
+See [README.md](README.md) for project overview and [USAGE_GUIDE.md](USAGE_GUIDE.md) for detailed command reference.
