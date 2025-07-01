@@ -27,6 +27,7 @@ Controls:
 - 1 or y: Label as POSITIVE (target sound detected)
 - 0 or n: Label as NEGATIVE (target sound NOT detected)
 - p: Play/replay audio
+- x: Stop currently playing audio
 - u: Jump to next unlabeled sample
 - q: Quit and save
 
@@ -64,6 +65,7 @@ class SimpleAudioLabeler:
         self.candidates = []
         self.fieldnames = []
         self.changes_made = False
+        self.audio_process = None  # For tracking currently playing audio
 
         # Load candidates
         self._load_candidates()
@@ -147,14 +149,19 @@ class SimpleAudioLabeler:
         return None
 
     def _play_audio(self, audio_path):
-        """Play an audio file using system command."""
+        """Play an audio file using system command (non-blocking)."""
         if not audio_path or not os.path.exists(audio_path):
             print(f"Audio file not found: {audio_path}")
             return False
 
+        # Stop any currently playing audio
+        self._stop_audio()
+
         try:
             if sys.platform == "darwin":  # macOS
-                subprocess.run(["afplay", audio_path], check=True, capture_output=True, text=True)
+                self.audio_process = subprocess.Popen(
+                    ["afplay", audio_path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL
+                )
             elif sys.platform.startswith("linux"):
                 # Try multiple Linux audio players
                 for player in ["aplay", "play", "cvlc --play-and-exit", "ffplay -nodisp -autoexit"]:
@@ -164,20 +171,48 @@ class SimpleAudioLabeler:
                         ).returncode
                         == 0
                     ):
-                        subprocess.run(f"{player} '{audio_path}'", shell=True, check=False)
+                        self.audio_process = subprocess.Popen(
+                            f"{player} '{audio_path}'",
+                            shell=True,
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                        )
                         break
             elif sys.platform == "win32":  # Windows
-                os.startfile(audio_path)
+                # For Windows, use PowerShell to play audio in a way we can control
+                self.audio_process = subprocess.Popen(
+                    [
+                        "powershell",
+                        "-c",
+                        f"(New-Object Media.SoundPlayer '{audio_path}').PlaySync()",
+                    ],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
             else:
                 print(f"Unsupported platform for audio playback: {sys.platform}")
                 return False
             return True
-        except subprocess.CalledProcessError as e:
-            print(f"Error playing audio: {e}")
-            return False
         except Exception as e:
             print(f"Error playing audio: {e}")
             return False
+
+    def _stop_audio(self):
+        """Stop currently playing audio."""
+        if self.audio_process and self.audio_process.poll() is None:
+            try:
+                self.audio_process.terminate()
+                # Give it a moment to terminate gracefully
+                try:
+                    self.audio_process.wait(timeout=1)
+                except subprocess.TimeoutExpired:
+                    # Force kill if it doesn't terminate gracefully
+                    self.audio_process.kill()
+                print("Audio stopped")
+            except Exception as e:
+                print(f"Error stopping audio: {e}")
+            finally:
+                self.audio_process = None
 
     def _save_candidates(self):
         """Save candidates back to CSV file."""
@@ -264,6 +299,7 @@ class SimpleAudioLabeler:
         print("  1 or y - Label as POSITIVE (1) - This IS the target sound")
         print("  0 or n - Label as NEGATIVE (0) - This is NOT the target sound")
         print("  p      - Play/replay audio")
+        print("  x      - Stop currently playing audio")
         print("  n      - Next sample (without labeling)")
         print("  b      - Previous sample")
         print("  j      - Jump to sample number")
@@ -277,95 +313,104 @@ class SimpleAudioLabeler:
         """Run the interactive labeling session."""
         print(f"\nSimple Audio Labeling Tool - {self.dataset_name.upper()}")
         print("Type 'h' for help")
-        print("Commands: 1=positive, 0=negative, u=next unlabeled, q=quit\n")
+        print("Commands: 1=positive, 0=negative, u=next unlabeled, x=stop audio, q=quit\n")
 
         # Display first candidate and auto-play
         self._display_current()
         self._auto_play_current()
 
-        while True:
-            try:
-                command = input("\nCommand: ").strip().lower()
+        try:
+            while True:
+                try:
+                    command = input("\nCommand: ").strip().lower()
 
-                if not command:
-                    continue
+                    if not command:
+                        continue
 
-                if command in ["q", "quit"]:
-                    if self.changes_made:
-                        save = input("Save changes before quitting? (y/n): ").strip().lower()
-                        if save in ["y", "yes"]:
-                            self._save_candidates()
-                    print("Goodbye!")
-                    break
+                    if command in ["q", "quit"]:
+                        self._stop_audio()  # Stop any playing audio before quitting
+                        if self.changes_made:
+                            save = input("Save changes before quitting? (y/n): ").strip().lower()
+                            if save in ["y", "yes"]:
+                                self._save_candidates()
+                        print("Goodbye!")
+                        break
 
-                elif command in ["h", "help", "?"]:
-                    self._show_help()
+                    elif command in ["h", "help", "?"]:
+                        self._show_help()
 
-                elif command in ["1", "y"]:
-                    self._label_and_advance("1", "Labeled as POSITIVE (1)")
+                    elif command in ["1", "y"]:
+                        self._label_and_advance("1", "Labeled as POSITIVE (1)")
 
-                elif command in ["0", "n"]:
-                    self._label_and_advance("0", "Labeled as NEGATIVE (0)")
+                    elif command in ["0", "n"]:
+                        self._label_and_advance("0", "Labeled as NEGATIVE (0)")
 
-                elif command == "p":
-                    self._auto_play_current()
-                    if not self._get_audio_path(self.candidates[self.current_index]):
-                        print("ERROR: No valid audio file path found")
+                    elif command == "p":
+                        self._auto_play_current()
+                        if not self._get_audio_path(self.candidates[self.current_index]):
+                            print("ERROR: No valid audio file path found")
 
-                elif command == "n":  # Next without labeling
-                    if self.current_index < len(self.candidates) - 1:
-                        self.current_index += 1
-                        self._display_current()
+                    elif command == "x":
+                        self._stop_audio()
 
-                elif command == "b":  # Back/previous
-                    if self.current_index > 0:
-                        self.current_index -= 1
-                        self._display_current()
+                    elif command == "n":  # Next without labeling
+                        if self.current_index < len(self.candidates) - 1:
+                            self.current_index += 1
+                            self._display_current()
 
-                elif command == "j":
-                    try:
-                        jump_to = int(input("Jump to sample number (1-based): ")) - 1
-                        if not self._jump_to_sample(jump_to):
-                            print("Invalid sample number!")
-                    except ValueError:
-                        print("Invalid number!")
+                    elif command == "b":  # Back/previous
+                        if self.current_index > 0:
+                            self.current_index -= 1
+                            self._display_current()
 
-                elif command == "u":
-                    # Jump to next unlabeled
-                    found = False
-                    for i in range(self.current_index + 1, len(self.candidates)):
-                        if self.candidates[i].get("needs_human_label", "").strip() == "":
-                            self.current_index = i
-                            found = True
-                            break
+                    elif command == "j":
+                        try:
+                            jump_to = int(input("Jump to sample number (1-based): ")) - 1
+                            if not self._jump_to_sample(jump_to):
+                                print("Invalid sample number!")
+                        except ValueError:
+                            print("Invalid number!")
 
-                    if not found:
-                        # Wrap around to beginning
-                        for i in range(0, self.current_index):
+                    elif command == "u":
+                        # Jump to next unlabeled
+                        found = False
+                        for i in range(self.current_index + 1, len(self.candidates)):
                             if self.candidates[i].get("needs_human_label", "").strip() == "":
                                 self.current_index = i
                                 found = True
                                 break
 
-                    if found:
-                        self._display_current()
-                        self._auto_play_current()
-                    else:
-                        print("No unlabeled samples found!")
+                        if not found:
+                            # Wrap around to beginning
+                            for i in range(0, self.current_index):
+                                if self.candidates[i].get("needs_human_label", "").strip() == "":
+                                    self.current_index = i
+                                    found = True
+                                    break
 
-                elif command == "s":
-                    self._save_candidates()
+                        if found:
+                            self._display_current()
+                            self._auto_play_current()
+                        else:
+                            print("No unlabeled samples found!")
 
-                else:
-                    print(f"Unknown command: '{command}'. Type 'h' for help.")
-
-            except KeyboardInterrupt:
-                print("\n\nInterrupted!")
-                if self.changes_made:
-                    save = input("\nSave changes before quitting? (y/n): ").strip().lower()
-                    if save in ["y", "yes"]:
+                    elif command == "s":
                         self._save_candidates()
-                break
+
+                    else:
+                        print(f"Unknown command: '{command}'. Type 'h' for help.")
+
+                except KeyboardInterrupt:
+                    print("\n\nInterrupted!")
+                    self._stop_audio()  # Stop any playing audio
+                    if self.changes_made:
+                        save = input("\nSave changes before quitting? (y/n): ").strip().lower()
+                        if save in ["y", "yes"]:
+                            self._save_candidates()
+                    break
+        finally:
+            # Ensure audio is stopped when exiting
+            self._stop_audio()
 
 
 def test_audio_playback(audio_file):
