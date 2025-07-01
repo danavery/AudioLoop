@@ -151,7 +151,7 @@ class FSD50KConfig:
     hop_length: int = 256
     n_mels: int = 128
     top_db: int = 80
-    fixed_length: int = 993  # Using same as UrbanSound8K for consistency
+    fixed_length: int = 2048
 
     # Processing parameters
     batch_size: int = 32
@@ -400,8 +400,12 @@ class FSD50KProcessor:
 
         return spec
 
-    def process_single_file(self, file_info: dict, output_dir: Path) -> bool:
-        """Process a single audio file and save its spectrogram."""
+    def process_single_file(self, file_info: dict, output_dir: Path) -> tuple[bool, int | None]:
+        """Process a single audio file and save its spectrogram.
+
+        Returns:
+            Tuple of (success, original_spectrogram_length)
+        """
         try:
             audio_path = file_info["audio_path"]
             filename = file_info["filename"]
@@ -409,13 +413,16 @@ class FSD50KProcessor:
             # Check if audio file exists
             if not audio_path.exists():
                 logger.warning(f"Audio file not found: {audio_path}")
-                return False
+                return False, None
 
             # Load audio
             waveform, sample_rate = torchaudio.load(audio_path)
 
             # Create spectrogram
             spec = self.spec_transform(waveform)
+
+            # Store original length before fixing
+            original_length = spec.shape[-1]
 
             # Fix spectrogram length
             spec = self.fix_spectrogram_length(spec)
@@ -425,8 +432,8 @@ class FSD50KProcessor:
             output_path = output_dir / output_filename
             torch.save(spec, output_path)
 
-            return True
+            return True, original_length
 
         except Exception as e:
             logger.error(f"Error processing {file_info['filename']}: {e}")
-            return False
+            return False, None

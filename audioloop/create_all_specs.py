@@ -2,6 +2,7 @@ import argparse
 import csv
 import logging
 import shutil
+import statistics
 import time
 from collections import defaultdict
 from pathlib import Path
@@ -11,6 +12,7 @@ from tqdm import tqdm
 
 from .datasets import UrbanSound8KConfig, UrbanSound8KProcessor
 from .datasets.fsd50k import FSD50KConfig, FSD50KProcessor
+from .utils.dataset_utils import get_dataset_help_text, resolve_dataset_choice
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -25,13 +27,16 @@ class ProcessingStats:
         self.failed = 0
         self.errors_by_type = defaultdict(int)
         self.processing_times = []
+        self.spectrogram_lengths = []
         self.start_time = time.time()
 
-    def record_success(self, processing_time: float | None = None):
+    def record_success(self, processing_time: float | None = None, spec_length: int | None = None):
         """Record a successful processing."""
         self.successful += 1
         if processing_time:
             self.processing_times.append(processing_time)
+        if spec_length:
+            self.spectrogram_lengths.append(spec_length)
 
     def record_failure(self, error_type: str = "unknown"):
         """Record a failed processing."""
@@ -54,12 +59,87 @@ class ProcessingStats:
         if self.processing_times:
             summary.append(f"Average processing time: {avg_time:.3f}s per file")
 
+        if self.spectrogram_lengths:
+            summary.append("")
+            summary.append("Spectrogram length statistics (before fixing to 993):")
+            summary.append(f"  Count: {len(self.spectrogram_lengths)}")
+            summary.append(f"  Min: {min(self.spectrogram_lengths)}")
+            summary.append(f"  Max: {max(self.spectrogram_lengths)}")
+            summary.append(f"  Mean: {statistics.mean(self.spectrogram_lengths):.1f}")
+            summary.append(f"  Median: {statistics.median(self.spectrogram_lengths):.1f}")
+            summary.append(f"  Std Dev: {statistics.stdev(self.spectrogram_lengths):.1f}")
+
+            # Add histogram
+            summary.extend(self._create_length_histogram())
+
         if self.errors_by_type:
             summary.append("Error breakdown:")
             for error_type, count in self.errors_by_type.items():
                 summary.append(f"  {error_type}: {count}")
 
         return "\n".join(summary)
+
+    def _create_length_histogram(self) -> list[str]:
+        """Create a text-based histogram of spectrogram lengths."""
+        if not self.spectrogram_lengths:
+            return []
+
+        lengths = sorted(self.spectrogram_lengths)
+        min_len = min(lengths)
+        max_len = max(lengths)
+
+        # Calculate percentiles to handle outliers
+        p95 = lengths[int(0.95 * len(lengths))]
+        p99 = lengths[int(0.99 * len(lengths))]
+        p999 = lengths[int(0.999 * len(lengths))]
+
+        # Use 99th percentile as histogram max to avoid extreme outliers
+        hist_max = p99
+        outliers = [l for l in lengths if l > hist_max]
+
+        # Create 20 bins up to 99th percentile
+        num_bins = 20
+        bin_width = (hist_max - min_len) / num_bins
+        bins = [0] * num_bins
+
+        # Count items in each bin
+        for length in lengths:
+            if length <= hist_max:
+                bin_idx = min(int((length - min_len) / bin_width), num_bins - 1)
+                bins[bin_idx] += 1
+
+        # Find max count for scaling
+        max_count = max(bins)
+
+        # Create histogram display
+        histogram = ["", "Length distribution (up to 99th percentile):"]
+
+        for i, count in enumerate(bins):
+            bin_start = min_len + i * bin_width
+            bin_end = min_len + (i + 1) * bin_width
+
+            # Scale bar length (max 40 chars)
+            bar_length = int((count / max_count) * 40) if max_count > 0 else 0
+            bar = "█" * bar_length
+
+            # Format bin range
+            if bin_width >= 1:
+                range_str = f"{bin_start:6.0f}-{bin_end:6.0f}"
+            else:
+                range_str = f"{bin_start:6.1f}-{bin_end:6.1f}"
+
+            histogram.append(f"  {range_str}: {bar} ({count})")
+
+        # Add outlier summary
+        if outliers:
+            histogram.append("")
+            histogram.append(f"Outliers beyond 99th percentile ({p99:.0f}): {len(outliers)} files")
+            histogram.append(f"  95th percentile: {p95:.0f}")
+            histogram.append(f"  99th percentile: {p99:.0f}")
+            histogram.append(f"  99.9th percentile: {p999:.0f}")
+            histogram.append(f"  Maximum: {max_len:.0f}")
+
+        return histogram
 
 
 def create_specs(processor, config=None, clear_output=True) -> tuple[int, int]:
@@ -109,12 +189,12 @@ def create_specs(processor, config=None, clear_output=True) -> tuple[int, int]:
     for i, file_info in enumerate(tqdm(audio_files, desc="Creating spectrograms")):
         start_time = time.time()
 
-        success = processor.process_single_file(file_info, config.output_dir)
+        success, spec_length = processor.process_single_file(file_info, config.output_dir)
 
         processing_time = time.time() - start_time
 
         if success:
-            stats.record_success(processing_time)
+            stats.record_success(processing_time, spec_length)
 
             # Log sample info for first file
             if i == 0:
@@ -159,10 +239,9 @@ def create_inference_csv(processor, config=None) -> Path:
     # Prepare data for CSV - use labels arrays consistently
     files_data = []
     for file_info in audio_files:
-        files_data.append({
-            "filename": file_info["filename"],
-            "labels": ",".join(file_info["labels"])
-        })
+        files_data.append(
+            {"filename": file_info["filename"], "labels": ",".join(file_info["labels"])}
+        )
 
     # Ensure output directory exists
     config.inference_csv.parent.mkdir(parents=True, exist_ok=True)
@@ -198,8 +277,8 @@ Examples:
     parser.add_argument(
         "--dataset",
         choices=["urbansound8k", "fsd50k"],
-        default="urbansound8k",
-        help="Dataset to process (default: urbansound8k)",
+        default=None,
+        help=get_dataset_help_text() + " to process",
     )
 
     parser.add_argument(
@@ -210,11 +289,18 @@ Examples:
 
     args = parser.parse_args()
 
+    # Resolve dataset choice from CLI and environment variable
+    try:
+        dataset_name = resolve_dataset_choice(args.dataset)
+    except ValueError as e:
+        logger.error(f"Dataset error: {e}")
+        exit(1)
+
     # Set up dataset processor
-    if args.dataset == "fsd50k":
+    if dataset_name == "fsd50k":
         config = FSD50KConfig()
         processor = FSD50KProcessor(config)
-        logger.info("Processing FSD50K dataset (dev split)")
+        logger.info("Processing FSD50K dataset")
     else:
         config = UrbanSound8KConfig()
         processor = UrbanSound8KProcessor(config)
