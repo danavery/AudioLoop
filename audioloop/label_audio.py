@@ -1,17 +1,27 @@
 #!/usr/bin/env python3
 """
-Audio labeling tool for active learning workflow with UrbanSound8K.
+Audio labeling tool for active learning workflow with multiple dataset support.
 
 This tool is designed to work with the output of the active learning pipeline,
 specifically the labeling_candidates CSV files that contain a 'filepath' column.
 
+Supports both UrbanSound8K and FSD50K datasets with automatic dataset detection
+or explicit dataset specification.
+
 Requirements:
 - Candidates CSV must have a 'filepath' column (from active_learning.py output)
-- Audio files must be in UrbanSound8K fold structure (fold1-fold10)
-- Use --audio-dir to point to the parent directory containing fold directories
+- Audio files must be in proper dataset structure
+- Use --audio-dir to point to the appropriate audio directory
 
 Usage:
-  python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --audio-dir data/urbansound8k
+  # Auto-detect dataset from filepath
+  python -m audioloop.label_audio outputs/labeling_candidates_v1.csv
+
+  # Explicitly specify UrbanSound8K
+  python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --dataset urbansound8k --audio-dir data/urbansound8k
+
+  # Explicitly specify FSD50K
+  python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --dataset fsd50k --audio-dir data/FSD50K/FSD50K.dev_audio
 
 Controls:
 - 1 or y: Label as POSITIVE (target sound detected)
@@ -28,21 +38,57 @@ import csv
 import os
 import subprocess
 import sys
+from pathlib import Path
+
+from .datasets.fsd50k import FSD50KConfig, FSD50KProcessor
+from .datasets.urbansound8k import UrbanSound8KConfig, UrbanSound8KProcessor
+from .utils.dataset_utils import get_dataset_help_text, resolve_dataset_choice
+
+
+def get_dataset_processor(dataset_name: str, **kwargs):
+    """Get the appropriate dataset processor and config.
+
+    Args:
+        dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
+        **kwargs: Additional configuration parameters for the dataset
+
+    Returns:
+        Tuple of (processor, config)
+
+    Raises:
+        ValueError: If dataset_name is not supported
+    """
+    if dataset_name == "urbansound8k":
+        config = UrbanSound8KConfig()
+        # Override config paths if provided
+        if "audio_root" in kwargs:
+            config.audio_root = Path(kwargs["audio_root"])
+        processor = UrbanSound8KProcessor(config)
+        return processor, config
+    if dataset_name == "fsd50k":
+        config = FSD50KConfig()
+        # Override config paths if provided
+        if "audio_root" in kwargs:
+            config.audio_root = Path(kwargs["audio_root"])
+        processor = FSD50KProcessor(config)
+        return processor, config
+    raise ValueError(f"Unsupported dataset: {dataset_name}. Supported: urbansound8k, fsd50k")
 
 
 class SimpleAudioLabeler:
-    """Simple terminal-based audio labeling interface."""
+    """Simple terminal-based audio labeling interface with multi-dataset support."""
 
-    def __init__(self, candidates_csv, audio_dir=None):
+    def __init__(self, candidates_csv, dataset_name, audio_dir=None):
         """
         Initialize the audio labeler.
 
         Args:
             candidates_csv: Path to candidates CSV file
-            audio_dir: Directory containing audio files (if paths in CSV are relative)
+            dataset_name: Dataset name ('urbansound8k' or 'fsd50k')
+            audio_dir: Directory containing audio files
         """
         self.candidates_csv = candidates_csv
-        self.audio_dir = audio_dir or "."
+        self.dataset_name = dataset_name
         self.current_index = 0
         self.candidates = []
         self.fieldnames = []
@@ -50,6 +96,22 @@ class SimpleAudioLabeler:
 
         # Load candidates
         self._load_candidates()
+
+        # Set up dataset processor and config
+        dataset_kwargs = {}
+        if audio_dir:
+            dataset_kwargs["audio_root"] = audio_dir
+
+        self.processor, self.config = get_dataset_processor(self.dataset_name, **dataset_kwargs)
+
+        # Set default audio directory if not provided
+        if audio_dir is None:
+            self.audio_dir = str(self.config.audio_root)
+        else:
+            self.audio_dir = audio_dir
+
+        print(f"Using dataset: {self.dataset_name}")
+        print(f"Audio directory: {self.audio_dir}")
 
     def _load_candidates(self):
         """Load candidates from CSV file."""
@@ -88,15 +150,29 @@ class SimpleAudioLabeler:
         audio_filepath = filepath.replace(".pt", ".wav")
         filename = os.path.basename(audio_filepath)
 
-        # For UrbanSound8K: search through all fold directories
-        if "-" in filename and filename.endswith(".wav"):
-            for fold_num in range(1, 11):  # fold1 through fold10
-                fold_path = os.path.join(self.audio_dir, f"fold{fold_num}", filename)
-                if os.path.exists(fold_path):
-                    return fold_path
+        if self.dataset_name == "urbansound8k":
+            # For UrbanSound8K: search through all fold directories
+            if "-" in filename and filename.endswith(".wav"):
+                for fold_num in range(1, 11):  # fold1 through fold10
+                    fold_path = os.path.join(self.audio_dir, f"fold{fold_num}", filename)
+                    if os.path.exists(fold_path):
+                        return fold_path
 
-        print(f"ERROR: Audio file not found: {filename}")
-        print(f"Searched in: {self.audio_dir}/fold1/ through {self.audio_dir}/fold10/")
+            print(f"ERROR: Audio file not found: {filename}")
+            print(f"Searched in: {self.audio_dir}/fold1/ through {self.audio_dir}/fold10/")
+            return None
+
+        if self.dataset_name == "fsd50k":
+            # For FSD50K: files are directly in the audio directory
+            audio_path = os.path.join(self.audio_dir, filename)
+            if os.path.exists(audio_path):
+                return audio_path
+
+            print(f"ERROR: Audio file not found: {filename}")
+            print(f"Searched in: {self.audio_dir}")
+            return None
+
+        print(f"ERROR: Unsupported dataset: {self.dataset_name}")
         return None
 
     def _play_audio(self, audio_path):
@@ -185,7 +261,9 @@ class SimpleAudioLabeler:
         candidate = self.candidates[self.current_index]
 
         print("\n" + "=" * 60)
-        print(f"Sample {self.current_index + 1} of {len(self.candidates)}")
+        print(
+            f"Sample {self.current_index + 1} of {len(self.candidates)} ({self.dataset_name.upper()})"
+        )
         print("=" * 60)
 
         # Display candidate info
@@ -226,7 +304,7 @@ class SimpleAudioLabeler:
 
     def run(self):
         """Run the interactive labeling session."""
-        print("\nSimple Audio Labeling Tool")
+        print(f"\nSimple Audio Labeling Tool - {self.dataset_name.upper()}")
         print("Type 'h' for help")
         print("Commands: 1=positive, 0=negative, u=next unlabeled, q=quit\n")
 
@@ -340,48 +418,74 @@ def test_audio_playback(audio_file):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Audio labeling tool for active learning with UrbanSound8K",
+        description="Audio labeling tool for active learning with multi-dataset support",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog="""
-Example workflow:
+        epilog=f"""
+Example workflows:
+
+UrbanSound8K (default):
+  # Use default dataset (or set AUDIOLOOP_DATASET=urbansound8k)
+  python -m audioloop.label_audio outputs/labeling_candidates_v1.csv
+
+  # Explicit dataset specification
+  python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --dataset urbansound8k --audio-dir data/urbansound8k
+
+FSD50K:
+  # Set environment variable
+  AUDIOLOOP_DATASET=fsd50k python -m audioloop.label_audio outputs/labeling_candidates_v1.csv
+
+  # Explicit dataset specification
+  python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --dataset fsd50k --audio-dir data/FSD50K/FSD50K.dev_audio
+
+Full workflow example:
   # Run active learning to generate candidates
   python -m audioloop.active_learning --class-name dog_bark --run-number 1
 
-  # Label the candidates (point to UrbanSound8K directory)
-  python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --audio-dir data/urbansound8k
+  # Label the candidates (uses AUDIOLOOP_DATASET or default)
+  python -m audioloop.label_audio outputs/labeling_candidates_v1.csv
 
   # Merge labels back into training set
   python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv
 
-  # Train next model and continue
-  python -m audioloop.simple_train training_sets/training_set_v2.csv -v 2
-  python -m audioloop.active_learning --class-name dog_bark --run-number 2
-
 Requirements:
   - Candidates CSV must come from active_learning.py (has 'filepath' column)
-  - Audio files must be in UrbanSound8K fold structure
-  - For --audio-dir, use the parent directory containing fold1-fold10
+  - Audio files must be in proper dataset structure:
+    * UrbanSound8K: fold1-fold10 directories
+    * FSD50K: flat directory structure
+  - For custom audio directories, use --audio-dir
 
 Audio playback:
   - macOS: uses built-in afplay
   - Linux: install sox ('sudo apt-get install sox') for play command
   - Windows: uses default audio player
+
+{get_dataset_help_text()}
         """,
     )
 
     parser.add_argument(
         "candidates_csv", help="Path to labeling candidates CSV from active learning"
     )
+
+    parser.add_argument(
+        "--dataset",
+        choices=["urbansound8k", "fsd50k"],
+        help="Dataset type (uses AUDIOLOOP_DATASET env var or default if not specified)",
+    )
+
     parser.add_argument(
         "--audio-dir",
-        help="Parent directory containing fold1-fold10 directories",
-        default="data/urbansound8k",
+        help="Audio directory (uses dataset default if not specified)",
     )
+
     parser.add_argument(
         "--test-audio", help="Test audio playback with a specific file", metavar="FILE"
     )
 
     args = parser.parse_args()
+
+    # Handle dataset resolution
+    dataset_name = resolve_dataset_choice(args.dataset)
 
     # Handle test mode
     if args.test_audio:
@@ -403,7 +507,9 @@ Audio playback:
             sys.exit(1)
 
     # Create labeler and run
-    labeler = SimpleAudioLabeler(args.candidates_csv, audio_dir=args.audio_dir)
+    labeler = SimpleAudioLabeler(
+        args.candidates_csv, dataset_name=dataset_name, audio_dir=args.audio_dir
+    )
 
     try:
         labeler.run()
