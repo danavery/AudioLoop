@@ -5,12 +5,12 @@ This module provides dataset-specific configurations and processors
 for different audio datasets used in the AudioLoop framework.
 """
 
-from .urbansound8k import UrbanSound8KConfig, UrbanSound8KProcessor
 from .fsd50k import FSD50KConfig, FSD50KProcessor
+from .urbansound8k import UrbanSound8KConfig, UrbanSound8KProcessor
 
 __all__ = [
-    "UrbanSound8KConfig",
-    "UrbanSound8KProcessor",
     "FSD50KConfig",
     "FSD50KProcessor",
+    "UrbanSound8KConfig",
+    "UrbanSound8KProcessor",
 ]

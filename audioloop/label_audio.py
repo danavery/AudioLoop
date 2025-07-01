@@ -38,41 +38,12 @@ import csv
 import os
 import subprocess
 import sys
-from pathlib import Path
 
-from .datasets.fsd50k import FSD50KConfig, FSD50KProcessor
-from .datasets.urbansound8k import UrbanSound8KConfig, UrbanSound8KProcessor
-from .utils.dataset_utils import get_dataset_help_text, resolve_dataset_choice
-
-
-def get_dataset_processor(dataset_name: str, **kwargs):
-    """Get the appropriate dataset processor and config.
-
-    Args:
-        dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
-        **kwargs: Additional configuration parameters for the dataset
-
-    Returns:
-        Tuple of (processor, config)
-
-    Raises:
-        ValueError: If dataset_name is not supported
-    """
-    if dataset_name == "urbansound8k":
-        config = UrbanSound8KConfig()
-        # Override config paths if provided
-        if "audio_root" in kwargs:
-            config.audio_root = Path(kwargs["audio_root"])
-        processor = UrbanSound8KProcessor(config)
-        return processor, config
-    if dataset_name == "fsd50k":
-        config = FSD50KConfig()
-        # Override config paths if provided
-        if "audio_root" in kwargs:
-            config.audio_root = Path(kwargs["audio_root"])
-        processor = FSD50KProcessor(config)
-        return processor, config
-    raise ValueError(f"Unsupported dataset: {dataset_name}. Supported: urbansound8k, fsd50k")
+from .utils.dataset_utils import (
+    get_dataset_help_text,
+    get_dataset_processor,
+    resolve_dataset_choice,
+)
 
 
 class SimpleAudioLabeler:

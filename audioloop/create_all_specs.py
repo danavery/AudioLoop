@@ -180,7 +180,7 @@ def create_specs(processor, config=None, clear_output=True) -> tuple[int, int]:
 
     # Load metadata
     logger.info(f"Loading {processor.__class__.__name__} metadata...")
-    audio_files = processor.load_metadata()
+    audio_files = processor.load_metadata(split="dev")
     logger.info(f"Found {len(audio_files)} audio files in dataset")
 
     # Process files
@@ -234,7 +234,7 @@ def create_inference_csv(processor, config=None) -> Path:
         config = processor.config
 
     # Load metadata
-    audio_files = processor.load_metadata()
+    audio_files = processor.load_metadata(split="dev")
 
     # Prepare data for CSV - use labels arrays consistently
     files_data = []

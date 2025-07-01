@@ -234,6 +234,30 @@ class FSD50KProcessor:
 
         return audio_files
 
+    def get_binary_label(self, item: dict, positive_class_id: int, positive_class_name: str) -> int:
+        """Get binary label for an item based on positive class criteria.
+
+        Args:
+            item: Metadata item from load_metadata()
+            positive_class_id: ID of the positive class (unused for FSD50K)
+            positive_class_name: Name of the positive class
+
+        Returns:
+            1 if positive class, 0 otherwise
+        """
+        return 1 if positive_class_name in item["labels"] else 0
+
+    def get_spectrogram_filename(self, item: dict) -> str:
+        """Convert audio filename to spectrogram filename.
+
+        Args:
+            item: Metadata item from load_metadata()
+
+        Returns:
+            Spectrogram filename
+        """
+        return f"{item['filename']}.pt"
+
     def create_binary_labels_one_vs_all(
         self,
         positive_class: str,

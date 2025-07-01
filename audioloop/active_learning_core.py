@@ -8,10 +8,9 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from .datasets.fsd50k import FSD50KConfig, FSD50KProcessor
-from .datasets.urbansound8k import UrbanSound8KConfig, UrbanSound8KProcessor
 from .models.cnn_5layer import SoundCNN
 from .utils.data_utils import entropy, get_device, variable_length_collate_fn
+from .utils.dataset_utils import get_dataset_processor
 from .utils.spectrogram_dataset import SpectrogramDataset
 
 
@@ -209,19 +208,6 @@ def load_model(model_path, num_classes, device):
     return model
 
 
-def get_dataset_processor(dataset_name: str, **kwargs):
-    """Get the appropriate dataset processor and config."""
-    if dataset_name == "urbansound8k":
-        config = UrbanSound8KConfig()
-        processor = UrbanSound8KProcessor(config)
-        return processor, config
-    if dataset_name == "fsd50k":
-        config = FSD50KConfig()
-        processor = FSD50KProcessor(config)
-        return processor, config
-    raise ValueError(f"Unsupported dataset: {dataset_name}")
-
-
 def create_binary_labels(
     dataset_name="urbansound8k",
     dataset_file=None,
@@ -257,56 +243,22 @@ def create_binary_labels(
     positive_count = 0
     negative_count = 0
 
-    # Load metadata using the processor
-    if dataset_name == "urbansound8k":
-        metadata = processor.load_metadata()
-        for item in metadata:
-            filename = item["filename"]
-            class_id = item["class_id"]
+    # Load metadata using the processor (dataset-agnostic)
+    metadata = processor.load_metadata(split="dev")
+    for item in metadata:
+        # Use processor's binary classification method
+        is_positive = processor.get_binary_label(item, positive_class_id, positive_class_name)
 
-            # Binary classification: specified class vs everything else
-            is_positive = 1 if class_id == positive_class_id else 0
+        if is_positive:
+            positive_count += 1
+        else:
+            negative_count += 1
 
-            if is_positive:
-                positive_count += 1
-            else:
-                negative_count += 1
+        # Use processor's filename conversion method
+        spec_filename = processor.get_spectrogram_filename(item)
+        spec_path = f"data/all_specs/{spec_filename}"
 
-            # Convert audio filename to spectrogram filename
-            spec_filename = filename.replace('.wav', '.pt')
-            spec_path = f"data/all_specs/{spec_filename}"
-
-            binary_data.append({
-                "filepath": spec_path,
-                "label": is_positive,
-                "run": 1
-            })
-
-    elif dataset_name == "fsd50k":
-        metadata = processor.load_metadata(split="dev")
-        for item in metadata:
-            filename = item["filename"]
-            labels = item["labels"]
-
-            # For FSD50K, use the positive_class_name directly
-            is_positive = 1 if positive_class_name in labels else 0
-
-            if is_positive:
-                positive_count += 1
-            else:
-                negative_count += 1
-
-            # Convert audio filename to spectrogram filename
-            spec_filename = f"{filename}.pt"
-            spec_path = f"data/all_specs/{spec_filename}"
-
-            binary_data.append({
-                "filepath": spec_path,
-                "label": is_positive,
-                "run": 1
-            })
-    else:
-        raise ValueError(f"Unsupported dataset: {dataset_name}")
+        binary_data.append({"filepath": spec_path, "label": is_positive, "run": 1})
 
     # Ensure outputs directory exists
     os.makedirs("outputs", exist_ok=True)

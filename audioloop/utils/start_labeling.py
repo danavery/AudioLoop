@@ -1,54 +1,17 @@
 import argparse
 import os
 import random
-from pathlib import Path
 
-from audioloop.datasets.fsd50k import FSD50KConfig, FSD50KProcessor
-from audioloop.datasets.urbansound8k import UrbanSound8KConfig, UrbanSound8KProcessor
-from audioloop.utils.dataset_utils import get_dataset_help_text, resolve_dataset_choice
-
-
-def get_dataset_processor(dataset_name: str, **kwargs):
-    """Get the appropriate dataset processor and config.
-
-    Args:
-        dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
-        **kwargs: Additional configuration parameters for the dataset
-
-    Returns:
-        Tuple of (processor, config)
-
-    Raises:
-        ValueError: If dataset_name is not supported
-    """
-    if dataset_name == "urbansound8k":
-        config = UrbanSound8KConfig()
-        # Override config paths if provided
-        if 'metadata_csv' in kwargs:
-            config.metadata_csv = Path(kwargs['metadata_csv'])
-        if 'audio_root' in kwargs:
-            config.audio_root = Path(kwargs['audio_root'])
-        if 'output_dir' in kwargs:
-            config.output_dir = Path(kwargs['output_dir'])
-        processor = UrbanSound8KProcessor(config)
-        return processor, config
-    if dataset_name == "fsd50k":
-        config = FSD50KConfig()
-        # Override config paths if provided
-        if 'metadata_dir' in kwargs:
-            config.metadata_dir = Path(kwargs['metadata_dir'])
-        if 'ground_truth_dir' in kwargs:
-            config.ground_truth_dir = Path(kwargs['ground_truth_dir'])
-        if 'audio_root' in kwargs:
-            config.audio_root = Path(kwargs['audio_root'])
-        if 'output_dir' in kwargs:
-            config.output_dir = Path(kwargs['output_dir'])
-        processor = FSD50KProcessor(config)
-        return processor, config
-    raise ValueError(f"Unsupported dataset: {dataset_name}. Supported: urbansound8k, fsd50k")
+from audioloop.utils.dataset_utils import (
+    get_dataset_help_text,
+    get_dataset_processor,
+    resolve_dataset_choice,
+)
 
 
-def get_matching_samples_urbansound8k(processor, config, class_name: str | None = None, invert: bool = False) -> list[str]:
+def get_matching_samples_urbansound8k(
+    processor, config, class_name: str | None = None, invert: bool = False
+) -> list[str]:
     """Get matching samples for UrbanSound8K dataset.
 
     Args:
@@ -60,7 +23,7 @@ def get_matching_samples_urbansound8k(processor, config, class_name: str | None 
     Returns:
         List of spectrogram file paths
     """
-    metadata = processor.load_metadata()
+    metadata = processor.load_metadata(split="dev")
     matching_paths = []
 
     for item in metadata:
@@ -75,14 +38,16 @@ def get_matching_samples_urbansound8k(processor, config, class_name: str | None 
 
         if match:
             # Convert to spectrogram path
-            spec_filename = filename.replace('.wav', '.pt')
+            spec_filename = filename.replace(".wav", ".pt")
             spec_path = config.output_dir / spec_filename
             matching_paths.append(str(spec_path))
 
     return matching_paths
 
 
-def get_matching_samples_fsd50k(processor, config, class_name: str | None = None, invert: bool = False, split: str = "dev") -> list[str]:
+def get_matching_samples_fsd50k(
+    processor, config, class_name: str | None = None, invert: bool = False, split: str = "dev"
+) -> list[str]:
     """Get matching samples for FSD50K dataset.
 
     Args:
@@ -117,7 +82,9 @@ def get_matching_samples_fsd50k(processor, config, class_name: str | None = None
     return matching_paths
 
 
-def get_matching_samples(dataset_name: str, class_name: str | None = None, invert: bool = False, **kwargs) -> list[str]:
+def get_matching_samples(
+    dataset_name: str, class_name: str | None = None, invert: bool = False, **kwargs
+) -> list[str]:
     """Get matching samples for any supported dataset.
 
     Args:
@@ -134,14 +101,18 @@ def get_matching_samples(dataset_name: str, class_name: str | None = None, inver
     if dataset_name == "urbansound8k":
         return get_matching_samples_urbansound8k(processor, config, class_name, invert)
     if dataset_name == "fsd50k":
-        split = kwargs.get('split', 'dev')
+        split = kwargs.get("split", "dev")
         return get_matching_samples_fsd50k(processor, config, class_name, invert, split)
     raise ValueError(f"Unsupported dataset: {dataset_name}")
 
 
-def write_starting_labels(n_positive: int = 10, n_negative: int = 10,
-                         class_name: str = "siren", dataset_name: str = "urbansound8k",
-                         **kwargs) -> tuple[list[str], list[str]]:
+def write_starting_labels(
+    n_positive: int = 10,
+    n_negative: int = 10,
+    class_name: str = "siren",
+    dataset_name: str = "urbansound8k",
+    **kwargs,
+) -> tuple[list[str], list[str]]:
     """Create initial training set for any dataset and class.
 
     Args:
@@ -155,17 +126,25 @@ def write_starting_labels(n_positive: int = 10, n_negative: int = 10,
         (positives, negatives): Lists of file paths
     """
     # Get positive samples
-    positive_candidates = get_matching_samples(dataset_name, class_name=class_name, invert=False, **kwargs)
+    positive_candidates = get_matching_samples(
+        dataset_name, class_name=class_name, invert=False, **kwargs
+    )
     if len(positive_candidates) < n_positive:
-        raise ValueError(f"Not enough positive samples for class '{class_name}'. "
-                        f"Requested: {n_positive}, Available: {len(positive_candidates)}")
+        raise ValueError(
+            f"Not enough positive samples for class '{class_name}'. "
+            f"Requested: {n_positive}, Available: {len(positive_candidates)}"
+        )
     positives = random.sample(positive_candidates, k=n_positive)
 
     # Get negative samples
-    negative_candidates = get_matching_samples(dataset_name, class_name=class_name, invert=True, **kwargs)
+    negative_candidates = get_matching_samples(
+        dataset_name, class_name=class_name, invert=True, **kwargs
+    )
     if len(negative_candidates) < n_negative:
-        raise ValueError(f"Not enough negative samples for class '{class_name}'. "
-                        f"Requested: {n_negative}, Available: {len(negative_candidates)}")
+        raise ValueError(
+            f"Not enough negative samples for class '{class_name}'. "
+            f"Requested: {n_negative}, Available: {len(negative_candidates)}"
+        )
     negatives = random.sample(negative_candidates, k=n_negative)
 
     return positives, negatives
@@ -178,7 +157,7 @@ def create_training_set(
     output_path: str = "training_sets/training_set_v1.csv",
     run: int = 1,
     positive_percentage: float = 0.5,
-    **kwargs
+    **kwargs,
 ) -> tuple[list[str], list[str]]:
     """Create training set CSV file for any dataset and class.
 
@@ -236,6 +215,7 @@ def list_available_classes(dataset_name: str, **kwargs) -> None:
         processor.list_classes()
     elif dataset_name == "fsd50k":
         from audioloop.datasets.fsd50k import list_semantic_groups
+
         processor.list_classes()
         print("\n")
         list_semantic_groups()
@@ -264,15 +244,12 @@ Examples:
   # Use custom paths
   python -m audioloop.utils.start_labeling --dataset urbansound8k --class-name dog_bark \\
     --metadata-csv /path/to/UrbanSound8K.csv --audio-root /path/to/audio
-        """
+        """,
     )
 
     # Dataset selection
     parser.add_argument(
-        "--dataset",
-        choices=["urbansound8k", "fsd50k"],
-        default=None,
-        help=get_dataset_help_text()
+        "--dataset", choices=["urbansound8k", "fsd50k"], default=None, help=get_dataset_help_text()
     )
 
     # Core parameters
@@ -282,7 +259,7 @@ Examples:
         "--positive-pct",
         type=float,
         default=0.75,
-        help="Percentage positive (0.0-1.0, default 0.75)"
+        help="Percentage positive (0.0-1.0, default 0.75)",
     )
     parser.add_argument("--output", default="training_sets/training_set_v1.csv", help="Output path")
     parser.add_argument("--run", type=int, default=1, help="Run number for versioning")
@@ -291,12 +268,17 @@ Examples:
     parser.add_argument("--metadata-csv", help="Path to metadata CSV (UrbanSound8K)")
     parser.add_argument("--audio-root", help="Path to audio root directory")
     parser.add_argument("--output-dir", help="Path to spectrogram output directory")
-    parser.add_argument("--split", default="dev", choices=["dev", "eval"],
-                       help="Dataset split for FSD50K (default: dev)")
+    parser.add_argument(
+        "--split",
+        default="dev",
+        choices=["dev", "eval"],
+        help="Dataset split for FSD50K (default: dev)",
+    )
 
     # Utility options
-    parser.add_argument("--list-classes", action="store_true",
-                       help="List all available classes for the dataset")
+    parser.add_argument(
+        "--list-classes", action="store_true", help="List all available classes for the dataset"
+    )
     parser.add_argument("--seed", type=int, help="Random seed for reproducibility")
 
     args = parser.parse_args()
@@ -315,13 +297,13 @@ Examples:
     # Build kwargs for dataset processor
     dataset_kwargs = {}
     if args.metadata_csv:
-        dataset_kwargs['metadata_csv'] = args.metadata_csv
+        dataset_kwargs["metadata_csv"] = args.metadata_csv
     if args.audio_root:
-        dataset_kwargs['audio_root'] = args.audio_root
+        dataset_kwargs["audio_root"] = args.audio_root
     if args.output_dir:
-        dataset_kwargs['output_dir'] = args.output_dir
+        dataset_kwargs["output_dir"] = args.output_dir
     if dataset_name == "fsd50k":
-        dataset_kwargs['split'] = args.split
+        dataset_kwargs["split"] = args.split
 
     if args.list_classes:
         list_available_classes(dataset_name, **dataset_kwargs)
@@ -334,7 +316,7 @@ Examples:
                 output_path=args.output,
                 run=args.run,
                 positive_percentage=args.positive_pct,
-                **dataset_kwargs
+                **dataset_kwargs,
             )
         except ValueError as e:
             print(f"Error: {e}")

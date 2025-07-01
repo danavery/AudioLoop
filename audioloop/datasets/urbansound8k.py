@@ -158,8 +158,12 @@ class UrbanSound8KProcessor:
             "fold": int(row["fold"]),
         }
 
-    def load_metadata(self) -> list[dict]:
-        """Load all metadata for the UrbanSound8K dataset."""
+    def load_metadata(self, split: str = "dev") -> list[dict]:
+        """Load all metadata for the UrbanSound8K dataset.
+
+        Args:
+            split: Ignored for UrbanSound8K (kept for interface consistency with FSD50K)
+        """
         if not self.config.metadata_csv.exists():
             raise FileNotFoundError(f"Metadata CSV not found: {self.config.metadata_csv}")
 
@@ -210,6 +214,30 @@ class UrbanSound8KProcessor:
         for class_id in sorted(self.vocabulary.keys()):
             name = self.vocabulary[class_id]
             print(f"{class_id}: {name}")
+
+    def get_binary_label(self, item: dict, positive_class_id: int, positive_class_name: str) -> int:
+        """Get binary label for an item based on positive class criteria.
+
+        Args:
+            item: Metadata item from load_metadata()
+            positive_class_id: ID of the positive class
+            positive_class_name: Name of the positive class (unused for UrbanSound8K)
+
+        Returns:
+            1 if positive class, 0 otherwise
+        """
+        return 1 if item["class_id"] == positive_class_id else 0
+
+    def get_spectrogram_filename(self, item: dict) -> str:
+        """Convert audio filename to spectrogram filename.
+
+        Args:
+            item: Metadata item from load_metadata()
+
+        Returns:
+            Spectrogram filename
+        """
+        return item["filename"].replace(".wav", ".pt")
 
     def process_single_file(self, file_info: dict, output_dir: Path) -> tuple[bool, int | None]:
         """Process a single audio file and save its spectrogram.

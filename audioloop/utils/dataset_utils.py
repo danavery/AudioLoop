@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Literal
 
 DatasetType = Literal["urbansound8k", "fsd50k"]
@@ -55,6 +56,52 @@ def resolve_dataset_choice(cli_dataset: str | None = None) -> DatasetType:
     return get_default_dataset()
 
 
+def get_dataset_processor(dataset_name: str, **kwargs):
+    """Get the appropriate dataset processor and config.
+
+    Args:
+        dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
+        **kwargs: Additional configuration parameters for the dataset
+
+    Returns:
+        Tuple of (processor, config)
+
+    Raises:
+        ValueError: If dataset_name is not supported
+    """
+    if dataset_name == "urbansound8k":
+        from audioloop.datasets.urbansound8k import UrbanSound8KConfig, UrbanSound8KProcessor
+
+        config = UrbanSound8KConfig()
+        # Override config paths if provided
+        if "metadata_csv" in kwargs:
+            config.metadata_csv = Path(kwargs["metadata_csv"])
+        if "audio_root" in kwargs:
+            config.audio_root = Path(kwargs["audio_root"])
+        if "output_dir" in kwargs:
+            config.output_dir = Path(kwargs["output_dir"])
+        processor = UrbanSound8KProcessor(config)
+        return processor, config
+
+    if dataset_name == "fsd50k":
+        from audioloop.datasets.fsd50k import FSD50KConfig, FSD50KProcessor
+
+        config = FSD50KConfig()
+        # Override config paths if provided
+        if "metadata_dir" in kwargs:
+            config.metadata_dir = Path(kwargs["metadata_dir"])
+        if "ground_truth_dir" in kwargs:
+            config.ground_truth_dir = Path(kwargs["ground_truth_dir"])
+        if "audio_root" in kwargs:
+            config.audio_root = Path(kwargs["audio_root"])
+        if "output_dir" in kwargs:
+            config.output_dir = Path(kwargs["output_dir"])
+        processor = FSD50KProcessor(config)
+        return processor, config
+
+    raise ValueError(f"Unsupported dataset: {dataset_name}. Supported: urbansound8k, fsd50k")
+
+
 def get_dataset_help_text() -> str:
     """Get help text for dataset argument that mentions environment variable."""
     env_dataset = os.environ.get("AUDIOLOOP_DATASET")
@@ -65,6 +112,8 @@ def get_dataset_help_text() -> str:
             return f"Dataset to use (default: {resolved_dataset} from AUDIOLOOP_DATASET)"
         except ValueError:
             # Invalid env var - show error message instead
-            return f"Dataset to use (default: {DEFAULT_DATASET}, AUDIOLOOP_DATASET has invalid value)"
+            return (
+                f"Dataset to use (default: {DEFAULT_DATASET}, AUDIOLOOP_DATASET has invalid value)"
+            )
     else:
         return f"Dataset to use (default: {DEFAULT_DATASET}, or set AUDIOLOOP_DATASET)"
