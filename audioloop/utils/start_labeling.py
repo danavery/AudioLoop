@@ -233,12 +233,10 @@ def list_available_classes(dataset_name: str, **kwargs) -> None:
     processor, config = get_dataset_processor(dataset_name, **kwargs)
 
     if dataset_name == "urbansound8k":
-        from audioloop.datasets.urbansound8k import list_classes
-        list_classes()
+        processor.list_classes()
     elif dataset_name == "fsd50k":
-        from audioloop.datasets.fsd50k import list_classes, list_semantic_groups
-        vocab_path = kwargs.get('vocab_path', getattr(config, 'vocabulary_csv', None))
-        list_classes(vocab_path)
+        from audioloop.datasets.fsd50k import list_semantic_groups
+        processor.list_classes()
         print("\n")
         list_semantic_groups()
     else:

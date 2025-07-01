@@ -3,18 +3,57 @@ import os
 import re
 
 from .active_learning_core import run_active_learning_cycle
-from .datasets.urbansound8k import get_class_id, get_class_name, list_classes
+from .datasets.fsd50k import FSD50KConfig, FSD50KProcessor
+from .datasets.urbansound8k import UrbanSound8KConfig, UrbanSound8KProcessor
+from .utils.dataset_utils import get_dataset_help_text, resolve_dataset_choice
+
+
+def get_dataset_processor(dataset_name: str, **kwargs):
+    """Get the appropriate dataset processor and config.
+
+    Args:
+        dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
+        **kwargs: Additional configuration parameters for the dataset
+
+    Returns:
+        Tuple of (processor, config)
+
+    Raises:
+        ValueError: If dataset_name is not supported
+    """
+    if dataset_name == "urbansound8k":
+        config = UrbanSound8KConfig()
+        # Override config paths if provided
+        if "metadata_csv" in kwargs:
+            config.metadata_csv = kwargs["metadata_csv"]
+        processor = UrbanSound8KProcessor(config)
+        return processor, config
+    if dataset_name == "fsd50k":
+        config = FSD50KConfig()
+        # Override config paths if provided
+        if "metadata_dir" in kwargs:
+            config.metadata_dir = kwargs["metadata_dir"]
+        if "ground_truth_dir" in kwargs:
+            config.ground_truth_dir = kwargs["ground_truth_dir"]
+        processor = FSD50KProcessor(config)
+        return processor, config
+    raise ValueError(f"Unsupported dataset: {dataset_name}. Supported: urbansound8k, fsd50k")
+
+
+
 
 
 def run_active_learning_for_class(
     positive_class_name,
     model_path,
     negative_class_name=None,
-    dataset_file="data/urbansound8k/UrbanSound8K.csv",
+    dataset_name="urbansound8k",
+    dataset_file=None,
     run_number=1,
     total_candidates=20,
     positive_percentage=0.75,
     min_confidence=0.8,
+    **dataset_kwargs,
 ):
     """
     Simplified active learning cycle - just provide the class name.
@@ -23,17 +62,26 @@ def run_active_learning_for_class(
         positive_class_name: Audio class name (e.g., "dog_bark", "siren")
         model_path: Path to trained model
         negative_class_name: Name for negative class (auto-generated if None)
-        dataset_file: Path to dataset metadata CSV
+        dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
+        dataset_file: Path to dataset metadata CSV (auto-detected if None)
         run_number: Version number for output files
         total_candidates: Total number of candidates to select
         positive_percentage: Percentage of candidates that should be positive predictions (0.0-1.0)
         min_confidence: Minimum confidence threshold for candidate selection
+        **dataset_kwargs: Additional dataset-specific configuration
 
     Returns:
         tuple: (predictions_file, candidates_file)
     """
+    # Get processor and config once
+    processor, config = get_dataset_processor(dataset_name, **dataset_kwargs)
+
+    # Auto-detect dataset file if not provided
+    if dataset_file is None:
+        dataset_file = str(config.dataset_csv)
+
     # Validate class name and get class ID
-    positive_class_id = get_class_id(positive_class_name)
+    positive_class_id = processor.get_class_id(positive_class_name)
 
     # Auto-generate negative class name if not provided
     if negative_class_name is None:
@@ -45,6 +93,7 @@ def run_active_learning_for_class(
         positive_class_name=positive_class_name,
         negative_class_name=negative_class_name,
         model_path=model_path,
+        dataset_name=dataset_name,
         dataset_file=dataset_file,
         run_number=run_number,
         total_candidates=total_candidates,
@@ -66,7 +115,10 @@ Examples:
   # Run dog bark detection cycle 2 (automatically uses outputs/model_v2.pt)
   python -m audioloop.active_learning --class-name dog_bark --run-number 2
 
-  # Run with class ID instead of name
+  # Run with FSD50K dataset
+  python -m audioloop.active_learning --dataset fsd50k --class-name Drill --run-number 1
+
+  # Run with class ID instead of name (UrbanSound8K only)
   python -m audioloop.active_learning --class-id 3 --run-number 1
 
   # Specify custom model path
@@ -80,18 +132,24 @@ Examples:
         """,
     )
 
+    # Dataset selection
+    parser.add_argument(
+        "--dataset",
+        type=str,
+        help=get_dataset_help_text(),
+    )
+
     # Mode selection
     mode_group = parser.add_mutually_exclusive_group(required=True)
     mode_group.add_argument(
         "--class-name",
         type=str,
-        help="Audio class name to use as positive class (e.g., siren, dog_bark)",
+        help="Audio class name to use as positive class (e.g., siren, dog_bark for UrbanSound8K; Drill, Dog for FSD50K)",
     )
     mode_group.add_argument(
         "--class-id",
         type=int,
-        choices=range(10),
-        help="Audio class ID to use as positive class (0-9)",
+        help="Audio class ID to use as positive class (UrbanSound8K: 0-9, FSD50K: varies)",
     )
     mode_group.add_argument(
         "--list-classes", action="store_true", help="List all available audio classes and exit"
@@ -134,15 +192,23 @@ Examples:
     parser.add_argument(
         "--dataset-file",
         type=str,
-        default="data/urbansound8k/UrbanSound8K.csv",
-        help="Path to dataset metadata CSV file",
+        help="Path to dataset metadata CSV file (auto-detected from dataset if not specified)",
     )
 
     args = parser.parse_args()
 
+    # Resolve dataset choice
+    try:
+        dataset_name = resolve_dataset_choice(args.dataset)
+    except ValueError as e:
+        parser.error(str(e))
+
+    # Get processor and config once for the entire operation
+    processor, config = get_dataset_processor(dataset_name)
+
     # Handle list classes
     if args.list_classes:
-        list_classes()
+        processor.list_classes()
         return
 
     # Default model path based on run_number if not specified
@@ -164,12 +230,15 @@ Examples:
     if args.class_name:
         positive_class_name = args.class_name
         try:
-            positive_class_id = get_class_id(args.class_name)
+            positive_class_id = processor.get_class_id(args.class_name)
         except ValueError as e:
             parser.error(str(e))
     else:  # args.class_id is not None
         positive_class_id = args.class_id
-        positive_class_name = get_class_name(positive_class_id)
+        try:
+            positive_class_name = processor.get_class_name(positive_class_id)
+        except ValueError as e:
+            parser.error(str(e))
 
     # Determine negative class name
     negative_class_name = args.negative_name or f"not_{positive_class_name}"
@@ -195,6 +264,7 @@ Examples:
         positive_class_name=positive_class_name,
         negative_class_name=negative_class_name,
         model_path=args.model,
+        dataset_name=dataset_name,
         dataset_file=args.dataset_file,
         run_number=args.run_number,
         total_candidates=args.total_candidates,

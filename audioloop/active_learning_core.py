@@ -8,6 +8,8 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from .datasets.fsd50k import FSD50KConfig, FSD50KProcessor
+from .datasets.urbansound8k import UrbanSound8KConfig, UrbanSound8KProcessor
 from .models.cnn_5layer import SoundCNN
 from .utils.data_utils import entropy, get_device, variable_length_collate_fn
 from .utils.spectrogram_dataset import SpectrogramDataset
@@ -207,35 +209,60 @@ def load_model(model_path, num_classes, device):
     return model
 
 
+def get_dataset_processor(dataset_name: str, **kwargs):
+    """Get the appropriate dataset processor and config."""
+    if dataset_name == "urbansound8k":
+        config = UrbanSound8KConfig()
+        processor = UrbanSound8KProcessor(config)
+        return processor, config
+    if dataset_name == "fsd50k":
+        config = FSD50KConfig()
+        processor = FSD50KProcessor(config)
+        return processor, config
+    raise ValueError(f"Unsupported dataset: {dataset_name}")
+
+
 def create_binary_labels(
-    dataset_file="data/urbansound8k/UrbanSound8K.csv",
+    dataset_name="urbansound8k",
+    dataset_file=None,
     positive_class_id=8,
     output_csv="outputs/binary_labels.csv",
     positive_class_name="positive",
     negative_class_name="negative",
+    **dataset_kwargs,
 ):
     """
     Create binary labels from audio dataset for any specified class.
 
     Args:
-        dataset_file: Path to dataset metadata CSV file
+        dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
+        dataset_file: Path to dataset metadata CSV file (auto-detected if None)
         positive_class_id: Audio class ID to treat as positive (1)
         output_csv: Path for output binary labels CSV
         positive_class_name: Name for positive class (for logging)
         negative_class_name: Name for negative class (for logging)
+        **dataset_kwargs: Additional dataset-specific configuration
 
     Returns:
         str: Path to created binary labels CSV
     """
+    # Get dataset processor and config
+    processor, config = get_dataset_processor(dataset_name, **dataset_kwargs)
+
+    # Auto-detect dataset file if not provided
+    if dataset_file is None:
+        dataset_file = str(config.dataset_csv)
+
     binary_data = []
     positive_count = 0
     negative_count = 0
 
-    with open(dataset_file) as f:
-        csv_reader = csv.DictReader(f)
-        for row in csv_reader:
-            filename = row["slice_file_name"]
-            class_id = int(row["classID"])
+    # Load metadata using the processor
+    if dataset_name == "urbansound8k":
+        metadata = processor.load_metadata()
+        for item in metadata:
+            filename = item["filename"]
+            class_id = item["class_id"]
 
             # Binary classification: specified class vs everything else
             is_positive = 1 if class_id == positive_class_id else 0
@@ -245,16 +272,48 @@ def create_binary_labels(
             else:
                 negative_count += 1
 
-            binary_data.append(
-                {"filename": filename, "label": is_positive, "original_class": class_id}
-            )
+            # Convert audio filename to spectrogram filename
+            spec_filename = filename.replace('.wav', '.pt')
+            spec_path = f"data/all_specs/{spec_filename}"
+
+            binary_data.append({
+                "filepath": spec_path,
+                "label": is_positive,
+                "run": 1
+            })
+
+    elif dataset_name == "fsd50k":
+        metadata = processor.load_metadata(split="dev")
+        for item in metadata:
+            filename = item["filename"]
+            labels = item["labels"]
+
+            # For FSD50K, use the positive_class_name directly
+            is_positive = 1 if positive_class_name in labels else 0
+
+            if is_positive:
+                positive_count += 1
+            else:
+                negative_count += 1
+
+            # Convert audio filename to spectrogram filename
+            spec_filename = f"{filename}.pt"
+            spec_path = f"data/all_specs/{spec_filename}"
+
+            binary_data.append({
+                "filepath": spec_path,
+                "label": is_positive,
+                "run": 1
+            })
+    else:
+        raise ValueError(f"Unsupported dataset: {dataset_name}")
 
     # Ensure outputs directory exists
     os.makedirs("outputs", exist_ok=True)
 
-    # Write binary labels CSV
+    # Write binary labels CSV in training set format
     with open(output_csv, "w", newline="") as f:
-        fieldnames = ["filename", "label", "original_class"]
+        fieldnames = ["filepath", "label", "run"]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(binary_data)
@@ -652,11 +711,13 @@ def run_active_learning_cycle(
     positive_class_name="siren",
     negative_class_name="not_siren",
     model_path=None,
-    dataset_file="data/urbansound8k/UrbanSound8K.csv",
+    dataset_name="urbansound8k",
+    dataset_file=None,
     run_number=1,
     total_candidates=20,
     positive_percentage=0.75,
     min_confidence=0.8,
+    **dataset_kwargs,
 ):
     """
     Run a complete active learning cycle for binary classification.
@@ -666,10 +727,12 @@ def run_active_learning_cycle(
         positive_class_name: Human-readable name for positive class
         negative_class_name: Human-readable name for negative class
         model_path: Path to trained model (default: outputs/model_v{run_number}.pt)
-        dataset_file: Path to dataset metadata CSV
+        dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
+        dataset_file: Path to dataset metadata CSV (auto-detected if None)
         run_number: Version number for output files (e.g., 1 creates v1 files)
         total_candidates: Total number of candidates to select
         positive_percentage: Percentage of candidates that should be positive predictions
+        **dataset_kwargs: Additional dataset-specific configuration
 
     Returns:
         tuple: (predictions_file, candidates_file)
@@ -684,11 +747,13 @@ def run_active_learning_cycle(
     # Step 1: Create binary labels for the specified class
     print(f"Step 1: Creating binary labels for {positive_class_name} vs {negative_class_name}...")
     binary_labels_file = create_binary_labels(
+        dataset_name=dataset_name,
         dataset_file=dataset_file,
         positive_class_id=positive_class_id,
         output_csv=f"outputs/binary_labels_v{run_number}.csv",
         positive_class_name=positive_class_name,
         negative_class_name=negative_class_name,
+        **dataset_kwargs,
     )
 
     # Step 2: Run inference on all files

@@ -166,6 +166,7 @@ class FSD50KConfig:
     # Specific files
     vocabulary_csv: Path = Path("data/FSD50K/FSD50K.ground_truth/vocabulary.csv")
     dev_csv: Path = Path("data/FSD50K/FSD50K.ground_truth/dev.csv")
+    dataset_csv: Path = Path("data/FSD50K/FSD50K.ground_truth/dev.csv")  # Common interface
     eval_csv: Path = Path("data/FSD50K/FSD50K.ground_truth/eval.csv")
     inference_csv: Path = Path("outputs/fsd50k_files.csv")
 
@@ -399,6 +400,28 @@ class FSD50KProcessor:
             spec = spec[..., start_idx : start_idx + target_length]
 
         return spec
+
+    def get_class_id(self, class_name: str) -> int:
+        """Get FSD50K class ID from human-readable class name."""
+        if class_name not in self.name_to_id:
+            raise ValueError(
+                f"Invalid class name: '{class_name}'. Use list_classes() to see valid names."
+            )
+        return self.name_to_id[class_name]
+
+    def get_class_name(self, class_id: int) -> str:
+        """Get human-readable class name from FSD50K class ID."""
+        if class_id not in self.vocabulary:
+            raise ValueError(f"Invalid class ID: {class_id}. Must be 0-199.")
+        return self.vocabulary[class_id]
+
+    def list_classes(self) -> None:
+        """Print all available FSD50K classes."""
+        print("FSD50K Classes (200 total):")
+        print("=" * 40)
+        for class_id in sorted(self.vocabulary.keys()):
+            name = self.vocabulary[class_id]
+            print(f"{class_id:3d}: {name}")
 
     def process_single_file(self, file_info: dict, output_dir: Path) -> tuple[bool, int | None]:
         """Process a single audio file and save its spectrogram.
