@@ -20,8 +20,8 @@ line-length = 100
 
 [tool.ruff.lint]
 # extend-select = ["I", "B", "SIM", "RET"]
-extend-select = ["I", "B", "SIM", "RET", "UP", "C4", "F", "RUF", "TID"]
-ignore = ["RET504"]
+extend-select = ["I", "B", "SIM", "RET", "UP", "C4", "F", "RUF", "TID", "E"]
+ignore = ["RET504", "E501"]
 
 [tool.ruff.lint.per-file-ignores]
 "audioloop/label_audio.py" = ["RET508"]
