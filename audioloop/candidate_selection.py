@@ -15,7 +15,7 @@ class CandidateSelector:
 
     def __init__(
         self,
-        total_candidates: int = 20,
+        total_candidates: int = 50,
         positive_percentage: float = 0.80,
         min_confidence: float = 0.8,
         candidate_pool_multiplier: int = 5,
@@ -88,18 +88,22 @@ class CandidateSelector:
 
         # Print statistics and recommendations
         self._print_statistics(
-            predictions, positive_preds, negative_preds,
-            positive_candidates, negative_candidates,
-            positive_class_name, negative_class_name,
-            positive_pool_size, negative_pool_size
+            predictions,
+            positive_preds,
+            negative_preds,
+            positive_candidates,
+            negative_candidates,
+            positive_class_name,
+            negative_class_name,
+            positive_pool_size,
+            negative_pool_size,
         )
 
         # Save candidates to file
         if all_candidates:
             self._save_candidates(all_candidates, candidates_csv)
             self._print_candidate_summary(
-                positive_candidates, negative_candidates,
-                positive_class_name, negative_class_name
+                positive_candidates, negative_candidates, positive_class_name, negative_class_name
             )
         else:
             print("No candidates found.")
@@ -148,23 +152,31 @@ class CandidateSelector:
         true_negative_samples = []
 
         for p in all_predictions:
-            true_label = int(p["true_label"]) if isinstance(p["true_label"], str) else p["true_label"]
+            true_label = (
+                int(p["true_label"]) if isinstance(p["true_label"], str) else p["true_label"]
+            )
             if true_label == 1:
                 true_positive_samples.append(p)
             else:
                 true_negative_samples.append(p)
 
         positive_correct = sum(
-            1 for p in true_positive_samples
+            1
+            for p in true_positive_samples
             if (isinstance(p["correct"], str) and p["correct"].lower() == "true") or p["correct"]
         )
         negative_correct = sum(
-            1 for p in true_negative_samples
+            1
+            for p in true_negative_samples
             if (isinstance(p["correct"], str) and p["correct"].lower() == "true") or p["correct"]
         )
 
-        positive_accuracy = positive_correct / len(true_positive_samples) if true_positive_samples else 0
-        negative_accuracy = negative_correct / len(true_negative_samples) if true_negative_samples else 0
+        positive_accuracy = (
+            positive_correct / len(true_positive_samples) if true_positive_samples else 0
+        )
+        negative_accuracy = (
+            negative_correct / len(true_negative_samples) if true_negative_samples else 0
+        )
 
         # Overall confidence statistics
         all_confidences = [p["confidence"] for p in all_predictions]
@@ -202,9 +214,13 @@ class CandidateSelector:
         )
         print(f"Selected {len(positive_candidates)} {positive_class_name} candidates")
         print(f"Selected {len(negative_candidates)} {negative_class_name} candidates")
-        print(f"Total candidates for labeling: {len(positive_candidates) + len(negative_candidates)}")
+        print(
+            f"Total candidates for labeling: {len(positive_candidates) + len(negative_candidates)}"
+        )
 
-    def _print_confidence_distribution(self, predictions: list[dict[str, Any]], class_name: str) -> None:
+    def _print_confidence_distribution(
+        self, predictions: list[dict[str, Any]], class_name: str
+    ) -> None:
         """Print confidence distribution for a class."""
         if not predictions:
             print(f"{class_name}: No predictions available")
@@ -214,7 +230,7 @@ class CandidateSelector:
         print(f"{class_name} confidence distribution:")
         print(f"  Count: {len(confidences)}")
         print(f"  Range: {min(confidences):.3f} - {max(confidences):.3f}")
-        print(f"  Mean: {sum(confidences)/len(confidences):.3f}")
+        print(f"  Mean: {sum(confidences) / len(confidences):.3f}")
 
     def _save_candidates(self, candidates: list[dict[str, Any]], candidates_csv: str) -> None:
         """Save candidates to CSV file."""
@@ -224,7 +240,10 @@ class CandidateSelector:
             candidate["human_confidence"] = ""  # Human confidence in the label
 
         # Ensure outputs directory exists
-        os.makedirs(os.path.dirname(candidates_csv) if os.path.dirname(candidates_csv) else "outputs", exist_ok=True)
+        os.makedirs(
+            os.path.dirname(candidates_csv) if os.path.dirname(candidates_csv) else "outputs",
+            exist_ok=True,
+        )
 
         # Save candidates
         fieldnames = list(candidates[0].keys())

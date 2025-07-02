@@ -456,7 +456,7 @@ def run_active_learning_cycle(
     dataset_name="urbansound8k",
     dataset_file=None,
     run_number=1,
-    total_candidates=20,
+    total_candidates=50,
     positive_percentage=0.75,
     min_confidence=0.8,
     **dataset_kwargs,

@@ -17,7 +17,7 @@ def run_active_learning_for_class(
     dataset_name="urbansound8k",
     dataset_file=None,
     run_number=1,
-    total_candidates=20,
+    total_candidates=50,
     positive_percentage=0.75,
     min_confidence=0.8,
     **dataset_kwargs,
@@ -141,7 +141,7 @@ Examples:
     parser.add_argument(
         "--total-candidates",
         type=int,
-        default=20,
+        default=50,
         help="Total number of candidates to select (default: 20)",
     )
     parser.add_argument(
