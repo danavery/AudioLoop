@@ -17,6 +17,7 @@ def run_active_learning_for_class(
     dataset_name="urbansound8k",
     dataset_file=None,
     run_number=1,
+    training_set_csv=None,
     total_candidates=50,
     positive_percentage=0.75,
     min_confidence=0.8,
@@ -32,6 +33,7 @@ def run_active_learning_for_class(
         dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
         dataset_file: Path to dataset metadata CSV (auto-detected if None)
         run_number: Version number for output files
+        training_set_csv: Path to training set CSV (auto-detected if None)
         total_candidates: Total number of candidates to select
         positive_percentage: Percentage of candidates that should be positive predictions (0.0-1.0)
         min_confidence: Minimum confidence threshold for candidate selection
@@ -63,6 +65,7 @@ def run_active_learning_for_class(
         dataset_name=dataset_name,
         dataset_file=dataset_file,
         run_number=run_number,
+        training_set_csv=training_set_csv,
         total_candidates=total_candidates,
         positive_percentage=positive_percentage,
         min_confidence=min_confidence,
@@ -161,6 +164,11 @@ Examples:
         type=str,
         help="Path to dataset metadata CSV file (auto-detected from dataset if not specified)",
     )
+    parser.add_argument(
+        "--training-set",
+        type=str,
+        help="Path to training set CSV (default: training_sets/training_set_v{run_number}.csv)",
+    )
 
     args = parser.parse_args()
 
@@ -234,6 +242,7 @@ Examples:
         dataset_name=dataset_name,
         dataset_file=args.dataset_file,
         run_number=args.run_number,
+        training_set_csv=args.training_set,
         total_candidates=args.total_candidates,
         positive_percentage=args.positive_pct,
         min_confidence=args.min_confidence,

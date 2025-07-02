@@ -9,79 +9,6 @@ from audioloop.utils.dataset_utils import (
 )
 
 
-def get_matching_samples_urbansound8k(
-    processor, config, class_name: str | None = None, invert: bool = False
-) -> list[str]:
-    """Get matching samples for UrbanSound8K dataset.
-
-    Args:
-        processor: UrbanSound8K processor instance
-        config: UrbanSound8K config instance
-        class_name: Class name to filter by (if None, returns all)
-        invert: If True, return samples NOT matching the class
-
-    Returns:
-        List of spectrogram file paths
-    """
-    metadata = processor.load_metadata(split="dev")
-    matching_paths = []
-
-    for item in metadata:
-        filename = item["filename"]
-        original_class = item["class_name"]
-
-        # Determine if this sample matches our criteria
-        match = True if class_name is None else original_class == class_name
-
-        if invert:
-            match = not match
-
-        if match:
-            # Convert to spectrogram path
-            spec_filename = filename.replace(".wav", ".pt")
-            spec_path = config.output_dir / spec_filename
-            matching_paths.append(str(spec_path))
-
-    return matching_paths
-
-
-def get_matching_samples_fsd50k(
-    processor, config, class_name: str | None = None, invert: bool = False, split: str = "dev"
-) -> list[str]:
-    """Get matching samples for FSD50K dataset.
-
-    Args:
-        processor: FSD50K processor instance
-        config: FSD50K config instance
-        class_name: Class name to filter by (if None, returns all)
-        invert: If True, return samples NOT matching the class
-        split: Dataset split to use ('dev' or 'eval')
-
-    Returns:
-        List of spectrogram file paths
-    """
-    metadata = processor.load_metadata(split=split)
-    matching_paths = []
-
-    for item in metadata:
-        filename = item["filename"]
-        labels = item["labels"]
-
-        # Determine if this sample matches our criteria
-        match = True if class_name is None else class_name in labels
-
-        if invert:
-            match = not match
-
-        if match:
-            # Convert to spectrogram path
-            spec_filename = f"{filename}.pt"
-            spec_path = config.output_dir / spec_filename
-            matching_paths.append(str(spec_path))
-
-    return matching_paths
-
-
 def get_matching_samples(
     dataset_name: str, class_name: str | None = None, invert: bool = False, **kwargs
 ) -> list[str]:
@@ -94,16 +21,38 @@ def get_matching_samples(
         **kwargs: Additional dataset-specific parameters
 
     Returns:
-        List of spectrogram file paths
+        List of spectrogram filenames (not full paths)
     """
     processor, config = get_dataset_processor(dataset_name, **kwargs)
 
-    if dataset_name == "urbansound8k":
-        return get_matching_samples_urbansound8k(processor, config, class_name, invert)
-    if dataset_name == "fsd50k":
-        split = kwargs.get("split", "dev")
-        return get_matching_samples_fsd50k(processor, config, class_name, invert, split)
-    raise ValueError(f"Unsupported dataset: {dataset_name}")
+    # Get split parameter (FSD50K uses it, UrbanSound8K ignores it)
+    split = kwargs.get("split", "dev")
+    metadata = processor.load_metadata(split=split)
+
+    # Get positive class ID if we have a class name
+    positive_class_id = None
+    if class_name is not None:
+        positive_class_id = processor.get_class_id(class_name)
+
+    matching_filenames = []
+
+    for item in metadata:
+        # Determine if this sample matches our criteria
+        if class_name is None:
+            match = True
+        else:
+            is_positive = processor.get_binary_label(item, positive_class_id, class_name)
+            match = bool(is_positive)
+
+        if invert:
+            match = not match
+
+        if match:
+            # Use processor's method to get spectrogram filename
+            spec_filename = processor.get_spectrogram_filename(item)
+            matching_filenames.append(spec_filename)
+
+    return matching_filenames
 
 
 def write_starting_labels(

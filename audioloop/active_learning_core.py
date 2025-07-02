@@ -13,6 +13,21 @@ from .utils.dataset_utils import get_dataset_processor
 from .utils.spectrogram_dataset import SpectrogramDataset
 
 
+def load_training_set_filenames(training_set_csv):
+    """Load filenames from training set CSV."""
+    if not training_set_csv or not os.path.exists(training_set_csv):
+        return set()
+
+    training_filenames = set()
+    with open(training_set_csv) as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if row.get("filename"):
+                training_filenames.add(row["filename"])
+
+    return training_filenames
+
+
 def load_model(model_path, num_classes, device):
     """Load a trained model from disk."""
     # Load the state dict first to detect architecture
@@ -44,6 +59,7 @@ def run_binary_inference(
     dataset_name="urbansound8k",
     dataset_file=None,
     positive_class_id=8,
+    training_set_csv=None,
     **dataset_kwargs,
 ):
     """
@@ -57,6 +73,7 @@ def run_binary_inference(
         dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
         dataset_file: Path to dataset metadata CSV (auto-detected if None)
         positive_class_id: Audio class ID to treat as positive
+        training_set_csv: Path to training set CSV (files to exclude from inference)
         **dataset_kwargs: Additional dataset-specific configuration
 
     Returns:
@@ -76,14 +93,26 @@ def run_binary_inference(
     metadata = processor.load_metadata(split="dev")
     print(f"Found {len(metadata)} total samples in dataset")
 
+    # Load training set filenames to exclude
+    training_filenames = load_training_set_filenames(training_set_csv)
+    if training_filenames:
+        print(f"Excluding {len(training_filenames)} files already in training set")
+
     # Create dataset entries directly (no intermediate file)
     dataset_entries = []
+    filtered_count = 0
     for item in metadata:
+        # Use processor's filename conversion method
+        spec_filename = processor.get_spectrogram_filename(item)
+
+        # Skip if already in training set
+        if spec_filename in training_filenames:
+            filtered_count += 1
+            continue
+
         # Use processor's binary classification method
         is_positive = processor.get_binary_label(item, positive_class_id, positive_class_name)
 
-        # Use processor's filename conversion method
-        spec_filename = processor.get_spectrogram_filename(item)
         spec_path = f"data/all_specs/{spec_filename}"
 
         # Get original class info
@@ -101,7 +130,9 @@ def run_binary_inference(
 
     # Load dataset directly from entries
     dataset = SpectrogramDataset(data=dataset_entries, specs_dir="data/all_specs")
-    print(f"Dataset size: {len(dataset)}")
+    if filtered_count > 0:
+        print(f"Filtered out {filtered_count} files already in training set")
+    print(f"Running inference on {len(dataset)} files")
 
     # Binary classification
     num_classes = 2
@@ -234,6 +265,7 @@ def run_active_learning_cycle(
     dataset_name="urbansound8k",
     dataset_file=None,
     run_number=1,
+    training_set_csv=None,
     total_candidates=50,
     positive_percentage=0.75,
     min_confidence=0.8,
@@ -250,6 +282,7 @@ def run_active_learning_cycle(
         dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
         dataset_file: Path to dataset metadata CSV (auto-detected if None)
         run_number: Version number for output files (e.g., 1 creates v1 files)
+        training_set_csv: Path to training set CSV (auto-detected if None)
         total_candidates: Total number of candidates to select
         positive_percentage: Percentage of candidates that should be positive predictions
         **dataset_kwargs: Additional dataset-specific configuration
@@ -262,7 +295,15 @@ def run_active_learning_cycle(
     if model_path is None:
         model_path = f"outputs/model_v{run_number}.pt"
 
+    # Auto-detect training set if not provided
+    if training_set_csv is None:
+        training_set_csv = f"training_sets/training_set_v{run_number}.csv"
+
     print(f"Using model: {model_path}")
+    if os.path.exists(training_set_csv):
+        print(f"Using training set: {training_set_csv}")
+    else:
+        print(f"Training set not found: {training_set_csv} (will process all files)")
 
     # Step 1: Run inference on all files
     print("\nStep 1: Running binary classification inference...")
@@ -276,6 +317,7 @@ def run_active_learning_cycle(
         dataset_name=dataset_name,
         dataset_file=dataset_file,
         positive_class_id=positive_class_id,
+        training_set_csv=training_set_csv,
         **dataset_kwargs,
     )
 
