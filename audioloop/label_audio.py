@@ -412,6 +412,70 @@ class SimpleAudioLabeler:
             # Ensure audio is stopped when exiting
             self._stop_audio()
 
+    def _parse_target_class(self, prediction: str) -> str:
+        """Parse the target class from prediction field.
+
+        Args:
+            prediction: Prediction string like "Guitar" or "not_Guitar"
+
+        Returns:
+            Target class name (e.g., "Guitar")
+        """
+        if prediction.startswith("not_"):
+            return prediction[4:]  # Remove "not_" prefix
+        return prediction
+
+    def auto_label(self):
+        """Automatically label all candidates using ground truth."""
+        print(f"\nAuto-labeling candidates using ground truth - {self.dataset_name.upper()}")
+        print("=" * 60)
+
+        if not self.candidates:
+            print("No candidates to label!")
+            return
+
+        # Get target class from first candidate's prediction
+        first_prediction = self.candidates[0].get("prediction", "")
+        if not first_prediction:
+            print("Error: No prediction field found in candidates CSV")
+            return
+
+        target_class = self._parse_target_class(first_prediction)
+        print(f"Target class: {target_class}")
+
+        positive_count = 0
+        negative_count = 0
+
+        for i, candidate in enumerate(self.candidates):
+            original_class = candidate.get("original_class", "")
+
+            # Determine ground truth label
+            if original_class == target_class:
+                ground_truth_label = "1"
+                positive_count += 1
+            else:
+                ground_truth_label = "0"
+                negative_count += 1
+
+            # Set the label
+            candidate["needs_human_label"] = ground_truth_label
+
+            # Show progress
+            if (i + 1) % 10 == 0 or i == len(self.candidates) - 1:
+                print(f"Processed {i + 1}/{len(self.candidates)} samples...")
+
+        self.changes_made = True
+
+        # Print summary
+        print("\nAuto-labeling complete:")
+        print(f"  Positive samples: {positive_count}")
+        print(f"  Negative samples: {negative_count}")
+        print(f"  Total samples: {len(self.candidates)}")
+
+        # Save the results
+        self._save_candidates()
+        print(f"Results saved to: {self.candidates_csv}")
+
 
 def test_audio_playback(audio_file):
     """Test audio playback with a specific file."""
@@ -463,6 +527,13 @@ Full workflow example:
   # Merge labels back into training set
   python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv
 
+Automated labeling (for testing):
+  # Automatically label using ground truth instead of human input
+  python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --auto-label
+
+  # With explicit dataset
+  python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --auto-label --dataset fsd50k
+
 Requirements:
   - Candidates CSV must come from active_learning.py (has 'filepath' column)
   - Audio files must be in proper dataset structure:
@@ -498,6 +569,12 @@ Audio playback:
         "--test-audio", help="Test audio playback with a specific file", metavar="FILE"
     )
 
+    parser.add_argument(
+        "--auto-label",
+        action="store_true",
+        help="Automatically label candidates using ground truth (for testing)",
+    )
+
     args = parser.parse_args()
 
     # Handle dataset resolution
@@ -528,7 +605,10 @@ Audio playback:
     )
 
     try:
-        labeler.run()
+        if args.auto_label:
+            labeler.auto_label()
+        else:
+            labeler.run()
     except Exception as e:
         print(f"\nError: {e}")
         sys.exit(1)
