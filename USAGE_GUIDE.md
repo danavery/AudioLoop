@@ -68,14 +68,17 @@ python -m audioloop.simple_train training_sets/training_set_v1.csv -v 1 --epochs
 
 ### Active Learning Workflow
 ```bash
-# Run active learning cycle (auto-detects version from model)
-python -m audioloop.active_learning --class-name siren --model outputs/model_v1.pt
+# Run active learning cycle (auto-detects model from run number)
+python -m audioloop.active_learning --class-name siren --run-number 1
 
 # Run with explicit parameters
 python -m audioloop.active_learning --class-name dog_bark --run-number 2 --total-candidates 20 --positive-pct 0.75 --min-confidence 0.85
 
 # List available sound classes
 python -m audioloop.active_learning --list-classes
+
+# FSD50K dataset
+python -m audioloop.active_learning --dataset fsd50k --class-name Drill --run-number 1
 ```
 
 ### Human Labeling

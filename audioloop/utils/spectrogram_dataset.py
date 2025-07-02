@@ -16,17 +16,29 @@ class SpectrogramDataset(torch.utils.data.Dataset):
     The dataset automatically detects the CSV format and adapts accordingly.
     """
 
-    def __init__(self, csv_file, specs_dir="data/specs"):
+    def __init__(self, csv_file=None, data=None, specs_dir="data/specs"):
         """
         Initialize the dataset.
 
         Args:
-            csv_file: Path to CSV file containing labels
+            csv_file: Path to CSV file containing labels (optional if data provided)
+            data: List of data entries (optional if csv_file provided)
             specs_dir: Directory containing precomputed .pt spectrogram files
         """
         self.specs_dir = specs_dir
         self.samples = []
 
+        if data is not None:
+            # Use provided data directly
+            self._load_from_data(data)
+        elif csv_file is not None:
+            # Load from CSV file
+            self._load_from_csv(csv_file)
+        else:
+            raise ValueError("Either csv_file or data must be provided")
+
+    def _load_from_csv(self, csv_file):
+        """Load data from CSV file."""
         with open(csv_file) as f:
             # Peek at first line to detect format
             first_line = f.readline().strip()
@@ -114,6 +126,45 @@ class SpectrogramDataset(torch.utils.data.Dataset):
             "label": label,
             "run": run,
             "original_class": None,
+        }
+
+    def _load_from_data(self, data):
+        """Load data from provided data entries."""
+        for entry in data:
+            sample = self._parse_data_entry(entry)
+            if sample:
+                self.samples.append(sample)
+
+    def _parse_data_entry(self, entry):
+        """Parse a data entry dictionary."""
+        # Get filename
+        if "filename" in entry:
+            filename = entry["filename"]
+        elif "filepath" in entry:
+            filename = os.path.basename(entry["filepath"])
+        else:
+            return None
+
+        # Get label
+        if "label" in entry:
+            label = int(entry["label"])
+        else:
+            return None
+
+        # Optional fields
+        run = entry.get("run", "1")
+        original_class = int(entry["original_class"]) if "original_class" in entry else None
+
+        # Build spectrogram path
+        spec_filename = filename.replace(".wav", ".pt")
+        spec_filepath = os.path.join(self.specs_dir, spec_filename)
+
+        return {
+            "filename": filename,
+            "spec_filepath": spec_filepath,
+            "label": label,
+            "run": run,
+            "original_class": original_class,
         }
 
     def __len__(self):

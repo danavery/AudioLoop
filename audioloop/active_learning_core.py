@@ -13,286 +13,51 @@ from .utils.dataset_utils import get_dataset_processor
 from .utils.spectrogram_dataset import SpectrogramDataset
 
 
-def calculate_percentiles(values, percentiles=None):
-    """Calculate percentiles for a list of values."""
-    if percentiles is None:
-        percentiles = [10, 25, 50, 75, 90, 95]
-    if not values:
-        return dict.fromkeys(percentiles, 0)
-    sorted_values = sorted(values)
-    n = len(sorted_values)
-    result = {}
-    for p in percentiles:
-        index = int((p / 100) * (n - 1))
-        result[p] = sorted_values[index]
-    return result
-
-
-def analyze_confidence_distribution(predictions, class_name):
-    """Analyze confidence distribution and return statistics."""
-    if not predictions:
-        return None
-
-    confidences = [p["confidence"] for p in predictions]
-    percentiles = calculate_percentiles(confidences)
-
-    high_conf = sum(1 for c in confidences if c >= 0.8)
-    very_high_conf = sum(1 for c in confidences if c >= 0.9)
-    ultra_high_conf = sum(1 for c in confidences if c >= 0.95)
-
-    return {
-        "class_name": class_name,
-        "count": len(predictions),
-        "confidences": confidences,
-        "percentiles": percentiles,
-        "mean": sum(confidences) / len(confidences),
-        "min": min(confidences),
-        "max": max(confidences),
-        "high_conf": high_conf,
-        "very_high_conf": very_high_conf,
-        "ultra_high_conf": ultra_high_conf,
-    }
-
-
-def print_confidence_distribution(predictions, class_name):
-    """Print detailed confidence distribution for a class."""
-    stats = analyze_confidence_distribution(predictions, class_name)
-    if not stats:
-        print(f"No {class_name} predictions to analyze")
-        return
-
-    print(
-        f"\n{stats['class_name'].title()} Prediction Confidence Distribution ({stats['count']} samples):"
-    )
-    print(f"  Mean: {stats['mean']:.3f}")
-    print(f"  Min:  {stats['min']:.3f}")
-    print(f"  10th: {stats['percentiles'][10]:.3f}")
-    print(f"  25th: {stats['percentiles'][25]:.3f}")
-    print(f"  50th: {stats['percentiles'][50]:.3f}")
-    print(f"  75th: {stats['percentiles'][75]:.3f}")
-    print(f"  90th: {stats['percentiles'][90]:.3f}")
-    print(f"  95th: {stats['percentiles'][95]:.3f}")
-    print(f"  Max:  {stats['max']:.3f}")
-
-    print(
-        f"  High confidence (≥0.8):  {stats['high_conf']}/{stats['count']} ({stats['high_conf'] / stats['count']:.1%})"
-    )
-    print(
-        f"  Very high conf (≥0.9):   {stats['very_high_conf']}/{stats['count']} ({stats['very_high_conf'] / stats['count']:.1%})"
-    )
-    print(
-        f"  Ultra high conf (≥0.95): {stats['ultra_high_conf']}/{stats['count']} ({stats['ultra_high_conf'] / stats['count']:.1%})"
-    )
-
-
-def save_confidence_stats(
-    predictions_file,
-    positive_preds,
-    negative_preds,
-    positive_class_name,
-    negative_class_name,
-    overall_accuracy,
-    positive_accuracy,
-    negative_accuracy,
-    avg_confidence,
-    min_conf,
-    max_conf,
-    high_conf_percentage,
-):
-    """Save detailed confidence distribution statistics to a file."""
-    import re
-
-    # Extract version/run number from predictions filename for stats filename
-    version_match = re.search(r"_v(\d+)", predictions_file)
-    version_suffix = f"_v{version_match.group(1)}" if version_match else ""
-
-    stats_file = f"outputs/confidence_stats{version_suffix}.txt"
-
-    with open(stats_file, "w") as f:
-        f.write(f"Confidence Distribution Statistics{version_suffix}\n")
-        f.write("=" * 50 + "\n\n")
-
-        # Overall model performance
-        f.write("Model Performance Summary:\n")
-        f.write(f"Overall Accuracy: {overall_accuracy:.3f}\n")
-        f.write(f"True {positive_class_name} Accuracy: {positive_accuracy:.3f}\n")
-        f.write(f"True {negative_class_name} Accuracy: {negative_accuracy:.3f}\n")
-        f.write(
-            f"Overall Confidence: avg={avg_confidence:.3f}, range={min_conf:.3f}-{max_conf:.3f}\n"
-        )
-        f.write(f"High confidence samples (≥0.8): {high_conf_percentage:.1%}\n\n")
-
-        # Predicted positive class distribution
-        pos_stats = analyze_confidence_distribution(positive_preds, positive_class_name)
-        if pos_stats:
-            f.write(
-                f"Predicted {pos_stats['class_name'].title()} Distribution ({pos_stats['count']} samples):\n"
-            )
-            f.write(f"  Mean: {pos_stats['mean']:.3f}\n")
-            f.write(f"  Min:  {pos_stats['min']:.3f}\n")
-            f.write(f"  10th: {pos_stats['percentiles'][10]:.3f}\n")
-            f.write(f"  25th: {pos_stats['percentiles'][25]:.3f}\n")
-            f.write(f"  50th: {pos_stats['percentiles'][50]:.3f}\n")
-            f.write(f"  75th: {pos_stats['percentiles'][75]:.3f}\n")
-            f.write(f"  90th: {pos_stats['percentiles'][90]:.3f}\n")
-            f.write(f"  95th: {pos_stats['percentiles'][95]:.3f}\n")
-            f.write(f"  Max:  {pos_stats['max']:.3f}\n")
-
-            f.write(
-                f"  High confidence (≥0.8):  {pos_stats['high_conf']}/{pos_stats['count']} ({pos_stats['high_conf'] / pos_stats['count']:.1%})\n"
-            )
-            f.write(
-                f"  Very high conf (≥0.9):   {pos_stats['very_high_conf']}/{pos_stats['count']} ({pos_stats['very_high_conf'] / pos_stats['count']:.1%})\n"
-            )
-            f.write(
-                f"  Ultra high conf (≥0.95): {pos_stats['ultra_high_conf']}/{pos_stats['count']} ({pos_stats['ultra_high_conf'] / pos_stats['count']:.1%})\n\n"
-            )
-
-        # Predicted negative class distribution
-        neg_stats = analyze_confidence_distribution(negative_preds, negative_class_name)
-        if neg_stats:
-            f.write(
-                f"Predicted {neg_stats['class_name'].title()} Distribution ({neg_stats['count']} samples):\n"
-            )
-            f.write(f"  Mean: {neg_stats['mean']:.3f}\n")
-            f.write(f"  Min:  {neg_stats['min']:.3f}\n")
-            f.write(f"  10th: {neg_stats['percentiles'][10]:.3f}\n")
-            f.write(f"  25th: {neg_stats['percentiles'][25]:.3f}\n")
-            f.write(f"  50th: {neg_stats['percentiles'][50]:.3f}\n")
-            f.write(f"  75th: {neg_stats['percentiles'][75]:.3f}\n")
-            f.write(f"  90th: {neg_stats['percentiles'][90]:.3f}\n")
-            f.write(f"  95th: {neg_stats['percentiles'][95]:.3f}\n")
-            f.write(f"  Max:  {neg_stats['max']:.3f}\n")
-
-            f.write(
-                f"  High confidence (≥0.8):  {neg_stats['high_conf']}/{neg_stats['count']} ({neg_stats['high_conf'] / neg_stats['count']:.1%})\n"
-            )
-            f.write(
-                f"  Very high conf (≥0.9):   {neg_stats['very_high_conf']}/{neg_stats['count']} ({neg_stats['very_high_conf'] / neg_stats['count']:.1%})\n"
-            )
-            f.write(
-                f"  Ultra high conf (≥0.95): {neg_stats['ultra_high_conf']}/{neg_stats['count']} ({neg_stats['ultra_high_conf'] / neg_stats['count']:.1%})\n\n"
-            )
-
-        # Prediction counts
-        f.write("Prediction Counts:\n")
-        f.write(f"Predicted {positive_class_name}: {pos_stats['count'] if pos_stats else 0}\n")
-        f.write(f"Predicted {negative_class_name}: {neg_stats['count'] if neg_stats else 0}\n")
-        f.write(
-            f"Total predictions: {(pos_stats['count'] if pos_stats else 0) + (neg_stats['count'] if neg_stats else 0)}\n"
-        )
-
-    print(f"Confidence statistics saved to: {stats_file}")
-
-
 def load_model(model_path, num_classes, device):
-    """Load trained model from checkpoint."""
-    # Try to load the model state dict to check its structure
+    """Load a trained model from disk."""
+    # Load the state dict first to detect architecture
     state_dict = torch.load(model_path, map_location=device)
 
-    # Check if the model has BatchNorm layers by looking for 'bn' keys
-    has_batchnorm = any("bn" in key for key in state_dict)
+    # Handle both direct state dict and checkpoint format
+    if "model_state_dict" in state_dict:
+        actual_state_dict = state_dict["model_state_dict"]
+    else:
+        actual_state_dict = state_dict
+
+    # Detect if the model was trained with BatchNorm by checking for bn keys
+    has_batchnorm = any("bn" in key for key in actual_state_dict)
 
     # Create model with appropriate BatchNorm setting
     model = SoundCNN(num_classes=num_classes, kernel_size=(3, 3), use_batchnorm=has_batchnorm)
 
-    if has_batchnorm:
-        print("Loading model WITH BatchNorm")
-    else:
-        print("Loading model WITHOUT BatchNorm")
-
-    model.load_state_dict(state_dict)
+    model.load_state_dict(actual_state_dict)
     model.to(device)
     model.eval()
     return model
 
 
-def create_binary_labels(
-    dataset_name="urbansound8k",
-    dataset_file=None,
-    positive_class_id=8,
-    output_csv="outputs/binary_labels.csv",
-    positive_class_name="positive",
-    negative_class_name="negative",
-    **dataset_kwargs,
-):
-    """
-    Create binary labels from audio dataset for any specified class.
-
-    Args:
-        dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
-        dataset_file: Path to dataset metadata CSV file (auto-detected if None)
-        positive_class_id: Audio class ID to treat as positive (1)
-        output_csv: Path for output binary labels CSV
-        positive_class_name: Name for positive class (for logging)
-        negative_class_name: Name for negative class (for logging)
-        **dataset_kwargs: Additional dataset-specific configuration
-
-    Returns:
-        str: Path to created binary labels CSV
-    """
-    # Get dataset processor and config
-    processor, config = get_dataset_processor(dataset_name, **dataset_kwargs)
-
-    # Auto-detect dataset file if not provided
-    if dataset_file is None:
-        dataset_file = str(config.dataset_csv)
-
-    binary_data = []
-    positive_count = 0
-    negative_count = 0
-
-    # Load metadata using the processor (dataset-agnostic)
-    metadata = processor.load_metadata(split="dev")
-    for item in metadata:
-        # Use processor's binary classification method
-        is_positive = processor.get_binary_label(item, positive_class_id, positive_class_name)
-
-        if is_positive:
-            positive_count += 1
-        else:
-            negative_count += 1
-
-        # Use processor's filename conversion method
-        spec_filename = processor.get_spectrogram_filename(item)
-        spec_path = f"data/all_specs/{spec_filename}"
-
-        binary_data.append({"filepath": spec_path, "label": is_positive, "run": 1})
-
-    # Ensure outputs directory exists
-    os.makedirs("outputs", exist_ok=True)
-
-    # Write binary labels CSV in training set format
-    with open(output_csv, "w", newline="") as f:
-        fieldnames = ["filepath", "label", "run"]
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
-        writer.writerows(binary_data)
-
-    print(f"Created binary labels: {output_csv}")
-    print(f"{positive_class_name} samples: {positive_count}")
-    print(f"{negative_class_name} samples: {negative_count}")
-    print(f"Total samples: {len(binary_data)}")
-
-    return output_csv
-
-
 def run_binary_inference(
     model_path,
-    labels_file="outputs/binary_labels.csv",
     predictions_csv="outputs/predictions.csv",
     positive_class_name="positive",
     negative_class_name="negative",
+    dataset_name="urbansound8k",
+    dataset_file=None,
+    positive_class_id=8,
+    **dataset_kwargs,
 ):
     """
     Run binary classification inference on all dataset files.
 
     Args:
         model_path: Path to trained binary model
-        labels_file: CSV file with binary labels (filename,label,original_class)
         predictions_csv: Path for output predictions CSV
         positive_class_name: Name for positive class (for logging and output)
         negative_class_name: Name for negative class (for logging and output)
+        dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
+        dataset_file: Path to dataset metadata CSV (auto-detected if None)
+        positive_class_id: Audio class ID to treat as positive
+        **dataset_kwargs: Additional dataset-specific configuration
 
     Returns:
         list: Inference results with predictions and confidences
@@ -300,8 +65,42 @@ def run_binary_inference(
     device = get_device()
     print(f"Using device: {device}")
 
-    # Load dataset
-    dataset = SpectrogramDataset(csv_file=labels_file, specs_dir="data/all_specs")
+    # Get dataset processor and config
+    processor, config = get_dataset_processor(dataset_name, **dataset_kwargs)
+
+    # Auto-detect dataset file if not provided
+    if dataset_file is None:
+        dataset_file = str(config.dataset_csv)
+
+    # Load all available metadata and create binary labels inline
+    metadata = processor.load_metadata(split="dev")
+    print(f"Found {len(metadata)} total samples in dataset")
+
+    # Create dataset entries directly (no intermediate file)
+    dataset_entries = []
+    for item in metadata:
+        # Use processor's binary classification method
+        is_positive = processor.get_binary_label(item, positive_class_id, positive_class_name)
+
+        # Use processor's filename conversion method
+        spec_filename = processor.get_spectrogram_filename(item)
+        spec_path = f"data/all_specs/{spec_filename}"
+
+        # Get original class info
+        original_class = getattr(item, "classID", getattr(item, "class_id", -1))
+
+        dataset_entries.append(
+            {
+                "filepath": spec_path,
+                "label": int(is_positive),
+                "run": 1,
+                "original_class": original_class,
+                "filename": spec_filename,
+            }
+        )
+
+    # Load dataset directly from entries
+    dataset = SpectrogramDataset(data=dataset_entries, specs_dir="data/all_specs")
     print(f"Dataset size: {len(dataset)}")
 
     # Binary classification
@@ -376,8 +175,8 @@ def run_binary_inference(
 
                 result = {
                     "filename": audio_filename,
-                    "true_label": true_label,
-                    "predicted_label": predicted_class,
+                    "true_is_positive": (true_label == 1),
+                    "predicted_is_positive": (predicted_class == 1),
                     "prediction": prediction_name,
                     "confidence": confidences[i].item(),
                     "entropy": entropies[i].item(),
@@ -385,34 +184,12 @@ def run_binary_inference(
                     "prob_positive": prob_positive,
                     "correct": (true_label == predicted_class),
                     "original_class": original_class if original_class is not None else -1,
+                    "fold": getattr(
+                        batch.get("fold", [None] * len(true_labels))[i], "item", lambda: -1
+                    )(),
                     "filepath": batch["filepath"][i],
                 }
                 results.append(result)
-
-    # Calculate summary statistics
-    total_samples = len(results)
-    correct_predictions = sum(1 for r in results if r["correct"])
-    accuracy = correct_predictions / total_samples
-
-    positive_predictions = sum(1 for r in results if r["prediction"] == positive_class_name)
-    negative_predictions = total_samples - positive_predictions
-
-    true_positives = sum(1 for r in results if r["true_label"] == 1)
-    true_negatives = total_samples - true_positives
-
-    print("\nBinary Classification Results:")
-    print(f"Total samples: {total_samples}")
-    print(f"Accuracy: {accuracy:.4f} ({correct_predictions}/{total_samples})")
-    print(f"True {positive_class_name}s in dataset: {true_positives}")
-    print(f"True {negative_class_name}s in dataset: {true_negatives}")
-    print(f"Predicted {positive_class_name}s: {positive_predictions}")
-    print(f"Predicted {negative_class_name}s: {negative_predictions}")
-
-    # Calculate mean confidence and entropy
-    mean_confidence = sum(r["confidence"] for r in results) / total_samples
-    mean_entropy = sum(r["entropy"] for r in results) / total_samples
-    print(f"Mean confidence: {mean_confidence:.4f}")
-    print(f"Mean entropy: {mean_entropy:.4f}")
 
     # Ensure outputs directory exists
     os.makedirs("outputs", exist_ok=True)
@@ -420,8 +197,8 @@ def run_binary_inference(
     # Save results to CSV
     fieldnames = [
         "filename",
-        "true_label",
-        "predicted_label",
+        "true_is_positive",
+        "predicted_is_positive",
         "prediction",
         "confidence",
         "entropy",
@@ -429,6 +206,7 @@ def run_binary_inference(
         "prob_positive",
         "correct",
         "original_class",
+        "fold",
         "filepath",
     ]
 
@@ -444,7 +222,7 @@ def run_binary_inference(
             formatted_result["prob_positive"] = f"{result['prob_positive']:.3f}"
             writer.writerow(formatted_result)
 
-    print(f"\nResults saved to: {predictions_csv}")
+    print(f"Predictions saved to: {predictions_csv}")
     return results
 
 
@@ -486,32 +264,23 @@ def run_active_learning_cycle(
 
     print(f"Using model: {model_path}")
 
-    # Step 1: Create binary labels for the specified class
-    print(f"Step 1: Creating binary labels for {positive_class_name} vs {negative_class_name}...")
-    binary_labels_file = create_binary_labels(
-        dataset_name=dataset_name,
-        dataset_file=dataset_file,
-        positive_class_id=positive_class_id,
-        output_csv=f"outputs/binary_labels_v{run_number}.csv",
-        positive_class_name=positive_class_name,
-        negative_class_name=negative_class_name,
-        **dataset_kwargs,
-    )
-
-    # Step 2: Run inference on all files
-    print("\nStep 2: Running binary classification inference...")
+    # Step 1: Run inference on all files
+    print("\nStep 1: Running binary classification inference...")
     predictions_file = f"outputs/predictions_v{run_number}.csv"
 
     _ = run_binary_inference(
         model_path=model_path,
-        labels_file=binary_labels_file,
         predictions_csv=predictions_file,
         positive_class_name=positive_class_name,
         negative_class_name=negative_class_name,
+        dataset_name=dataset_name,
+        dataset_file=dataset_file,
+        positive_class_id=positive_class_id,
+        **dataset_kwargs,
     )
 
-    # Step 3: Select candidates for active learning
-    print("\nStep 3: Selecting candidates for human labeling...")
+    # Step 2: Select candidates for active learning
+    print("\nStep 2: Selecting candidates for human labeling...")
     candidates_file = f"outputs/labeling_candidates_v{run_number}.csv"
 
     selector = CandidateSelector(

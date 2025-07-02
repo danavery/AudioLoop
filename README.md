@@ -15,7 +15,7 @@ python -m audioloop.create_all_specs
 python -m audioloop.simple_train training_sets/training_set_v1.csv
 
 # Run active learning cycle
-python -m audioloop.active_learning --class-name siren --model outputs/model_v1.pt
+python -m audioloop.active_learning --class-name siren --run-number 1
 
 # Label audio samples interactively
 python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --audio-dir data/urbansound8k
@@ -29,10 +29,11 @@ python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/label
 Traditional supervised learning requires large labeled datasets. AudioLoop reduces this burden through active learning:
 
 1. **Start small**: Begin with minimal labeled training set (20 samples)
-2. **Train iteratively**: Train model, run inference on unlabeled data
-3. **Smart selection**: Choose most informative samples for human labeling
+2. **Train iteratively**: Train model, run inference on all available data
+3. **Smart selection**: Choose most informative samples using model confidence and entropy
 4. **Human feedback**: Get labels for carefully selected samples
 5. **Repeat**: Add new labels to training set and iterate
+6. **Evaluate**: Track performance trends across iterations using comprehensive metrics
 
 ## Project Structure
 

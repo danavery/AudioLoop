@@ -152,10 +152,12 @@ class CandidateSelector:
         true_negative_samples = []
 
         for p in all_predictions:
-            true_label = (
-                int(p["true_label"]) if isinstance(p["true_label"], str) else p["true_label"]
-            )
-            if true_label == 1:
+            true_is_positive = p["true_is_positive"]
+            # Handle string/boolean values
+            if isinstance(true_is_positive, str):
+                true_is_positive = true_is_positive.lower() == "true"
+
+            if true_is_positive:
                 true_positive_samples.append(p)
             else:
                 true_negative_samples.append(p)

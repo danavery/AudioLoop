@@ -4,7 +4,29 @@ This document explains the candidate selection strategy used in AudioLoop's acti
 
 ## Overview
 
-The active learning system selects audio samples for human labeling based on the model's predictions. The goal is to choose samples that will be most informative for improving the model.
+The active learning system selects audio samples for human labeling based on the model's predictions and confidence levels. The goal is to choose samples that will be most informative for improving the model.
+
+## Clean Architecture
+
+The system maintains clean separation between inference and analysis:
+
+### Active Learning Pipeline (Inference Focus)
+- **Process**: Runs model inference on all available audio files
+- **Output**: Complete prediction record with confidence levels
+- **Selection**: Chooses candidates based on model outputs (confidence, entropy)
+- **Focus**: Lean, fast inference without statistical analysis
+
+### Metrics Pipeline (Analysis Focus)  
+- **Input**: Prediction files from active learning iterations
+- **Process**: Comprehensive performance analysis and trend tracking
+- **Output**: Accuracy metrics, plots, and insights across versions
+- **Focus**: Rich evaluation separate from candidate selection
+
+### What's Used for Candidate Selection
+- Model predictions (positive/negative)
+- Confidence scores (0.0 to 1.0)
+- Entropy values (uncertainty measure)
+- Prediction probabilities for each class
 
 ## Selection Process
 
@@ -13,6 +35,7 @@ First, the trained model runs inference on all available audio samples, producin
 - **Prediction**: Whether it's the target class (e.g., "siren") or not ("not_siren")
 - **Confidence**: The maximum probability from the softmax output (0.0 to 1.0)
 - **Entropy**: A measure of uncertainty in the prediction
+- **Probabilities**: Raw probabilities for positive and negative classes
 
 ### 2. Confidence Calculation
 ```python
@@ -43,6 +66,12 @@ The system selects candidates using a **high-confidence approach with randomizat
 5. If not enough, take all high-confidence samples + next highest until we have N
 
 This process is applied separately to positive and negative predictions.
+
+**Selection Inputs**: The process uses only model outputs:
+- Model confidence scores
+- Model predictions (positive/negative)
+- Entropy values (uncertainty measure)
+- Random sampling for diversity
 
 **Important:** The randomization step prevents systematic bias when many samples have identical confidence scores, ensuring diverse selection from across the dataset rather than always picking from the same files/folds.
 

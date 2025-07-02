@@ -21,8 +21,8 @@ AudioLoop uses consistent versioning across all artifacts:
 python -m audioloop.simple_train training_sets/training_set_v1.csv
 # → Creates: outputs/model_v1.pt
 
-# 2. Run active learning (auto-detects v1 from model)
-python -m audioloop.active_learning --class-name dog_bark --model outputs/model_v1.pt
+# 2. Run active learning (creates complete inference record and candidates)
+python -m audioloop.active_learning --class-name dog_bark --run-number 1
 # → Creates: outputs/predictions_v1.csv, outputs/labeling_candidates_v1.csv
 
 # 3. Human labeling
@@ -38,7 +38,7 @@ python -m audioloop.simple_train training_sets/training_set_v2.csv
 # → Creates: outputs/model_v2.pt
 
 # 6. Run active learning cycle 2
-python -m audioloop.active_learning --class-name dog_bark --model outputs/model_v2.pt
+python -m audioloop.active_learning --class-name dog_bark --run-number 2
 # → Creates: outputs/predictions_v2.csv, outputs/labeling_candidates_v2.csv
 
 # 7. Human labeling cycle 2
@@ -54,7 +54,7 @@ python -m audioloop.simple_train training_sets/training_set_v3.csv
 # → Creates: outputs/model_v3.pt
 
 # 10. Final active learning cycle
-python -m audioloop.active_learning --class-name dog_bark --model outputs/model_v3.pt
+python -m audioloop.active_learning --class-name dog_bark --run-number 3
 # → Creates: outputs/predictions_v3.csv, outputs/labeling_candidates_v3.csv
 ```
 
@@ -77,6 +77,38 @@ python -m audioloop.simple_train training_sets/training_set_v1.csv -v 5
 ```
 
 ### Active Learning Cycles
+```bash
+# Version auto-detected from run number (finds corresponding model)
+python -m audioloop.active_learning --class-name siren --run-number 1
+# → Uses: outputs/model_v1.pt
+# → Creates: outputs/predictions_v1.csv, outputs/labeling_candidates_v1.csv
+
+python -m audioloop.active_learning --class-name siren --run-number 2
+# → Uses: outputs/model_v2.pt
+# → Creates: outputs/predictions_v2.csv, outputs/labeling_candidates_v2.csv
+
+# Explicit model specification (overrides auto-detection)
+python -m audioloop.active_learning --class-name siren --run-number 1 \
+    --model outputs/custom_model.pt
+```
+
+## Clean Architecture
+
+**DESIGN**: AudioLoop maintains clean separation between inference and analysis:
+
+### Active Learning Pipeline (Focused Inference)
+- **Input**: Trained model + dataset metadata
+- **Process**: Runs inference on ALL available files, creates complete prediction record
+- **Output**: Predictions with confidence + selected candidates for human labeling
+- **Focus**: Lean, fast inference engine without statistical analysis
+
+### Metrics Pipeline (Comprehensive Analysis)
+- **Input**: Prediction files from multiple active learning iterations
+- **Process**: Calculate trends, accuracy, F1, precision, recall across versions
+- **Output**: Performance analysis, plots, and insights
+- **Focus**: Rich evaluation and progress tracking
+
+### Example: Clean Data Flow
 ```bash
 # Version auto-detected from model filename
 python -m audioloop.active_learning --class-name siren --model outputs/model_v2.pt
