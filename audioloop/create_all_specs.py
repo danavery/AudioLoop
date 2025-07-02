@@ -95,7 +95,7 @@ class ProcessingStats:
 
         # Use 99th percentile as histogram max to avoid extreme outliers
         hist_max = p99
-        outliers = [l for l in lengths if l > hist_max]
+        outliers = [length for length in lengths if length > hist_max]
 
         # Create 20 bins up to 99th percentile
         num_bins = 20
