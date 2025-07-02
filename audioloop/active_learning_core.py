@@ -1,13 +1,12 @@
 import csv
 import os
-import random
-import time
 
 import torch
 import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
+from .candidate_selection import CandidateSelector
 from .models.cnn_5layer import SoundCNN
 from .utils.data_utils import entropy, get_device, variable_length_collate_fn
 from .utils.dataset_utils import get_dataset_processor
@@ -449,215 +448,6 @@ def run_binary_inference(
     return results
 
 
-def select_candidates_for_labeling(
-    predictions_file="outputs/predictions.csv",
-    total_candidates=20,
-    positive_percentage=0.80,
-    min_confidence=0.8,
-    candidates_csv="outputs/labeling_candidates.csv",
-    positive_class_name="positive",
-    negative_class_name="negative",
-    candidate_pool_multiplier=5,
-):
-    """
-    Select predictions for human labeling in active learning.
-    Uses percentage-based selection to focus on positive predictions for imbalanced datasets.
-
-    Args:
-        predictions_file: CSV file with model predictions
-        total_candidates: Total number of candidates to select
-        positive_percentage: Percentage of candidates that should be positive predictions (0.0-1.0)
-        min_confidence: Initial minimum confidence threshold
-        candidates_csv: Output file for candidates
-        positive_class_name: Name for positive class
-        negative_class_name: Name for negative class
-        candidate_pool_multiplier: Multiplier for candidate pool size (e.g., 5 means sample from top 50 if selecting 10)
-
-    Returns:
-        list: Selected candidates for human labeling
-    """
-
-    # Read predictions
-    predictions = []
-    with open(predictions_file) as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            row["confidence"] = float(row["confidence"])
-            row["entropy"] = float(row["entropy"])
-            predictions.append(row)
-
-    # Calculate numbers based on percentage
-    num_positive = int(total_candidates * positive_percentage)
-    num_negative = total_candidates - num_positive
-
-    # Separate positive and negative predictions
-    positive_preds = [p for p in predictions if p["prediction"] == positive_class_name]
-    negative_preds = [p for p in predictions if p["prediction"] == negative_class_name]
-
-    # Sort by confidence (highest first)
-    positive_preds.sort(key=lambda x: x["confidence"], reverse=True)
-    negative_preds.sort(key=lambda x: x["confidence"], reverse=True)
-
-    # Create broader candidate pools for sampling
-    positive_pool_size = min(len(positive_preds), num_positive * candidate_pool_multiplier)
-    negative_pool_size = min(len(negative_preds), num_negative * candidate_pool_multiplier)
-
-    positive_pool = positive_preds[:positive_pool_size]
-    negative_pool = negative_preds[:negative_pool_size]
-
-    # Randomly sample from the pools to improve diversity
-    random.seed(int(time.time()))
-
-    positive_candidates = random.sample(positive_pool, min(num_positive, len(positive_pool)))
-    negative_candidates = random.sample(negative_pool, min(num_negative, len(negative_pool)))
-
-    # Combine and shuffle final candidates
-    all_candidates = positive_candidates + negative_candidates
-    random.shuffle(all_candidates)
-
-    # Calculate overall accuracy statistics (use all predictions, not just selected candidates)
-    all_predictions = positive_preds + negative_preds
-    total_samples = len(all_predictions)
-
-    # Handle both boolean and string representations of 'correct' field
-    correct_predictions = 0
-    for p in all_predictions:
-        if isinstance(p["correct"], str):
-            if p["correct"].lower() == "true":
-                correct_predictions += 1
-        elif p["correct"]:
-            correct_predictions += 1
-
-    overall_accuracy = correct_predictions / total_samples if total_samples > 0 else 0
-
-    # Calculate accuracy by true class (not by predicted class)
-    true_positive_samples = []
-    true_negative_samples = []
-
-    for p in all_predictions:
-        true_label = int(p["true_label"]) if isinstance(p["true_label"], str) else p["true_label"]
-
-        if true_label == 1:
-            true_positive_samples.append(p)
-        else:
-            true_negative_samples.append(p)
-
-    positive_correct = 0
-    for p in true_positive_samples:
-        if isinstance(p["correct"], str):
-            if p["correct"].lower() == "true":
-                positive_correct += 1
-        elif p["correct"]:
-            positive_correct += 1
-
-    negative_correct = 0
-    for p in true_negative_samples:
-        if isinstance(p["correct"], str):
-            if p["correct"].lower() == "true":
-                negative_correct += 1
-        elif p["correct"]:
-            negative_correct += 1
-
-    positive_accuracy = (
-        positive_correct / len(true_positive_samples) if len(true_positive_samples) > 0 else 0
-    )
-    negative_accuracy = (
-        negative_correct / len(true_negative_samples) if len(true_negative_samples) > 0 else 0
-    )
-
-    # Overall statistics
-    all_confidences = [p["confidence"] for p in all_predictions]
-    high_conf_count = sum(1 for conf in all_confidences if conf >= min_confidence)
-    high_conf_percentage = high_conf_count / total_samples if total_samples > 0 else 0
-
-    avg_confidence = sum(all_confidences) / len(all_confidences) if all_confidences else 0
-    min_conf = min(all_confidences) if all_confidences else 0
-    max_conf = max(all_confidences) if all_confidences else 0
-
-    print("\nModel Performance Summary:")
-    print(f"Overall Accuracy: {overall_accuracy:.3f}")
-    print(f"True {positive_class_name} Accuracy: {positive_accuracy:.3f}")
-    print(f"True {negative_class_name} Accuracy: {negative_accuracy:.3f}")
-    print(f"Overall Confidence: avg={avg_confidence:.3f}, range={min_conf:.3f}-{max_conf:.3f}")
-    print(
-        f"High confidence samples (≥{min_confidence}): {high_conf_count}/{total_samples} ({high_conf_percentage:.1%})"
-    )
-
-    # Show confidence distribution for each class
-    print_confidence_distribution(positive_preds, positive_class_name)
-    print_confidence_distribution(negative_preds, negative_class_name)
-
-    # Save detailed statistics to file
-    save_confidence_stats(
-        predictions_file,
-        positive_preds,
-        negative_preds,
-        positive_class_name,
-        negative_class_name,
-        overall_accuracy,
-        positive_accuracy,
-        negative_accuracy,
-        avg_confidence,
-        min_conf,
-        max_conf,
-        high_conf_percentage,
-    )
-
-    # Recommendation for selection strategy
-    if overall_accuracy > 0.95 and high_conf_percentage > 0.8:
-        print("💡 Recommendation: Model is highly accurate and confident")
-        print("   Consider implementing entropy-based selection for uncertainty sampling")
-        print("   Current confidence-based selection may not find challenging cases")
-
-    print("\nActive Learning Candidate Selection:")
-    print(f"Available {positive_class_name} predictions: {len(positive_preds)}")
-    print(f"Available {negative_class_name} predictions: {len(negative_preds)}")
-    print(
-        f"Candidate pool sizes: {positive_pool_size} {positive_class_name}, {negative_pool_size} {negative_class_name}"
-    )
-    print(f"Selected {len(positive_candidates)} {positive_class_name} candidates")
-    print(f"Selected {len(negative_candidates)} {negative_class_name} candidates")
-    print(f"Total candidates for labeling: {len(all_candidates)}")
-
-    if len(all_candidates) > 0:
-        # Add labeling helper columns
-        for candidate in all_candidates:
-            candidate["needs_human_label"] = ""  # Empty column for human to fill
-            candidate["human_confidence"] = ""  # Human confidence in the label
-
-        # Ensure outputs directory exists
-        os.makedirs("outputs", exist_ok=True)
-
-        # Save candidates
-        fieldnames = list(all_candidates[0].keys())
-        with open(candidates_csv, "w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(all_candidates)
-
-        print(f"Candidates saved to: {candidates_csv}")
-        if positive_candidates:
-            conf_values = [p["confidence"] for p in positive_candidates]
-            print(
-                f"{positive_class_name} confidence range: {min(conf_values):.3f} - {max(conf_values):.3f}"
-            )
-            print(
-                f"  First 3 {positive_class_name} samples: {[p['filename'] for p in positive_candidates[:3]]}"
-            )
-        if negative_candidates:
-            conf_values = [p["confidence"] for p in negative_candidates]
-            print(
-                f"{negative_class_name} confidence range: {min(conf_values):.3f} - {max(conf_values):.3f}"
-            )
-            print(
-                f"  First 3 {negative_class_name} samples: {[p['filename'] for p in negative_candidates[:3]]}"
-            )
-    else:
-        print("No candidates found.")
-
-    return all_candidates
-
-
 def run_active_learning_cycle(
     positive_class_id=8,
     positive_class_name="siren",
@@ -724,11 +514,14 @@ def run_active_learning_cycle(
     print("\nStep 3: Selecting candidates for human labeling...")
     candidates_file = f"outputs/labeling_candidates_v{run_number}.csv"
 
-    _ = select_candidates_for_labeling(
-        predictions_file=predictions_file,
+    selector = CandidateSelector(
         total_candidates=total_candidates,
         positive_percentage=positive_percentage,
         min_confidence=min_confidence,
+        candidate_pool_multiplier=5,
+    )
+    _ = selector.select_candidates(
+        predictions_file=predictions_file,
         candidates_csv=candidates_file,
         positive_class_name=positive_class_name,
         negative_class_name=negative_class_name,
