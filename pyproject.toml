@@ -1,5 +1,6 @@
 [project]
 dependencies = [
+    "matplotlib>=3.7.0",
     "numpy>=2.3.0",
     "ruff",
     "soundfile>=0.13.1",
