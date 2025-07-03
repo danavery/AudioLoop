@@ -19,6 +19,7 @@ class CandidateSelector:
         positive_percentage: float = 0.80,
         min_confidence: float = 0.8,
         candidate_pool_multiplier: int = 5,
+        selection_mode: str = "confidence",
     ):
         """
         Initialize the candidate selector.
@@ -28,11 +29,19 @@ class CandidateSelector:
             positive_percentage: Percentage of candidates that should be positive predictions (0.0-1.0)
             min_confidence: Minimum confidence threshold for candidate selection
             candidate_pool_multiplier: Multiplier for candidate pool size (e.g., 5 means sample from top 50 if selecting 10)
+            selection_mode: Selection method ('confidence' for high-confidence samples, 'entropy' for high-uncertainty samples)
         """
         self.total_candidates = total_candidates
         self.positive_percentage = positive_percentage
         self.min_confidence = min_confidence
         self.candidate_pool_multiplier = candidate_pool_multiplier
+
+        # Validate selection_mode
+        if selection_mode not in ["confidence", "entropy"]:
+            raise ValueError(
+                f"Invalid selection_mode: '{selection_mode}'. Must be 'confidence' or 'entropy'"
+            )
+        self.selection_mode = selection_mode
 
     def select_candidates(
         self,
@@ -65,9 +74,15 @@ class CandidateSelector:
         positive_preds = [p for p in predictions if p["prediction"] == positive_class_name]
         negative_preds = [p for p in predictions if p["prediction"] == negative_class_name]
 
-        # Sort by confidence (highest first)
-        positive_preds.sort(key=lambda x: x["confidence"], reverse=True)
-        negative_preds.sort(key=lambda x: x["confidence"], reverse=True)
+        # Apply selection mode sorting
+        if self.selection_mode == "confidence":
+            # Sort by confidence (highest first)
+            positive_preds.sort(key=lambda x: x["confidence"], reverse=True)
+            negative_preds.sort(key=lambda x: x["confidence"], reverse=True)
+        elif self.selection_mode == "entropy":
+            # Sort by entropy (highest first = most uncertain)
+            positive_preds.sort(key=lambda x: x["entropy"], reverse=True)
+            negative_preds.sort(key=lambda x: x["entropy"], reverse=True)
 
         # Create broader candidate pools for sampling
         positive_pool_size = min(len(positive_preds), num_positive * self.candidate_pool_multiplier)
@@ -202,11 +217,16 @@ class CandidateSelector:
         self._print_confidence_distribution(positive_preds, positive_class_name)
         self._print_confidence_distribution(negative_preds, negative_class_name)
 
-        # Recommendation for selection strategy
+        # Show current selection mode and recommendations
+        print(f"Selection mode: {self.selection_mode}")
         if overall_accuracy > 0.95 and high_conf_percentage > 0.8:
-            print("💡 Recommendation: Model is highly accurate and confident")
-            print("   Consider implementing entropy-based selection for uncertainty sampling")
-            print("   Current confidence-based selection may not find challenging cases")
+            if self.selection_mode == "confidence":
+                print("💡 Recommendation: Model is highly accurate and confident")
+                print("   Consider switching to entropy-based selection for uncertainty sampling")
+                print("   Current confidence-based selection may not find challenging cases")
+            else:
+                print("💡 Model is highly accurate and confident")
+                print("   Using entropy-based selection should help find challenging cases")
 
         print("\nActive Learning Candidate Selection:")
         print(f"Available {positive_class_name} predictions: {len(positive_preds)}")

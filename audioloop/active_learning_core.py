@@ -269,6 +269,7 @@ def run_active_learning_cycle(
     total_candidates=50,
     positive_percentage=0.75,
     min_confidence=0.8,
+    selection_mode="confidence",
     **dataset_kwargs,
 ):
     """
@@ -285,6 +286,7 @@ def run_active_learning_cycle(
         training_set_csv: Path to training set CSV (auto-detected if None)
         total_candidates: Total number of candidates to select
         positive_percentage: Percentage of candidates that should be positive predictions
+        selection_mode: Selection method ('confidence' for high-confidence samples, 'entropy' for high-uncertainty samples)
         **dataset_kwargs: Additional dataset-specific configuration
 
     Returns:
@@ -330,6 +332,7 @@ def run_active_learning_cycle(
         positive_percentage=positive_percentage,
         min_confidence=min_confidence,
         candidate_pool_multiplier=5,
+        selection_mode=selection_mode,
     )
     _ = selector.select_candidates(
         predictions_file=predictions_file,

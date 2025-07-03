@@ -21,6 +21,7 @@ def run_active_learning_for_class(
     total_candidates=50,
     positive_percentage=0.75,
     min_confidence=0.8,
+    selection_mode="confidence",
     **dataset_kwargs,
 ):
     """
@@ -37,6 +38,7 @@ def run_active_learning_for_class(
         total_candidates: Total number of candidates to select
         positive_percentage: Percentage of candidates that should be positive predictions (0.0-1.0)
         min_confidence: Minimum confidence threshold for candidate selection
+        selection_mode: Selection method ('confidence' for high-confidence samples, 'entropy' for high-uncertainty samples)
         **dataset_kwargs: Additional dataset-specific configuration
 
     Returns:
@@ -69,6 +71,8 @@ def run_active_learning_for_class(
         total_candidates=total_candidates,
         positive_percentage=positive_percentage,
         min_confidence=min_confidence,
+        selection_mode=selection_mode,
+        **dataset_kwargs,
     )
 
 
@@ -169,6 +173,12 @@ Examples:
         type=str,
         help="Path to training set CSV (default: training_sets/training_set_v{run_number}.csv)",
     )
+    parser.add_argument(
+        "--selection-mode",
+        choices=["confidence", "entropy"],
+        default="confidence",
+        help="Selection method: 'confidence' for high-confidence samples, 'entropy' for high-uncertainty samples",
+    )
 
     args = parser.parse_args()
 
@@ -231,6 +241,7 @@ Examples:
         f"Candidates: {num_positive} positive, {num_negative} negative ({args.positive_pct:.0%} positive)"
     )
     print(f"Min confidence: {args.min_confidence}")
+    print(f"Selection mode: {args.selection_mode}")
     print("-" * 60)
 
     # Run the active learning cycle
@@ -246,6 +257,7 @@ Examples:
         total_candidates=args.total_candidates,
         positive_percentage=args.positive_pct,
         min_confidence=args.min_confidence,
+        selection_mode=args.selection_mode,
     )
 
     print("\n✅ Active learning cycle completed!")

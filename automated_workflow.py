@@ -23,15 +23,14 @@ Usage:
 import argparse
 import csv
 import os
-import sys
 import time
-from pathlib import Path
+
+from audioloop.active_learning import run_active_learning_for_class
+from audioloop.label_audio import SimpleAudioLabeler
+from audioloop.merge_labels import merge_training_sets
 
 # Import the APIs from the existing modules
 from audioloop.simple_train import run_training
-from audioloop.active_learning import run_active_learning_for_class
-from audioloop.merge_labels import merge_training_sets
-from audioloop.label_audio import SimpleAudioLabeler
 
 
 def auto_label_candidates(candidates_file, dataset_name="urbansound8k", audio_dir=None):
@@ -51,9 +50,7 @@ def auto_label_candidates(candidates_file, dataset_name="urbansound8k", audio_di
     try:
         # Create the labeler instance
         labeler = SimpleAudioLabeler(
-            candidates_csv=candidates_file,
-            dataset_name=dataset_name,
-            audio_dir=audio_dir
+            candidates_csv=candidates_file, dataset_name=dataset_name, audio_dir=audio_dir
         )
 
         # Run auto-labeling
@@ -61,10 +58,10 @@ def auto_label_candidates(candidates_file, dataset_name="urbansound8k", audio_di
 
         # Count labeled samples by reading the file back
         labeled_count = 0
-        with open(candidates_file, 'r') as f:
+        with open(candidates_file) as f:
             reader = csv.DictReader(f)
             for row in reader:
-                if row.get('needs_human_label', '').strip():
+                if row.get("needs_human_label", "").strip():
                     labeled_count += 1
 
         print(f"   ✅ Auto-labeled {labeled_count} samples")
@@ -85,7 +82,7 @@ def prompt_for_manual_labeling(candidates_file):
     Returns:
         int: Number of samples that were labeled (estimated)
     """
-    print(f"👤 MANUAL LABELING REQUIRED:")
+    print("👤 MANUAL LABELING REQUIRED:")
     print(f"   File: {candidates_file}")
     print(f"   Command: python -m audioloop.label_audio {candidates_file}")
     print()
@@ -95,10 +92,10 @@ def prompt_for_manual_labeling(candidates_file):
     # Count labeled samples
     labeled_count = 0
     try:
-        with open(candidates_file, 'r') as f:
+        with open(candidates_file) as f:
             reader = csv.DictReader(f)
             for row in reader:
-                if row.get('needs_human_label', '').strip():
+                if row.get("needs_human_label", "").strip():
                     labeled_count += 1
         print(f"   ✅ Found {labeled_count} manually labeled samples")
     except Exception as e:
@@ -142,15 +139,16 @@ def run_automated_workflow(
     Returns:
         list: Paths to training sets created during the workflow
     """
+    print("\n" + "=" * 80)
     print("🚀 AUTOMATED ACTIVE LEARNING WORKFLOW")
-    print("=" * 60)
+    print("=" * 80)
     print(f"Target class: {class_name}")
     print(f"Dataset: {dataset_name}")
     print(f"Cycles: {num_cycles}")
     print(f"Auto-label: {auto_label}")
     print(f"Training epochs: {epochs}")
     print(f"Candidates per cycle: {total_candidates}")
-    print("=" * 60)
+    print("=" * 80)
 
     # Check that initial training set exists
     initial_training_set = "training_sets/training_set_v1.csv"
@@ -163,8 +161,9 @@ def run_automated_workflow(
     training_sets = [initial_training_set]
 
     for cycle in range(1, num_cycles + 1):
-        print(f"\n🔄 CYCLE {cycle}")
-        print("-" * 40)
+        print("\n" + "█" * 80)
+        print(f"🔄 CYCLE {cycle} of {num_cycles}")
+        print("█" * 80)
 
         current_training_set = f"training_sets/training_set_v{cycle}.csv"
         current_model = f"outputs/model_v{cycle}.pt"
@@ -175,7 +174,8 @@ def run_automated_workflow(
             print(f"Using previous training set: {current_training_set}")
 
         # Step 1: Train model
-        print(f"Step 1: Training model v{cycle}...")
+        print(f"\n🧠 STEP 1: TRAINING MODEL v{cycle}")
+        print("▼" * 50)
         print(f"   Training set: {current_training_set}")
         print(f"   Model output: {current_model}")
 
@@ -194,7 +194,9 @@ def run_automated_workflow(
             break
 
         # Step 2: Run active learning
-        print(f"Step 2: Running active learning cycle {cycle}...")
+        print("\n🎯 STEP 2: ACTIVE LEARNING INFERENCE")
+        print("▼" * 50)
+        print(f"   Running active learning cycle {cycle}...")
         try:
             predictions_file, candidates_file = run_active_learning_for_class(
                 positive_class_name=class_name,
@@ -211,12 +213,11 @@ def run_automated_workflow(
             break
 
         # Step 3: Label candidates
-        print(f"Step 3: Labeling candidates...")
+        print("\n🏷️  STEP 3: LABELING CANDIDATES")
+        print("▼" * 50)
         if auto_label:
             labeled_count = auto_label_candidates(
-                candidates_file=candidates_file,
-                dataset_name=dataset_name,
-                audio_dir=audio_dir
+                candidates_file=candidates_file, dataset_name=dataset_name, audio_dir=audio_dir
             )
         else:
             labeled_count = prompt_for_manual_labeling(candidates_file)
@@ -226,11 +227,11 @@ def run_automated_workflow(
             break
 
         # Step 4: Merge labels into new training set
-        print(f"Step 4: Merging labels...")
+        print("\n📊 STEP 4: MERGING LABELS")
+        print("▼" * 50)
         try:
             new_training_set = merge_training_sets(
-                original_csv=current_training_set,
-                new_labels_csv=candidates_file
+                original_csv=current_training_set, new_labels_csv=candidates_file
             )
             training_sets.append(new_training_set)
             print(f"   ✅ Created: {new_training_set}")
@@ -239,19 +240,24 @@ def run_automated_workflow(
             break
 
         # Show progress summary
-        print(f"Cycle {cycle} complete:")
+        print("\n" + "▲" * 50)
+        print(f"✅ CYCLE {cycle} COMPLETE")
         print(f"   📊 Added {labeled_count} new labeled samples")
         print(f"   📁 Next training set: {new_training_set}")
+        print("▲" * 50)
 
         # Brief pause between cycles
         if cycle < num_cycles:
             time.sleep(1)
 
-    print(f"\n🎉 WORKFLOW COMPLETE!")
+    print("\n" + "=" * 80)
+    print("✅ WORKFLOW COMPLETE")
+    print("=" * 80)
     print(f"Completed {len(training_sets) - 1} cycles")
-    print(f"Training sets created:")
+    print("Training sets created:")
     for i, ts in enumerate(training_sets):
         print(f"   v{i + 1}: {ts}")
+    print("=" * 80)
 
     return training_sets
 
@@ -280,41 +286,65 @@ Examples:
 Prerequisites:
   1. Run: python -m audioloop.create_all_specs  (one-time setup)
   2. Run: python -m audioloop.utils.start_labeling --class-name <CLASS_NAME> --n 40
-        """
+        """,
     )
 
     # Required arguments
-    parser.add_argument('--class-name', required=True,
-                       help='Target class name (e.g., siren, dog_bark)')
+    parser.add_argument(
+        "--class-name", required=True, help="Target class name (e.g., siren, dog_bark)"
+    )
 
     # Workflow parameters
-    parser.add_argument('--cycles', type=int, default=3,
-                       help='Number of active learning cycles (default: 3)')
-    parser.add_argument('--auto-label', action='store_true',
-                       help='Automatically label using ground truth (for testing)')
+    parser.add_argument(
+        "--cycles", type=int, default=3, help="Number of active learning cycles (default: 3)"
+    )
+    parser.add_argument(
+        "--auto-label",
+        action="store_true",
+        help="Automatically label using ground truth (for testing)",
+    )
 
     # Dataset parameters
-    parser.add_argument('--dataset', default='urbansound8k',
-                       choices=['urbansound8k', 'fsd50k'],
-                       help='Dataset name (default: urbansound8k)')
-    parser.add_argument('--audio-dir',
-                       help='Custom audio directory (uses dataset default if not specified)')
+    parser.add_argument(
+        "--dataset",
+        default="urbansound8k",
+        choices=["urbansound8k", "fsd50k"],
+        help="Dataset name (default: urbansound8k)",
+    )
+    parser.add_argument(
+        "--audio-dir", help="Custom audio directory (uses dataset default if not specified)"
+    )
 
     # Training parameters
-    parser.add_argument('--epochs', type=int, default=1000,
-                       help='Max training epochs per cycle (default: 1000)')
-    parser.add_argument('--batch-size', type=int, default=32,
-                       help='Training batch size (default: 32)')
-    parser.add_argument('--learning-rate', type=float, default=1e-3,
-                       help='Learning rate (default: 0.001)')
+    parser.add_argument(
+        "--epochs", type=int, default=1000, help="Max training epochs per cycle (default: 1000)"
+    )
+    parser.add_argument(
+        "--batch-size", type=int, default=32, help="Training batch size (default: 32)"
+    )
+    parser.add_argument(
+        "--learning-rate", type=float, default=1e-3, help="Learning rate (default: 0.001)"
+    )
 
     # Active learning parameters
-    parser.add_argument('--candidates', type=int, default=50,
-                       help='Number of candidates to select per cycle (default: 50)')
-    parser.add_argument('--positive-pct', type=float, default=0.75,
-                       help='Target percentage of positive samples (default: 0.75)')
-    parser.add_argument('--min-confidence', type=float, default=0.8,
-                       help='Minimum confidence threshold (default: 0.8)')
+    parser.add_argument(
+        "--candidates",
+        type=int,
+        default=50,
+        help="Number of candidates to select per cycle (default: 50)",
+    )
+    parser.add_argument(
+        "--positive-pct",
+        type=float,
+        default=0.75,
+        help="Target percentage of positive samples (default: 0.75)",
+    )
+    parser.add_argument(
+        "--min-confidence",
+        type=float,
+        default=0.8,
+        help="Minimum confidence threshold (default: 0.8)",
+    )
 
     args = parser.parse_args()
 
@@ -350,19 +380,18 @@ Prerequisites:
         )
 
         if training_sets:
-            print(f"\n📈 WORKFLOW SUMMARY:")
+            print("\n📈 WORKFLOW SUMMARY:")
             print(f"   Initial training set: {training_sets[0]}")
             print(f"   Final training set: {training_sets[-1]}")
             print(f"   Total cycles completed: {len(training_sets) - 1}")
 
             # Suggest next steps
-            print(f"\n💡 NEXT STEPS:")
-            print(f"   • Run metrics: python -m audioloop.track_metrics --plot")
-            print(f"   • Clean outputs: python -m audioloop.clean_outputs")
+            print("\n💡 NEXT STEPS:")
+            print("   • Run metrics: python -m audioloop.track_metrics --plot")
+            print("   • Clean outputs: python -m audioloop.clean_outputs")
             return 0
-        else:
-            print("❌ Workflow failed to complete any cycles")
-            return 1
+        print("❌ Workflow failed to complete any cycles")
+        return 1
 
     except KeyboardInterrupt:
         print("\n⏹️ Workflow interrupted by user")
@@ -370,6 +399,7 @@ Prerequisites:
     except Exception as e:
         print(f"\n❌ Workflow failed: {e}")
         import traceback
+
         traceback.print_exc()
         return 1
 

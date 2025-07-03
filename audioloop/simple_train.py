@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader
 from .models.cnn_5layer import SoundCNN
 from .utils.data_utils import get_device, simple_collate_fn
 from .utils.spectrogram_dataset import SpectrogramDataset
+from .utils.stopping_criteria import AccuracyCriterion
 
 
 def set_seed(seed):
@@ -67,6 +68,7 @@ def run_training(
     model_path=None,
     version=None,
     use_batchnorm=None,
+    stopping_criterion=None,
 ):
     device = get_device()
     print(f"Using device: {device}")
@@ -103,19 +105,15 @@ def run_training(
         use_batchnorm = len(train_dataset) >= 100
         if len(train_dataset) < 100:
             print(f"⚠️  Small dataset ({len(train_dataset)} samples) detected - disabling BatchNorm")
-            print("   BatchNorm running statistics are unreliable with <100 samples")
-            print(
-                "   This ensures consistent train/eval behavior but may limit performance scaling"
-            )
 
     # Create 5-layer CNN model with appropriate architecture
     model = SoundCNN(num_classes=num_classes, kernel_size=(3, 3), use_batchnorm=use_batchnorm).to(
         device
     )
     if use_batchnorm:
-        print("Using model WITH BatchNorm (recommended for larger datasets)")
+        print("Using model WITH BatchNorm")
     else:
-        print("Using model WITHOUT BatchNorm (consistent train/eval behavior)")
+        print("Using model WITHOUT BatchNorm")
 
     # Print basic model info
     sample = train_dataset[0]
@@ -126,12 +124,15 @@ def run_training(
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
 
-    print("Model parameters:")
-    for name, param in model.named_parameters():
-        print(f"  {name}: {param.shape}")
+    # Use default stopping criterion if none provided
+    if stopping_criterion is None:
+        stopping_criterion = AccuracyCriterion(max_epochs=max_epochs)
+
+    # Reset stopping criterion for this training run
+    stopping_criterion.reset()
 
     print("Starting training...")
-    print("Target: 100% training accuracy")
+    print(f"Stopping criterion: {stopping_criterion.__class__.__name__}")
     print("-" * 50)
 
     # Pre-allocate timing list to avoid memory allocation during training
@@ -151,12 +152,13 @@ def run_training(
                 f"Loss: {avg_loss:.4f} - Accuracy: {accuracy:.4f} ({accuracy * 100:.2f}%)"
             )
 
-        # Check if we've reached 100% accuracy
-        if accuracy >= 1.0:
+        # Check stopping criterion
+        if stopping_criterion.should_stop(epoch, accuracy, avg_loss):
             print()
             print("=" * 60)
-            print("🎉 Reached 100% training accuracy!")
+            print(f"🛑 Stopping criterion met ({stopping_criterion.__class__.__name__})")
             print(f"Training completed in {epoch + 1} epochs")
+            print(f"Final accuracy: {accuracy:.4f}")
             print("=" * 60)
             break
     else:
@@ -165,7 +167,6 @@ def run_training(
     # Always save the final model regardless of how training ended
     os.makedirs("outputs", exist_ok=True)
     if model_path is None:
-        # Always use version number (defaults to 1)
         model_path = f"outputs/model_v{version}.pt"
     torch.save(model.state_dict(), model_path)
     print(f"Model saved to: {model_path}")
