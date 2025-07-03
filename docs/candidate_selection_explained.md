@@ -55,8 +55,11 @@ entropy = -sum(p * log(p) for p in probabilities)
 - **Low entropy** (near 0): Model is very certain (e.g., [0.01, 0.99])
 - **High entropy** (near 0.69 for binary): Model is uncertain (e.g., [0.5, 0.5])
 
-### 4. Candidate Selection Strategy
+### 4. Candidate Selection Strategies
 
+AudioLoop supports multiple candidate selection strategies:
+
+#### 4.1 High-Confidence Strategy (Default)
 The system selects candidates using a **high-confidence approach with randomization**:
 
 1. **Randomize samples first** to prevent bias when many have identical confidence (e.g., 1.0)
@@ -110,6 +113,45 @@ dog2.wav           dog_bark      0.88          ✓ (high conf positive)
 cat1.wav           not_dog_bark  0.92          ✓ (high conf negative)
 dog3.wav           dog_bark      0.76          ✓ (if need more positives)
 ambiguous1.wav     dog_bark      0.51          ✗ (too low confidence)
+```
+
+#### 4.2 Entropy-Based Strategy
+The entropy-based strategy selects samples with **highest uncertainty**:
+
+1. Sort by entropy (highest first = most uncertain)
+2. Select from high-entropy samples for each class
+3. Focus on samples near decision boundaries
+4. Useful when model becomes overconfident
+
+#### 4.3 Basic Transition Strategy
+The basic transition strategy **automatically switches** from confidence to entropy based on model performance:
+
+**Initial Phase**: Uses confidence-based selection (same as 4.1)
+
+**Transition Criteria**: Switches to entropy-based when ALL three conditions are met:
+- **F1 Score > 0.2**: Model has learned basic patterns
+- **Mean Confidence > 0.9**: Model shows confidence in predictions
+- **Std Confidence < 0.12**: Uncertainty is decreasing (overconfidence risk)
+
+**Analysis Output**:
+```
+Basic Transition Analysis:
+  ✓ F1 Score: 0.265 (>0.2 required)
+  ✓ Mean Confidence: 0.951 (>0.9 required) 
+  ✓ Std Confidence: 0.104 (<0.12 required)
+  → Using ENTROPY-based selection (uncertainty sampling)
+```
+
+**Usage**:
+```bash
+# Use basic transition with default thresholds
+python -m audioloop.active_learning --class-name siren --selection-mode basic_transition
+
+# Custom thresholds
+python -m audioloop.active_learning --class-name siren --selection-mode basic_transition \
+  --basic-transition-f1-threshold 0.25 \
+  --basic-transition-confidence-threshold 0.95 \
+  --basic-transition-variance-threshold 0.10
 ```
 
 ## Customizing Selection

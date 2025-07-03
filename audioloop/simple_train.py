@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader
 from .models.cnn_5layer import SoundCNN
 from .utils.data_utils import get_device, simple_collate_fn
 from .utils.spectrogram_dataset import SpectrogramDataset
-from .utils.stopping_criteria import AccuracyCriterion
+from .utils.stopping_criteria import AccuracyCriterion, PlateauCriterion
 
 
 def set_seed(seed):
@@ -126,7 +126,7 @@ def run_training(
 
     # Use default stopping criterion if none provided
     if stopping_criterion is None:
-        stopping_criterion = AccuracyCriterion(max_epochs=max_epochs)
+        stopping_criterion = PlateauCriterion(max_epochs=max_epochs)
 
     # Reset stopping criterion for this training run
     stopping_criterion.reset()
@@ -209,6 +209,24 @@ if __name__ == "__main__":
         action="store_true",
         help="Disable BatchNorm (auto-disabled for <100 samples)",
     )
+    parser.add_argument(
+        "--stopping-criterion",
+        choices=["accuracy", "plateau"],
+        default="plateau",
+        help="Stopping criterion to use (default: plateau)",
+    )
+    parser.add_argument(
+        "--patience",
+        type=int,
+        default=20,
+        help="Patience for plateau stopping criterion (default: 20)",
+    )
+    parser.add_argument(
+        "--min-delta",
+        type=float,
+        default=0.01,
+        help="Minimum delta for plateau stopping criterion (default: 0.01)",
+    )
 
     args = parser.parse_args()
 
@@ -223,6 +241,16 @@ if __name__ == "__main__":
             args.version = 1
             print("Could not detect version from filename, defaulting to version 1")
 
+    # Create stopping criterion based on CLI arguments
+    if args.stopping_criterion == "accuracy":
+        stopping_criterion = AccuracyCriterion(max_epochs=args.epochs)
+    elif args.stopping_criterion == "plateau":
+        stopping_criterion = PlateauCriterion(
+            patience=args.patience, min_delta=args.min_delta, max_epochs=args.epochs
+        )
+    else:
+        stopping_criterion = PlateauCriterion(max_epochs=args.epochs)
+
     # Run training with CLI arguments
     accuracy = run_training(
         labels_file=args.labels_file,
@@ -234,5 +262,6 @@ if __name__ == "__main__":
         model_path=args.output,
         version=args.version,
         use_batchnorm=False if args.no_batchnorm else None,
+        stopping_criterion=stopping_criterion,
     )
     print(f"\nFinal training accuracy: {accuracy:.4f}")

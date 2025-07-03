@@ -43,44 +43,42 @@ def simulate_human_labeling(candidates_file, error_rate=0.1):
     # Read candidates file
     rows = []
     fieldnames = None
-    with open(candidates_file, 'r') as f:
+    with open(candidates_file) as f:
         reader = csv.DictReader(f)
         fieldnames = reader.fieldnames or []
 
         for row in reader:
             # Simulate human decision-making
             # In real life, human would listen to audio and decide
-            predicted_label = int(row['predicted_label'])
-            confidence = float(row['confidence'])
+            predicted_label = int(row["predicted_label"])
+            confidence = float(row["confidence"])
 
             # Simulate human labeling with occasional errors
-            if random.random() < error_rate:
-                # Simulate human disagreement with model
-                human_label = 1 - predicted_label
-            else:
-                # Human agrees with model
-                human_label = predicted_label
+            # Human disagrees with model at error_rate, otherwise agrees
+            human_label = 1 - predicted_label if random.random() < error_rate else predicted_label
 
             # Only label high-confidence predictions (simulate human effort)
             if confidence >= 0.7:
-                row['needs_human_label'] = str(human_label)
+                row["needs_human_label"] = str(human_label)
             else:
-                row['needs_human_label'] = ''  # Human skips uncertain cases
+                row["needs_human_label"] = ""  # Human skips uncertain cases
 
             rows.append(row)
 
     # Write back with human labels
-    with open(candidates_file, 'w', newline='') as f:
+    with open(candidates_file, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
 
-    labeled_count = sum(1 for row in rows if row['needs_human_label'])
+    labeled_count = sum(1 for row in rows if row["needs_human_label"])
     print(f"   → Labeled {labeled_count} samples")
     return labeled_count
 
 
-def run_complete_workflow(class_name, initial_model, num_cycles=2, simulate_human=True):
+def run_complete_workflow(
+    class_name, initial_model, num_cycles=2, simulate_human=True, selection_mode="confidence"
+):
     """
     Run complete active learning workflow with multiple cycles.
 
@@ -89,6 +87,7 @@ def run_complete_workflow(class_name, initial_model, num_cycles=2, simulate_huma
         initial_model: Path to initial trained model
         num_cycles: Number of active learning cycles to run
         simulate_human: Whether to simulate human labeling (for demo)
+        selection_mode: Selection strategy ('confidence', 'entropy', 'basic_transition')
 
     Returns:
         list: Training set paths for each cycle
@@ -96,6 +95,7 @@ def run_complete_workflow(class_name, initial_model, num_cycles=2, simulate_huma
     print(f"🚀 Starting Active Learning Workflow: {class_name}")
     print(f"   Initial model: {initial_model}")
     print(f"   Cycles: {num_cycles}")
+    print(f"   Selection strategy: {selection_mode}")
     print("=" * 60)
 
     training_sets = []
@@ -111,7 +111,8 @@ def run_complete_workflow(class_name, initial_model, num_cycles=2, simulate_huma
             predictions_file, candidates_file = run_active_learning_for_class(
                 positive_class_name=class_name,
                 model_path=current_model,
-                run_number=cycle
+                run_number=cycle,
+                selection_mode=selection_mode,
             )
             print(f"   ✅ Generated: {candidates_file}")
         except Exception as e:
@@ -137,10 +138,7 @@ def run_complete_workflow(class_name, initial_model, num_cycles=2, simulate_huma
             if not os.path.exists(current_training_set):
                 current_training_set = "training_sets/training_set_v1.csv"
 
-            new_training_set = merge_training_sets(
-                current_training_set,
-                candidates_file
-            )
+            new_training_set = merge_training_sets(current_training_set, candidates_file)
             training_sets.append(new_training_set)
             print(f"   ✅ Created: {new_training_set}")
 
@@ -156,7 +154,9 @@ def run_complete_workflow(class_name, initial_model, num_cycles=2, simulate_huma
 
             if not os.path.exists(next_model):
                 print(f"   ⚠️ Model {next_model} not found")
-                print(f"   💡 Train it with: python -m audioloop.simple_train {new_training_set} -v {cycle + 1}")
+                print(
+                    f"   💡 Train it with: python -m audioloop.simple_train {new_training_set} -v {cycle + 1}"
+                )
                 if not simulate_human:
                     input("   Press Enter when model training is complete...")
 
@@ -181,25 +181,47 @@ Examples:
 
   # Use custom initial model
   python example_workflow.py --class-name gun_shot --model outputs/custom_model.pt
-        """
+
+  # Use basic transition strategy
+  python example_workflow.py --class-name siren --cycles 2 --selection-mode basic_transition
+
+  # Use entropy-based selection
+  python example_workflow.py --class-name dog_bark --cycles 3 --selection-mode entropy
+        """,
     )
 
-    parser.add_argument('--class-name', required=True,
-                       help='Target class name (e.g., siren, dog_bark, gun_shot)')
-    parser.add_argument('--model', default=None,
-                       help='Initial model path (default: outputs/model_v1.pt)')
-    parser.add_argument('--cycles', type=int, default=2,
-                       help='Number of active learning cycles (default: 2)')
-    parser.add_argument('--no-simulate', action='store_true',
-                       help='Disable simulated human labeling (requires manual input)')
+    parser.add_argument(
+        "--class-name", required=True, help="Target class name (e.g., siren, dog_bark, gun_shot)"
+    )
+    parser.add_argument(
+        "--model", default=None, help="Initial model path (default: outputs/model_v1.pt)"
+    )
+    parser.add_argument(
+        "--cycles", type=int, default=2, help="Number of active learning cycles (default: 2)"
+    )
+    parser.add_argument(
+        "--no-simulate",
+        action="store_true",
+        help="Disable simulated human labeling (requires manual input)",
+    )
+    parser.add_argument(
+        "--selection-mode",
+        choices=["confidence", "entropy", "basic_transition"],
+        default="confidence",
+        help="Selection strategy (default: confidence)",
+    )
 
     args = parser.parse_args()
+
+    # Set default model if not specified
+    if args.model is None:
+        args.model = "outputs/model_v1.pt"
 
     # Validate inputs
     if not os.path.exists(args.model):
         print(f"❌ Model not found: {args.model}")
         print("💡 Train an initial model first:")
-        print(f"   python -m audioloop.simple_train training_sets/training_set_v1.csv {args.model}")
+        print("   python -m audioloop.simple_train training_sets/training_set_v1.csv -v 1")
         return 1
 
     # Run the workflow
@@ -208,7 +230,8 @@ Examples:
             class_name=args.class_name,
             initial_model=args.model,
             num_cycles=args.cycles,
-            simulate_human=not args.no_simulate
+            simulate_human=not args.no_simulate,
+            selection_mode=args.selection_mode,
         )
 
         print("\n📊 Summary:")
@@ -217,7 +240,9 @@ Examples:
         print(f"   Final training set: {training_sets[-1] if training_sets else 'None'}")
 
         print("\n💡 For convenience, consider using:")
-        print(f"   python automated_workflow.py --class-name {args.class_name} --cycles {args.cycles} --auto-label")
+        print(
+            f"   python automated_workflow.py --class-name {args.class_name} --cycles {args.cycles} --selection-mode {args.selection_mode} --auto-label"
+        )
 
         return 0
 

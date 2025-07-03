@@ -8,8 +8,6 @@ from tqdm import tqdm
 
 from .models.cnn_5layer import SoundCNN
 from .utils.candidate_selection import (
-    ConfidenceStrategy,
-    EntropyStrategy,
     load_predictions,
     print_selection_statistics,
     save_candidates,
@@ -276,6 +274,9 @@ def run_active_learning_cycle(
     positive_percentage=0.75,
     min_confidence=0.8,
     selection_mode="confidence",
+    basic_transition_f1_threshold=0.2,
+    basic_transition_confidence_threshold=0.9,
+    basic_transition_variance_threshold=0.12,
     **dataset_kwargs,
 ):
     """
@@ -292,7 +293,10 @@ def run_active_learning_cycle(
         training_set_csv: Path to training set CSV (auto-detected if None)
         total_candidates: Total number of candidates to select
         positive_percentage: Percentage of candidates that should be positive predictions
-        selection_mode: Selection method ('confidence' for high-confidence samples, 'entropy' for high-uncertainty samples)
+        selection_mode: Selection method ('confidence' for high-confidence samples, 'entropy' for high-uncertainty samples, 'basic_transition' for basic transition strategy)
+        basic_transition_f1_threshold: F1 threshold for basic transition (default: 0.2)
+        basic_transition_confidence_threshold: Mean confidence threshold for basic transition (default: 0.9)
+        basic_transition_variance_threshold: Std confidence threshold for basic transition (default: 0.12)
         **dataset_kwargs: Additional dataset-specific configuration
 
     Returns:
@@ -333,16 +337,20 @@ def run_active_learning_cycle(
     print("\nStep 2: Selecting candidates for human labeling...")
     candidates_file = f"outputs/labeling_candidates_v{run_number}.csv"
 
-    if selection_mode == "confidence":
-        strategy = ConfidenceStrategy()
-    elif selection_mode == "entropy":
-        strategy = EntropyStrategy()
-    else:
-        raise ValueError(
-            f"Unknown selection mode: '{selection_mode}'. Available: confidence, entropy"
-        )
+    # Create strategy with basic transition parameters
+    strategy_kwargs = {}
+    if selection_mode == "basic_transition":
+        strategy_kwargs = {
+            "f1_threshold": basic_transition_f1_threshold,
+            "confidence_threshold": basic_transition_confidence_threshold,
+            "variance_threshold": basic_transition_variance_threshold,
+        }
 
-    print(f"Using strategy: {strategy.__class__.__name__}")
+    from .utils.candidate_selection import create_strategy
+
+    strategy = create_strategy(selection_mode, **strategy_kwargs)
+
+    print(f"Using strategy: {strategy.get_name()}")
     predictions = load_predictions(predictions_file)
     candidates = strategy.select_candidates(
         predictions=predictions,
@@ -356,7 +364,7 @@ def run_active_learning_cycle(
     print_selection_statistics(
         all_predictions=predictions,
         selected_candidates=candidates,
-        strategy_name=strategy.__class__.__name__,
+        strategy_name=strategy.get_name(),
         positive_class_name=positive_class_name,
         negative_class_name=negative_class_name,
         min_confidence=min_confidence,

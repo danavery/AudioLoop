@@ -15,8 +15,14 @@ import re
 from collections import defaultdict
 
 import matplotlib.pyplot as plt
-import numpy as np
 from matplotlib.ticker import FuncFormatter
+
+from .utils.metrics_utils import (
+    calculate_binary_metrics,
+    calculate_class_balance_metrics,
+    calculate_confidence_percentiles,
+    calculate_entropy_metrics,
+)
 
 
 def extract_version_number(filename: str) -> int:
@@ -30,6 +36,7 @@ def extract_version_number(filename: str) -> int:
 def calculate_core_metrics(predictions_file: str) -> dict:
     """
     Calculates the essential 'starter pack' of metrics from a predictions file.
+    Now uses the shared metrics utility for consistency.
 
     Args:
         predictions_file: Path to a predictions_v*.csv file.
@@ -40,64 +47,33 @@ def calculate_core_metrics(predictions_file: str) -> dict:
     if not os.path.exists(predictions_file):
         raise FileNotFoundError(f"Predictions file not found: {predictions_file}")
 
-    true_labels, predicted_labels, confidences, entropies = [], [], [], []
-
+    # Load predictions into the format expected by metrics_utils
+    predictions = []
     with open(predictions_file, newline="") as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
-            # Convert boolean strings to integers (True -> 1, False -> 0)
-            true_labels.append(1 if row["true_is_positive"].lower() == "true" else 0)
-            predicted_labels.append(1 if row["predicted_is_positive"].lower() == "true" else 0)
-            confidences.append(float(row["confidence"]))
-            if row.get("entropy"):
-                entropies.append(float(row["entropy"]))
+            predictions.append(
+                {
+                    "true_is_positive": row["true_is_positive"],
+                    "predicted_is_positive": row["predicted_is_positive"],
+                    "confidence": float(row["confidence"]),
+                    "entropy": float(row.get("entropy", 0)) if row.get("entropy") else None,
+                }
+            )
 
-    if not true_labels:
+    if not predictions:
         raise ValueError(f"No samples found in {predictions_file}")
 
-    # Convert to numpy arrays for efficient calculation
-    true = np.array(true_labels)
-    pred = np.array(predicted_labels)
+    # Calculate different types of metrics using imported functions
+    binary_metrics = calculate_binary_metrics(predictions)
+    entropy_metrics = calculate_entropy_metrics(predictions)
+    balance_metrics = calculate_class_balance_metrics(predictions)
+    percentile_metrics = calculate_confidence_percentiles(predictions, percentiles=[5, 95])
 
-    # --- Performance Metrics ---
-    tp = np.sum((true == 1) & (pred == 1))
-    fp = np.sum((true == 0) & (pred == 1))
-    fn = np.sum((true == 1) & (pred == 0))
+    # Combine all metrics
+    all_metrics = {**binary_metrics, **entropy_metrics, **balance_metrics, **percentile_metrics}
 
-    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-    f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
-
-    # --- Model Internal State Metrics ---
-    conf_np = np.array(confidences)
-    mean_confidence = np.mean(conf_np)
-    median_confidence = np.median(conf_np)
-    std_confidence = np.std(conf_np)
-    p05_confidence = np.percentile(conf_np, 5)
-    p95_confidence = np.percentile(conf_np, 95)
-    mean_entropy = np.mean(entropies) if entropies else 0.0
-
-    # --- Sanity Check / Diagnostic Metrics ---
-    actual_positive_ratio = np.mean(true)
-    predicted_positive_ratio = np.mean(pred)
-
-    return {
-        "f1_score": f1_score,
-        "precision": precision,
-        "recall": recall,
-        "true_positives": tp,
-        "false_positives": fp,
-        "false_negatives": fn,
-        "mean_confidence": mean_confidence,
-        "median_confidence": median_confidence,
-        "std_confidence": std_confidence,
-        "p05_confidence": p05_confidence,
-        "p95_confidence": p95_confidence,
-        "mean_entropy": mean_entropy,
-        "actual_positive_ratio": actual_positive_ratio,
-        "predicted_positive_ratio": predicted_positive_ratio,
-        "total_samples": len(true),
-    }
+    return all_metrics
 
 
 def track_metrics_across_versions(output_dir: str) -> dict[int, dict]:

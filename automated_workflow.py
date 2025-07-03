@@ -119,6 +119,11 @@ def run_automated_workflow(
     total_candidates=50,
     positive_percentage=0.75,
     min_confidence=0.8,
+    selection_mode="confidence",
+    # Basic transition parameters
+    basic_transition_f1_threshold=0.2,
+    basic_transition_confidence_threshold=0.9,
+    basic_transition_variance_threshold=0.12,
 ):
     """
     Run the complete automated active learning workflow.
@@ -135,6 +140,10 @@ def run_automated_workflow(
         total_candidates: Number of candidates to select per cycle
         positive_percentage: Target percentage of positive samples in candidates
         min_confidence: Minimum confidence threshold for candidate selection
+        selection_mode: Selection strategy ('confidence', 'entropy', 'basic_transition')
+        basic_transition_f1_threshold: F1 threshold for basic transition (default: 0.2)
+        basic_transition_confidence_threshold: Mean confidence threshold for basic transition (default: 0.9)
+        basic_transition_variance_threshold: Std confidence threshold for basic transition (default: 0.12)
 
     Returns:
         list: Paths to training sets created during the workflow
@@ -148,6 +157,7 @@ def run_automated_workflow(
     print(f"Auto-label: {auto_label}")
     print(f"Training epochs: {epochs}")
     print(f"Candidates per cycle: {total_candidates}")
+    print(f"Selection strategy: {selection_mode}")
     print("=" * 80)
 
     # Check that initial training set exists
@@ -206,6 +216,10 @@ def run_automated_workflow(
                 total_candidates=total_candidates,
                 positive_percentage=positive_percentage,
                 min_confidence=min_confidence,
+                selection_mode=selection_mode,
+                basic_transition_f1_threshold=basic_transition_f1_threshold,
+                basic_transition_confidence_threshold=basic_transition_confidence_threshold,
+                basic_transition_variance_threshold=basic_transition_variance_threshold,
             )
             print(f"   ✅ Generated candidates: {candidates_file}")
         except Exception as e:
@@ -283,6 +297,12 @@ Examples:
   # FSD50K dataset
   python automated_workflow.py --class-name Drill --cycles 2 --dataset fsd50k --auto-label
 
+  # Use basic transition strategy
+  python automated_workflow.py --class-name siren --cycles 3 --selection-mode basic_transition --auto-label
+
+  # Use entropy-based selection
+  python automated_workflow.py --class-name dog_bark --cycles 2 --selection-mode entropy
+
 Prerequisites:
   1. Run: python -m audioloop.create_all_specs  (one-time setup)
   2. Run: python -m audioloop.utils.start_labeling --class-name <CLASS_NAME> --n 40
@@ -346,6 +366,32 @@ Prerequisites:
         help="Minimum confidence threshold (default: 0.8)",
     )
 
+    # Selection strategy parameters
+    parser.add_argument(
+        "--selection-mode",
+        choices=["confidence", "entropy", "basic_transition"],
+        default="confidence",
+        help="Selection strategy: 'confidence', 'entropy', or 'basic_transition' (default: confidence)",
+    )
+    parser.add_argument(
+        "--basic-transition-f1-threshold",
+        type=float,
+        default=0.2,
+        help="F1 threshold for basic transition (default: 0.2)",
+    )
+    parser.add_argument(
+        "--basic-transition-confidence-threshold",
+        type=float,
+        default=0.9,
+        help="Mean confidence threshold for basic transition (default: 0.9)",
+    )
+    parser.add_argument(
+        "--basic-transition-variance-threshold",
+        type=float,
+        default=0.12,
+        help="Std confidence threshold for basic transition (default: 0.12)",
+    )
+
     args = parser.parse_args()
 
     # Validate arguments
@@ -377,6 +423,10 @@ Prerequisites:
             total_candidates=args.candidates,
             positive_percentage=args.positive_pct,
             min_confidence=args.min_confidence,
+            selection_mode=args.selection_mode,
+            basic_transition_f1_threshold=args.basic_transition_f1_threshold,
+            basic_transition_confidence_threshold=args.basic_transition_confidence_threshold,
+            basic_transition_variance_threshold=args.basic_transition_variance_threshold,
         )
 
         if training_sets:

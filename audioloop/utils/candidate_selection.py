@@ -12,6 +12,8 @@ import time
 from abc import ABC, abstractmethod
 from typing import Any
 
+from .metrics_utils import calculate_binary_metrics
+
 
 class CandidateSelectionStrategy(ABC):
     """Base class for candidate selection strategies."""
@@ -147,19 +149,131 @@ class EntropyStrategy(CandidateSelectionStrategy):
         return "Entropy-Based (Uncertainty Sampling)"
 
 
+class BasicTransitionStrategy(CandidateSelectionStrategy):
+    """
+    Basic transition strategy that switches from confidence to entropy
+    based on model performance metrics (F1, confidence, variance thresholds).
+    """
+
+    def __init__(
+        self,
+        f1_threshold: float = 0.2,
+        confidence_threshold: float = 0.9,
+        variance_threshold: float = 0.12,
+    ):
+        self.f1_threshold = f1_threshold
+        self.confidence_threshold = confidence_threshold
+        self.variance_threshold = variance_threshold
+
+        # Delegate to existing strategies
+        self.confidence_strategy = ConfidenceStrategy()
+        self.entropy_strategy = EntropyStrategy()
+
+        # Track which strategy we're using (for reporting)
+        self.current_strategy_name = "confidence"
+
+    def _should_transition(self, metrics: dict) -> bool:
+        """
+        Determine if we should transition from confidence to entropy selection.
+
+        Args:
+            metrics: Dictionary of calculated metrics
+
+        Returns:
+            bool: True if all transition criteria are met
+        """
+        if not metrics:
+            return False
+
+        f1_met = metrics.get("f1_score", 0) > self.f1_threshold
+        confidence_met = metrics.get("mean_confidence", 0) > self.confidence_threshold
+        variance_met = metrics.get("std_confidence", 1) < self.variance_threshold
+
+        return f1_met and confidence_met and variance_met
+
+    def _print_transition_analysis(self, metrics: dict, should_transition: bool) -> None:
+        """
+        Print detailed transition analysis.
+
+        Args:
+            metrics: Dictionary of calculated metrics
+            should_transition: Whether transition criteria are met
+        """
+        if not metrics:
+            print("  Basic Transition: No metrics available, using confidence-based selection")
+            return
+
+        print("  Basic Transition Analysis:")
+
+        f1_met = metrics.get("f1_score", 0) > self.f1_threshold
+        confidence_met = metrics.get("mean_confidence", 0) > self.confidence_threshold
+        variance_met = metrics.get("std_confidence", 1) < self.variance_threshold
+
+        print(
+            f"    {'✓' if f1_met else '✗'} F1 Score: {metrics.get('f1_score', 0):.3f} (>{self.f1_threshold} required)"
+        )
+        print(
+            f"    {'✓' if confidence_met else '✗'} Mean Confidence: {metrics.get('mean_confidence', 0):.3f} (>{self.confidence_threshold} required)"
+        )
+        print(
+            f"    {'✓' if variance_met else '✗'} Std Confidence: {metrics.get('std_confidence', 1):.3f} (<{self.variance_threshold} required)"
+        )
+
+        if should_transition:
+            print("    → Using ENTROPY-based selection (uncertainty sampling)")
+        else:
+            print("    → Using CONFIDENCE-based selection")
+
+    def select_candidates(
+        self,
+        predictions: list[dict[str, Any]],
+        num_candidates: int,
+        positive_class_name: str = "positive",
+        negative_class_name: str = "negative",
+        **kwargs,
+    ) -> list[dict[str, Any]]:
+        """Select candidates using auto-transition logic."""
+
+        # Calculate metrics using imported function
+        metrics = calculate_binary_metrics(predictions)
+
+        # Make transition decision
+        should_transition = self._should_transition(metrics)
+
+        # Print analysis
+        self._print_transition_analysis(metrics, should_transition)
+
+        # Choose strategy based on transition decision
+        if should_transition:
+            self.current_strategy_name = "entropy"
+            strategy = self.entropy_strategy
+        else:
+            self.current_strategy_name = "confidence"
+            strategy = self.confidence_strategy
+
+        # Delegate to chosen strategy
+        return strategy.select_candidates(
+            predictions, num_candidates, positive_class_name, negative_class_name, **kwargs
+        )
+
+    def get_name(self) -> str:
+        return f"Basic Transition ({self.current_strategy_name.title()}-Based)"
+
+
 # Factory function
-def create_strategy(selection_mode: str) -> CandidateSelectionStrategy:
+def create_strategy(selection_mode: str, **kwargs) -> CandidateSelectionStrategy:
     """Create a selection strategy from a mode string."""
     strategies = {
         "confidence": ConfidenceStrategy,
         "entropy": EntropyStrategy,
+        "basic_transition": BasicTransitionStrategy,
     }
 
     if selection_mode not in strategies:
         available = ", ".join(strategies.keys())
         raise ValueError(f"Unknown selection mode: '{selection_mode}'. Available: {available}")
 
-    return strategies[selection_mode]()
+    return strategies[selection_mode](**kwargs)
 
 
 # Utility functions
@@ -217,13 +331,20 @@ def print_selection_statistics(
         print("No predictions available.")
         return
 
-    # Calculate overall accuracy statistics
+    # Calculate overall accuracy statistics with robust boolean conversion
     correct_predictions = 0
     for p in all_predictions:
-        if isinstance(p["correct"], str):
-            if p["correct"].lower() == "true":
-                correct_predictions += 1
-        elif p["correct"]:
+        correct_val = p["correct"]
+        if isinstance(correct_val, str):
+            is_correct = correct_val.lower() in ("true", "1")
+        elif isinstance(correct_val, bool):
+            is_correct = correct_val
+        elif isinstance(correct_val, (int, float)):
+            is_correct = bool(correct_val)
+        else:
+            is_correct = False
+
+        if is_correct:
             correct_predictions += 1
 
     overall_accuracy = correct_predictions / total_samples
@@ -234,25 +355,32 @@ def print_selection_statistics(
 
     for p in all_predictions:
         true_is_positive = p["true_is_positive"]
-        # Handle string/boolean values
+        # Handle string/boolean values with robust conversion
         if isinstance(true_is_positive, str):
-            true_is_positive = true_is_positive.lower() == "true"
+            true_is_positive = true_is_positive.lower() in ("true", "1")
+        elif isinstance(true_is_positive, (int, float)):
+            true_is_positive = bool(true_is_positive)
+        else:
+            true_is_positive = bool(true_is_positive)
 
         if true_is_positive:
             true_positive_samples.append(p)
         else:
             true_negative_samples.append(p)
 
-    positive_correct = sum(
-        1
-        for p in true_positive_samples
-        if (isinstance(p["correct"], str) and p["correct"].lower() == "true") or p["correct"]
-    )
-    negative_correct = sum(
-        1
-        for p in true_negative_samples
-        if (isinstance(p["correct"], str) and p["correct"].lower() == "true") or p["correct"]
-    )
+    # Calculate correct predictions with robust boolean conversion
+    def is_prediction_correct(pred):
+        correct_val = pred["correct"]
+        if isinstance(correct_val, str):
+            return correct_val.lower() in ("true", "1")
+        if isinstance(correct_val, bool):
+            return correct_val
+        if isinstance(correct_val, (int, float)):
+            return bool(correct_val)
+        return False
+
+    positive_correct = sum(1 for p in true_positive_samples if is_prediction_correct(p))
+    negative_correct = sum(1 for p in true_negative_samples if is_prediction_correct(p))
 
     positive_accuracy = (
         positive_correct / len(true_positive_samples) if true_positive_samples else 0
@@ -270,10 +398,24 @@ def print_selection_statistics(
     min_conf = min(all_confidences)
     max_conf = max(all_confidences)
 
+    # Sanity check for accuracy calculations
+    expected_overall_accuracy = (positive_correct + negative_correct) / total_samples
+    accuracy_mismatch = abs(overall_accuracy - expected_overall_accuracy) > 0.001
+
     print("\nModel Performance Summary:")
     print(f"Overall Accuracy: {overall_accuracy:.3f}")
-    print(f"True {positive_class_name} Accuracy: {positive_accuracy:.3f}")
-    print(f"True {negative_class_name} Accuracy: {negative_accuracy:.3f}")
+    print(
+        f"True {positive_class_name} Accuracy: {positive_accuracy:.3f} ({positive_correct}/{len(true_positive_samples)})"
+    )
+    print(
+        f"True {negative_class_name} Accuracy: {negative_accuracy:.3f} ({negative_correct}/{len(true_negative_samples)})"
+    )
+
+    if accuracy_mismatch:
+        print("⚠️  WARNING: Accuracy calculation mismatch detected!")
+        print(f"   Expected overall accuracy: {expected_overall_accuracy:.3f}")
+        print(f"   Calculated overall accuracy: {overall_accuracy:.3f}")
+
     print(f"Overall Confidence: avg={avg_confidence:.3f}, range={min_conf:.3f}-{max_conf:.3f}")
     print(
         f"High confidence samples (≥{min_confidence}): {high_conf_count}/{total_samples} ({high_conf_percentage:.1%})"

@@ -3,7 +3,6 @@ import os
 import re
 
 from .active_learning_core import run_active_learning_cycle
-from .utils.candidate_selection import ConfidenceStrategy, EntropyStrategy
 from .utils.dataset_utils import (
     get_dataset_help_text,
     get_dataset_processor,
@@ -23,6 +22,9 @@ def run_active_learning_for_class(
     positive_percentage=0.75,
     min_confidence=0.8,
     selection_mode="confidence",
+    basic_transition_f1_threshold=0.2,
+    basic_transition_confidence_threshold=0.9,
+    basic_transition_variance_threshold=0.12,
     **dataset_kwargs,
 ):
     """
@@ -39,7 +41,10 @@ def run_active_learning_for_class(
         total_candidates: Total number of candidates to select
         positive_percentage: Percentage of candidates that should be positive predictions (0.0-1.0)
         min_confidence: Minimum confidence threshold for candidate selection
-        selection_mode: Selection method ('confidence' for high-confidence samples, 'entropy' for high-uncertainty samples)
+        selection_mode: Selection method ('confidence' for high-confidence samples, 'entropy' for high-uncertainty samples, 'basic_transition' for basic transition strategy)
+        basic_transition_f1_threshold: F1 threshold for basic transition (default: 0.2)
+        basic_transition_confidence_threshold: Mean confidence threshold for basic transition (default: 0.9)
+        basic_transition_variance_threshold: Std confidence threshold for basic transition (default: 0.12)
         **dataset_kwargs: Additional dataset-specific configuration
 
     Returns:
@@ -73,6 +78,9 @@ def run_active_learning_for_class(
         positive_percentage=positive_percentage,
         min_confidence=min_confidence,
         selection_mode=selection_mode,
+        basic_transition_f1_threshold=basic_transition_f1_threshold,
+        basic_transition_confidence_threshold=basic_transition_confidence_threshold,
+        basic_transition_variance_threshold=basic_transition_variance_threshold,
         **dataset_kwargs,
     )
 
@@ -176,9 +184,29 @@ Examples:
     )
     parser.add_argument(
         "--selection-mode",
-        choices=["confidence", "entropy"],
+        choices=["confidence", "entropy", "basic_transition"],
         default="confidence",
-        help="Selection method: 'confidence' for high-confidence samples, 'entropy' for high-uncertainty samples",
+        help="Selection method: 'confidence', 'entropy', or 'basic_transition' for basic transition strategy",
+    )
+
+    # Basic transition configuration arguments
+    parser.add_argument(
+        "--basic-transition-f1-threshold",
+        type=float,
+        default=0.2,
+        help="F1 threshold for basic transition (default: 0.2)",
+    )
+    parser.add_argument(
+        "--basic-transition-confidence-threshold",
+        type=float,
+        default=0.9,
+        help="Mean confidence threshold for basic transition (default: 0.9)",
+    )
+    parser.add_argument(
+        "--basic-transition-variance-threshold",
+        type=float,
+        default=0.12,
+        help="Std confidence threshold for basic transition (default: 0.12)",
     )
 
     args = parser.parse_args()
@@ -243,20 +271,6 @@ Examples:
     )
     print(f"Min confidence: {args.min_confidence}")
 
-    # Show strategy name instead of just mode
-    if args.selection_mode == "confidence":
-        strategy = ConfidenceStrategy()
-    elif args.selection_mode == "entropy":
-        strategy = EntropyStrategy()
-    else:
-        strategy = None
-
-    if strategy:
-        print(f"Selection strategy: {strategy.__class__.__name__}")
-    else:
-        print(f"Selection mode: {args.selection_mode}")
-    print("-" * 60)
-
     # Run the active learning cycle
     predictions_file, candidates_file = run_active_learning_cycle(
         positive_class_id=positive_class_id,
@@ -271,6 +285,9 @@ Examples:
         positive_percentage=args.positive_pct,
         min_confidence=args.min_confidence,
         selection_mode=args.selection_mode,
+        basic_transition_f1_threshold=args.basic_transition_f1_threshold,
+        basic_transition_confidence_threshold=args.basic_transition_confidence_threshold,
+        basic_transition_variance_threshold=args.basic_transition_variance_threshold,
     )
 
     print("\n✅ Active learning cycle completed!")
