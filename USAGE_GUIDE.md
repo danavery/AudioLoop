@@ -2,7 +2,51 @@
 
 Quick reference for AudioLoop commands and practical usage patterns.
 
-## Command Reference
+## Automated Workflow (Recommended)
+
+The `automated_workflow.py` script provides a simple way to run complete active learning cycles with minimal manual intervention.
+
+### Quick Start
+```bash
+# Prerequisites (one-time setup)
+python -m audioloop.create_all_specs
+python -m audioloop.utils.start_labeling --class-name siren --n 40
+
+# Fully automated workflow (auto-labeling for testing)
+python automated_workflow.py --class-name siren --cycles 3 --auto-label
+
+# Semi-automated workflow (pause for human labeling)
+python automated_workflow.py --class-name dog_bark --cycles 2
+```
+
+### Common Usage Patterns
+```bash
+# Quick testing with auto-labeling
+python automated_workflow.py --class-name siren --cycles 3 --auto-label
+
+# Workflow with human labeling
+python automated_workflow.py --class-name dog_bark --cycles 2
+
+# Custom training parameters
+python automated_workflow.py --class-name gun_shot --cycles 3 --epochs 500 --batch-size 64
+
+# Custom active learning parameters
+python automated_workflow.py --class-name jackhammer --cycles 2 --candidates 100 --positive-pct 0.8
+
+# FSD50K dataset
+python automated_workflow.py --class-name Drill --cycles 2 --dataset fsd50k --auto-label
+```
+
+### Parameters
+- `--class-name`: Target class for binary classification (required)
+- `--cycles`: Number of active learning cycles (default: 3)
+- `--auto-label`: Use ground truth for automatic labeling (for testing)
+- `--dataset`: Dataset choice (`urbansound8k` or `fsd50k`)
+- `--epochs`: Max training epochs per cycle (default: 1000)
+- `--candidates`: Number of candidates per cycle (default: 50)
+- `--positive-pct`: Target percentage of positive samples (default: 0.75)
+
+## Manual Command Reference
 
 ### Environment Variable Setup
 ```bash

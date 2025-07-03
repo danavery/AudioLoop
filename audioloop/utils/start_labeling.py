@@ -41,6 +41,8 @@ def get_matching_samples(
         if class_name is None:
             match = True
         else:
+            # positive_class_id is guaranteed to be int when class_name is not None
+            assert positive_class_id is not None
             is_positive = processor.get_binary_label(item, positive_class_id, class_name)
             match = bool(is_positive)
 

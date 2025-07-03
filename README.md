@@ -4,6 +4,25 @@ AudioLoop is an active learning framework for binary audio classification that m
 
 ## Quick Start
 
+### Automated Workflow (Recommended)
+```bash
+# Install dependencies
+uv sync
+
+# Generate spectrograms (one-time setup)
+python -m audioloop.create_all_specs
+
+# Create initial training set
+python -m audioloop.utils.start_labeling --class-name siren --n 40
+
+# Run fully automated workflow (auto-labeling for testing)
+python automated_workflow.py --class-name siren --cycles 3 --auto-label
+
+# Run semi-automated workflow (pause for human labeling)
+python automated_workflow.py --class-name siren --cycles 2
+```
+
+### Manual Workflow (Step-by-step)
 ```bash
 # Install dependencies
 uv sync

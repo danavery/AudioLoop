@@ -8,6 +8,9 @@ This script demonstrates the full active learning cycle including:
 3. Merging labels back into training set
 4. Running subsequent cycles
 
+NOTE: For convenience, consider the automated workflow instead:
+    python automated_workflow.py --class-name siren --cycles 2 --auto-label
+
 Usage:
     python example_workflow.py --class-name siren --cycles 2
 """
@@ -212,6 +215,9 @@ Examples:
         print(f"   Class: {args.class_name}")
         print(f"   Cycles completed: {len(training_sets)}")
         print(f"   Final training set: {training_sets[-1] if training_sets else 'None'}")
+
+        print("\n💡 For convenience, consider using:")
+        print(f"   python automated_workflow.py --class-name {args.class_name} --cycles {args.cycles} --auto-label")
 
         return 0
 

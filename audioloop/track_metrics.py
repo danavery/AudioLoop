@@ -45,8 +45,9 @@ def calculate_core_metrics(predictions_file: str) -> dict:
     with open(predictions_file, newline="") as csvfile:
         reader = csv.DictReader(csvfile)
         for row in reader:
-            true_labels.append(int(row["true_label"]))
-            predicted_labels.append(int(row["predicted_label"]))
+            # Convert boolean strings to integers (True -> 1, False -> 0)
+            true_labels.append(1 if row["true_is_positive"].lower() == "true" else 0)
+            predicted_labels.append(1 if row["predicted_is_positive"].lower() == "true" else 0)
             confidences.append(float(row["confidence"]))
             if row.get("entropy"):
                 entropies.append(float(row["entropy"]))

@@ -2,6 +2,55 @@
 
 Complete reference for AudioLoop's versioned active learning workflow patterns.
 
+## Automated Workflow (Recommended)
+
+The `automated_workflow.py` script automates the complete active learning cycle, eliminating manual steps and reducing complexity.
+
+### Quick Start
+```bash
+# Prerequisites (one-time setup)
+python -m audioloop.create_all_specs
+python -m audioloop.utils.start_labeling --class-name siren --n 40
+
+# Fully automated workflow (auto-labeling for testing)
+python automated_workflow.py --class-name siren --cycles 3 --auto-label
+
+# Semi-automated workflow (pause for human labeling)
+python automated_workflow.py --class-name dog_bark --cycles 2
+```
+
+### What the Automated Workflow Does
+1. **Train Model**: Uses existing training set to create `model_v{N}.pt`
+2. **Active Learning**: Runs inference to generate `labeling_candidates_v{N}.csv`
+3. **Label Candidates**: Either auto-labels or pauses for human labeling
+4. **Merge Labels**: Creates expanded `training_set_v{N+1}.csv`
+5. **Repeat**: Continues for specified number of cycles
+
+### Advanced Usage
+```bash
+# Custom training parameters
+python automated_workflow.py --class-name gun_shot --cycles 3 --epochs 500 --batch-size 64
+
+# Custom active learning parameters
+python automated_workflow.py --class-name jackhammer --cycles 2 --candidates 100 --positive-pct 0.8
+
+# FSD50K dataset
+python automated_workflow.py --class-name Drill --cycles 2 --dataset fsd50k --auto-label
+```
+
+### Parameters
+- `--class-name`: Target class for binary classification
+- `--cycles`: Number of active learning cycles to run
+- `--auto-label`: Use ground truth for automatic labeling (testing)
+- `--dataset`: Dataset choice (`urbansound8k` or `fsd50k`)
+- `--epochs`: Max training epochs per cycle
+- `--candidates`: Number of candidates to select per cycle
+- `--positive-pct`: Target percentage of positive samples
+
+## Manual Workflow (Step-by-step)
+
+For fine-grained control or educational purposes, you can run each step manually:
+
 ## Version Naming Convention
 
 AudioLoop uses consistent versioning across all artifacts:
