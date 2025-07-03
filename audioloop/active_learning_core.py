@@ -6,8 +6,14 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from .candidate_selection import CandidateSelector
 from .models.cnn_5layer import SoundCNN
+from .utils.candidate_selection import (
+    ConfidenceStrategy,
+    EntropyStrategy,
+    load_predictions,
+    print_selection_statistics,
+    save_candidates,
+)
 from .utils.data_utils import entropy, get_device, variable_length_collate_fn
 from .utils.dataset_utils import get_dataset_processor
 from .utils.spectrogram_dataset import SpectrogramDataset
@@ -327,18 +333,33 @@ def run_active_learning_cycle(
     print("\nStep 2: Selecting candidates for human labeling...")
     candidates_file = f"outputs/labeling_candidates_v{run_number}.csv"
 
-    selector = CandidateSelector(
-        total_candidates=total_candidates,
-        positive_percentage=positive_percentage,
-        min_confidence=min_confidence,
-        candidate_pool_multiplier=5,
-        selection_mode=selection_mode,
-    )
-    _ = selector.select_candidates(
-        predictions_file=predictions_file,
-        candidates_csv=candidates_file,
+    if selection_mode == "confidence":
+        strategy = ConfidenceStrategy()
+    elif selection_mode == "entropy":
+        strategy = EntropyStrategy()
+    else:
+        raise ValueError(
+            f"Unknown selection mode: '{selection_mode}'. Available: confidence, entropy"
+        )
+
+    print(f"Using strategy: {strategy.__class__.__name__}")
+    predictions = load_predictions(predictions_file)
+    candidates = strategy.select_candidates(
+        predictions=predictions,
+        num_candidates=total_candidates,
         positive_class_name=positive_class_name,
         negative_class_name=negative_class_name,
+        positive_percentage=positive_percentage,
+        candidate_pool_multiplier=5,
+    )
+    save_candidates(candidates, candidates_file)
+    print_selection_statistics(
+        all_predictions=predictions,
+        selected_candidates=candidates,
+        strategy_name=strategy.__class__.__name__,
+        positive_class_name=positive_class_name,
+        negative_class_name=negative_class_name,
+        min_confidence=min_confidence,
     )
 
     print("\n🎯 Active Learning Cycle Complete!")

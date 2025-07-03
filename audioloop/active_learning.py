@@ -3,6 +3,7 @@ import os
 import re
 
 from .active_learning_core import run_active_learning_cycle
+from .utils.candidate_selection import ConfidenceStrategy, EntropyStrategy
 from .utils.dataset_utils import (
     get_dataset_help_text,
     get_dataset_processor,
@@ -241,7 +242,19 @@ Examples:
         f"Candidates: {num_positive} positive, {num_negative} negative ({args.positive_pct:.0%} positive)"
     )
     print(f"Min confidence: {args.min_confidence}")
-    print(f"Selection mode: {args.selection_mode}")
+
+    # Show strategy name instead of just mode
+    if args.selection_mode == "confidence":
+        strategy = ConfidenceStrategy()
+    elif args.selection_mode == "entropy":
+        strategy = EntropyStrategy()
+    else:
+        strategy = None
+
+    if strategy:
+        print(f"Selection strategy: {strategy.__class__.__name__}")
+    else:
+        print(f"Selection mode: {args.selection_mode}")
     print("-" * 60)
 
     # Run the active learning cycle
