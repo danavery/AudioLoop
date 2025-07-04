@@ -65,7 +65,7 @@ class AccuracyCriterion(TrainingStoppingCriterion):
 class PlateauCriterion(TrainingStoppingCriterion):
     """Stop when training loss plateaus (stops improving)."""
 
-    def __init__(self, patience: int = 20, min_delta: float = 0.01, max_epochs: int = 1000):
+    def __init__(self, patience: int = 50, min_delta: float = 0.01, max_epochs: int = 1000):
         """
         Args:
             patience: Number of epochs to wait for improvement before stopping

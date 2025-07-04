@@ -27,6 +27,7 @@ def calculate_binary_metrics(predictions: list[dict[str, Any]]) -> dict[str, flo
             - precision: Precision
             - recall: Recall
             - accuracy: Overall accuracy
+            - negative_class_accuracy: Negative class accuracy (specificity)
             - mean_confidence: Mean prediction confidence
             - std_confidence: Standard deviation of confidence
             - median_confidence: Median confidence
@@ -66,6 +67,7 @@ def calculate_binary_metrics(predictions: list[dict[str, Any]]) -> dict[str, flo
     recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
     f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
     accuracy = (tp + tn) / (tp + tn + fp + fn) if (tp + tn + fp + fn) > 0 else 0.0
+    negative_class_accuracy = tn / (tn + fp) if (tn + fp) > 0 else 0.0
 
     # Calculate confidence statistics
     mean_confidence = statistics.mean(confidences)
@@ -79,6 +81,7 @@ def calculate_binary_metrics(predictions: list[dict[str, Any]]) -> dict[str, flo
         "precision": precision,
         "recall": recall,
         "accuracy": accuracy,
+        "negative_class_accuracy": negative_class_accuracy,
         "mean_confidence": mean_confidence,
         "std_confidence": std_confidence,
         "median_confidence": median_confidence,

@@ -93,7 +93,8 @@ def run_training(
         train_dataset,
         batch_size=batch_size,
         shuffle=True,
-        num_workers=0,  # Set to 0 to avoid hanging with persistent workers
+        num_workers=2,
+        persistent_workers=True,  # Keep workers alive between epochs  # Set to 0 to avoid hanging with persistent workers
         pin_memory=torch.cuda.is_available(),
         collate_fn=simple_collate_fn,
     )

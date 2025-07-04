@@ -156,8 +156,9 @@ def run_binary_inference(
         dataset,
         batch_size=32,
         shuffle=False,
-        num_workers=0,
-        pin_memory=False,
+        num_workers=2,  # Enable parallel loading
+        pin_memory=torch.cuda.is_available(),  # Enable GPU memory pinning
+        persistent_workers=True,  # Keep workers alive
         collate_fn=variable_length_collate_fn,
     )
 

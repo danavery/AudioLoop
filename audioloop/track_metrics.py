@@ -93,11 +93,11 @@ def track_metrics_across_versions(output_dir: str) -> dict[int, dict]:
         raise FileNotFoundError(f"No 'predictions_v*.csv' files found in '{output_dir}'")
 
     print("Tracking Key Metrics Across Versions:")
-    print("-" * 95)
+    print("-" * 120)
     print(
-        f"{'Version':<10} {'F1-Score':<12} {'Precision':<12} {'Recall':<10} {'Mean Conf':<12} {'Std Conf':<11} {'p05-p95 Conf':<15} {'Pred/Actual+':<15}"
+        f"{'Version':<10} {'F1-Score':<12} {'Precision':<12} {'Recall':<10} {'Neg Acc':<10} {'Mean Conf':<12} {'Std Conf':<11} {'p05-p95 Conf':<15} {'Pred/Actual+':<15}"
     )
-    print("-" * 95)
+    print("-" * 120)
 
     all_metrics = {}
     for f in prediction_files:
@@ -109,6 +109,7 @@ def track_metrics_across_versions(output_dir: str) -> dict[int, dict]:
             print(
                 f"v{version:<8} {metrics['f1_score']:<12.3f} "
                 f"{metrics['precision']:<12.3f} {metrics['recall']:<10.3f} "
+                f"{metrics['negative_class_accuracy']:<10.3f} "
                 f"{metrics['mean_confidence']:<12.3f} {metrics['std_confidence']:<11.3f} "
                 f"{p05_p95_str:<15} "
                 f"{metrics['predicted_positive_ratio']:.1%}/{metrics['actual_positive_ratio']:.1%}"
@@ -116,7 +117,7 @@ def track_metrics_across_versions(output_dir: str) -> dict[int, dict]:
         except Exception as e:
             print(f"Could not process file {os.path.basename(f)}: {e}")
 
-    print("-" * 95)
+    print("-" * 120)
     return all_metrics
 
 
@@ -138,6 +139,12 @@ def analyze_trends(results: dict[int, dict]):
         print(f"{arrow} {metric_name:<20}: {start_val:.3f} -> {end_val:.3f} ({change:+.3f})")
 
     print_trend("F1-Score", start_m["f1_score"], end_m["f1_score"], higher_is_better=True)
+    print_trend(
+        "Negative Class Acc",
+        start_m["negative_class_accuracy"],
+        end_m["negative_class_accuracy"],
+        True,
+    )
     print_trend("Mean Confidence", start_m["mean_confidence"], end_m["mean_confidence"], True)
     print_trend("Std Confidence", start_m["std_confidence"], end_m["std_confidence"], True)
     print_trend(
@@ -181,7 +188,14 @@ def plot_core_trends(results: dict[int, dict], save_path: str | None = None):
     axes[0, 0].plot(versions, metrics_by_name["f1_score"], "o-", label="F1-Score")
     axes[0, 0].plot(versions, metrics_by_name["precision"], "o--", label="Precision", alpha=0.7)
     axes[0, 0].plot(versions, metrics_by_name["recall"], "o--", label="Recall", alpha=0.7)
-    axes[0, 0].set_title("Primary Performance (F1, Precision, Recall)")
+    axes[0, 0].plot(
+        versions,
+        metrics_by_name["negative_class_accuracy"],
+        "o:",
+        label="Negative Class Acc",
+        alpha=0.7,
+    )
+    axes[0, 0].set_title("Primary Performance (F1, Precision, Recall, Neg Acc)")
     axes[0, 0].set_ylabel("Score")
     axes[0, 0].legend()
     axes[0, 0].set_ylim(0, 1.05)
