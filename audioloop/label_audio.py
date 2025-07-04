@@ -447,10 +447,12 @@ class SimpleAudioLabeler:
         negative_count = 0
 
         for i, candidate in enumerate(self.candidates):
-            original_class = candidate.get("original_class", "")
+            # Use the true_is_positive field instead of original_class comparison
+            # This field is already correctly computed during inference
+            true_is_positive = candidate.get("true_is_positive", "")
 
-            # Determine ground truth label
-            if original_class == target_class:
+            # Convert string representation to label
+            if str(true_is_positive).lower() == "true":
                 ground_truth_label = "1"
                 positive_count += 1
             else:
