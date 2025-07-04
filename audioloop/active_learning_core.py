@@ -277,6 +277,8 @@ def run_active_learning_cycle(
     basic_transition_f1_threshold=0.2,
     basic_transition_confidence_threshold=0.9,
     basic_transition_variance_threshold=0.12,
+    auto_thresholds=False,
+    estimated_positive_pct=None,
     **dataset_kwargs,
 ):
     """
@@ -297,6 +299,8 @@ def run_active_learning_cycle(
         basic_transition_f1_threshold: F1 threshold for basic transition (default: 0.2)
         basic_transition_confidence_threshold: Mean confidence threshold for basic transition (default: 0.9)
         basic_transition_variance_threshold: Std confidence threshold for basic transition (default: 0.12)
+        auto_thresholds: Automatically calculate thresholds based on dataset characteristics (default: False)
+        estimated_positive_pct: Estimated percentage of positive samples (0.0-1.0). Used with auto_thresholds.
         **dataset_kwargs: Additional dataset-specific configuration
 
     Returns:
@@ -341,9 +345,13 @@ def run_active_learning_cycle(
     strategy_kwargs = {}
     if selection_mode == "basic_transition":
         strategy_kwargs = {
-            "f1_threshold": basic_transition_f1_threshold,
-            "confidence_threshold": basic_transition_confidence_threshold,
-            "variance_threshold": basic_transition_variance_threshold,
+            "f1_threshold": None if auto_thresholds else basic_transition_f1_threshold,
+            "confidence_threshold": None
+            if auto_thresholds
+            else basic_transition_confidence_threshold,
+            "variance_threshold": None if auto_thresholds else basic_transition_variance_threshold,
+            "auto_thresholds": auto_thresholds,
+            "estimated_positive_pct": estimated_positive_pct or 0.05,  # Default 5% if not provided
         }
 
     from .utils.candidate_selection import create_strategy

@@ -115,8 +115,14 @@ python -m audioloop.simple_train training_sets/training_set_v1.csv -v 1 --epochs
 # Run active learning cycle (auto-detects model from run number)
 python -m audioloop.active_learning --class-name siren --run-number 1
 
-# Run with basic transition strategy (automatically switches from confidence to entropy)
+# Run with basic transition strategy and auto-calculated thresholds (recommended for imbalanced datasets)
+python -m audioloop.active_learning --class-name siren --run-number 1 --selection-mode basic_transition --auto-thresholds --estimated-positive-pct 0.10
+
+# Run with basic transition strategy using default thresholds
 python -m audioloop.active_learning --class-name siren --run-number 1 --selection-mode basic_transition
+
+# Run with auto-thresholds using default estimate (5%)
+python -m audioloop.active_learning --class-name siren --run-number 1 --selection-mode basic_transition --auto-thresholds
 
 # Run with custom basic transition thresholds
 python -m audioloop.active_learning --class-name siren --run-number 1 --selection-mode basic_transition \
@@ -367,6 +373,8 @@ export AUDIOLOOP_DATASET=invalid_name  # Will show error with supported options
 --min-confidence 0.9           # Minimum confidence threshold (default: 0.8)
 --negative-name "background"   # Custom negative class name
 --selection-mode basic_transition  # Use basic transition strategy
+--auto-thresholds              # Auto-calculate thresholds based on dataset characteristics
+--estimated-positive-pct 0.05  # Estimated positive class percentage (default: 0.05)
 --basic-transition-f1-threshold 0.25  # F1 threshold for transition (default: 0.2)
 ```
 

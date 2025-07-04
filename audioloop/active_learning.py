@@ -25,6 +25,8 @@ def run_active_learning_for_class(
     basic_transition_f1_threshold=0.2,
     basic_transition_confidence_threshold=0.9,
     basic_transition_variance_threshold=0.12,
+    auto_thresholds=False,
+    estimated_positive_pct=None,
     **dataset_kwargs,
 ):
     """
@@ -45,6 +47,8 @@ def run_active_learning_for_class(
         basic_transition_f1_threshold: F1 threshold for basic transition (default: 0.2)
         basic_transition_confidence_threshold: Mean confidence threshold for basic transition (default: 0.9)
         basic_transition_variance_threshold: Std confidence threshold for basic transition (default: 0.12)
+        auto_thresholds: Automatically calculate thresholds based on dataset characteristics (default: False)
+        estimated_positive_pct: Estimated percentage of positive samples (0.0-1.0). Used with auto_thresholds.
         **dataset_kwargs: Additional dataset-specific configuration
 
     Returns:
@@ -81,6 +85,8 @@ def run_active_learning_for_class(
         basic_transition_f1_threshold=basic_transition_f1_threshold,
         basic_transition_confidence_threshold=basic_transition_confidence_threshold,
         basic_transition_variance_threshold=basic_transition_variance_threshold,
+        auto_thresholds=auto_thresholds,
+        estimated_positive_pct=estimated_positive_pct,
         **dataset_kwargs,
     )
 
@@ -208,6 +214,16 @@ Examples:
         default=0.12,
         help="Std confidence threshold for basic transition (default: 0.12)",
     )
+    parser.add_argument(
+        "--auto-thresholds",
+        action="store_true",
+        help="Automatically calculate BasicTransition thresholds based on dataset characteristics",
+    )
+    parser.add_argument(
+        "--estimated-positive-pct",
+        type=float,
+        help="Estimated percentage of positive samples in dataset (0.0-1.0). Used with --auto-thresholds. If not specified, uses dataset defaults.",
+    )
 
     args = parser.parse_args()
 
@@ -288,6 +304,8 @@ Examples:
         basic_transition_f1_threshold=args.basic_transition_f1_threshold,
         basic_transition_confidence_threshold=args.basic_transition_confidence_threshold,
         basic_transition_variance_threshold=args.basic_transition_variance_threshold,
+        auto_thresholds=args.auto_thresholds,
+        estimated_positive_pct=args.estimated_positive_pct,
     )
 
     print("\n✅ Active learning cycle completed!")

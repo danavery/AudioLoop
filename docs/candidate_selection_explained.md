@@ -129,25 +129,50 @@ The basic transition strategy **automatically switches** from confidence to entr
 **Initial Phase**: Uses confidence-based selection (same as 4.1)
 
 **Transition Criteria**: Switches to entropy-based when ALL three conditions are met:
-- **F1 Score > 0.2**: Model has learned basic patterns
-- **Mean Confidence > 0.9**: Model shows confidence in predictions
-- **Std Confidence < 0.12**: Uncertainty is decreasing (overconfidence risk)
+- **F1 Score > threshold**: Model has learned basic patterns
+- **Mean Confidence > threshold**: Model shows confidence in predictions
+- **Std Confidence < threshold**: Uncertainty is decreasing (overconfidence risk)
+
+**Adaptive Thresholds**: The system can automatically calculate optimal thresholds based on dataset characteristics:
+- **Class Imbalance**: Rare classes (< 5%) get more aggressive thresholds
+- **Training Set Size**: Smaller sets trigger earlier transitions
+- **No Ground Truth Required**: Only needs estimated positive class percentage
 
 **Analysis Output**:
 ```
+🎯 Adaptive Threshold Analysis:
+==================================================
+Estimated positive class prevalence: 5.0%
+Training set size: 80
+
+📊 Calculated Thresholds:
+F1 threshold: 0.141
+Confidence threshold: 0.820
+Variance threshold: 0.200
+
+💡 Rationale:
+• Rare class (< 5%) → Lower F1 threshold, aggressive confidence
+==================================================
+
 Basic Transition Analysis:
-  ✓ F1 Score: 0.265 (>0.2 required)
-  ✓ Mean Confidence: 0.951 (>0.9 required) 
-  ✓ Std Confidence: 0.104 (<0.12 required)
+  ✓ F1 Score: 0.265 (>0.141 required)
+  ✓ Mean Confidence: 0.951 (>0.820 required) 
+  ✓ Std Confidence: 0.104 (<0.200 required)
   → Using ENTROPY-based selection (uncertainty sampling)
 ```
 
 **Usage**:
 ```bash
+# Use basic transition with auto-calculated thresholds (recommended for imbalanced datasets)
+python -m audioloop.active_learning --class-name siren --selection-mode basic_transition --auto-thresholds --estimated-positive-pct 0.10
+
+# Use auto-thresholds with default estimate (5%)
+python -m audioloop.active_learning --class-name siren --selection-mode basic_transition --auto-thresholds
+
 # Use basic transition with default thresholds
 python -m audioloop.active_learning --class-name siren --selection-mode basic_transition
 
-# Custom thresholds
+# Custom manual thresholds
 python -m audioloop.active_learning --class-name siren --selection-mode basic_transition \
   --basic-transition-f1-threshold 0.25 \
   --basic-transition-confidence-threshold 0.95 \

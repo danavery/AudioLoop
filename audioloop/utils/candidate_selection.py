@@ -157,13 +157,47 @@ class BasicTransitionStrategy(CandidateSelectionStrategy):
 
     def __init__(
         self,
-        f1_threshold: float = 0.2,
-        confidence_threshold: float = 0.9,
-        variance_threshold: float = 0.12,
+        f1_threshold: float | None = None,
+        confidence_threshold: float | None = None,
+        variance_threshold: float | None = None,
+        auto_thresholds: bool = False,
+        estimated_positive_pct: float = 0.05,
+        training_set_size: int | None = None,
     ):
-        self.f1_threshold = f1_threshold
-        self.confidence_threshold = confidence_threshold
-        self.variance_threshold = variance_threshold
+        # Auto-calculate thresholds if requested or if any threshold is None
+        if auto_thresholds or any(
+            t is None for t in [f1_threshold, confidence_threshold, variance_threshold]
+        ):
+            from .adaptive_thresholds import threshold_calculator
+
+            calc_f1, calc_conf, calc_var = threshold_calculator.calculate_thresholds(
+                estimated_positive_pct, training_set_size
+            )
+
+            self.f1_threshold = f1_threshold if f1_threshold is not None else calc_f1
+            self.confidence_threshold = (
+                confidence_threshold if confidence_threshold is not None else calc_conf
+            )
+            self.variance_threshold = (
+                variance_threshold if variance_threshold is not None else calc_var
+            )
+
+            # Print analysis if fully auto
+            if auto_thresholds:
+                threshold_calculator.print_analysis(
+                    estimated_positive_pct,
+                    self.f1_threshold,
+                    self.confidence_threshold,
+                    self.variance_threshold,
+                    training_set_size,
+                )
+        else:
+            # Use provided thresholds or defaults
+            self.f1_threshold = f1_threshold if f1_threshold is not None else 0.2
+            self.confidence_threshold = (
+                confidence_threshold if confidence_threshold is not None else 0.9
+            )
+            self.variance_threshold = variance_threshold if variance_threshold is not None else 0.12
 
         # Delegate to existing strategies
         self.confidence_strategy = ConfidenceStrategy()
@@ -339,7 +373,7 @@ def print_selection_statistics(
             is_correct = correct_val.lower() in ("true", "1")
         elif isinstance(correct_val, bool):
             is_correct = correct_val
-        elif isinstance(correct_val, (int, float)):
+        elif isinstance(correct_val, int | float):
             is_correct = bool(correct_val)
         else:
             is_correct = False
@@ -358,7 +392,7 @@ def print_selection_statistics(
         # Handle string/boolean values with robust conversion
         if isinstance(true_is_positive, str):
             true_is_positive = true_is_positive.lower() in ("true", "1")
-        elif isinstance(true_is_positive, (int, float)):
+        elif isinstance(true_is_positive, int | float):
             true_is_positive = bool(true_is_positive)
         else:
             true_is_positive = bool(true_is_positive)
@@ -375,7 +409,7 @@ def print_selection_statistics(
             return correct_val.lower() in ("true", "1")
         if isinstance(correct_val, bool):
             return correct_val
-        if isinstance(correct_val, (int, float)):
+        if isinstance(correct_val, int | float):
             return bool(correct_val)
         return False
 

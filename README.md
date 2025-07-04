@@ -33,8 +33,8 @@ python -m audioloop.create_all_specs
 # Train initial model
 python -m audioloop.simple_train training_sets/training_set_v1.csv
 
-# Run active learning cycle (with basic transition strategy)
-python -m audioloop.active_learning --class-name siren --run-number 1 --selection-mode basic_transition
+# Run active learning cycle (with auto-calculated thresholds for imbalanced datasets)
+python -m audioloop.active_learning --class-name siren --run-number 1 --selection-mode basic_transition --auto-thresholds
 
 # Label audio samples interactively
 python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --audio-dir data/urbansound8k
@@ -171,6 +171,7 @@ filename,predicted_is_positive,confidence,needs_human_label,prediction,entropy,p
 ### Active Learning Strategies
 - **High-Confidence Sampling**: Selects samples where model is most confident
 - **Basic Transition**: Automatically switches from confidence to entropy based on F1, confidence, and variance metrics
+- **Adaptive Thresholds**: Auto-calculates optimal thresholds based on class imbalance without requiring ground truth
 - **Balanced Selection**: Maintains positive/negative ratio
 - **Exclusion Logic**: Avoids re-labeling existing samples
 
@@ -229,6 +230,7 @@ filename,predicted_is_positive,confidence,needs_human_label,prediction,entropy,p
 
 ### Advanced Selection Strategies
 - **Basic Transition**: Switches from confidence to entropy based on performance metrics
+- **Adaptive Thresholds**: Automatically adjusts transition criteria for imbalanced datasets
 - **Uncertainty Sampling**: Low-confidence samples near decision boundary
 - **Entropy-Based**: High-entropy (uncertain) predictions
 - **Diversity Sampling**: Ensures feature space coverage

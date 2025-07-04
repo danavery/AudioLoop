@@ -124,6 +124,8 @@ def run_automated_workflow(
     basic_transition_f1_threshold=0.2,
     basic_transition_confidence_threshold=0.9,
     basic_transition_variance_threshold=0.12,
+    auto_thresholds=False,
+    estimated_positive_pct=None,
 ):
     """
     Run the complete automated active learning workflow.
@@ -144,6 +146,8 @@ def run_automated_workflow(
         basic_transition_f1_threshold: F1 threshold for basic transition (default: 0.2)
         basic_transition_confidence_threshold: Mean confidence threshold for basic transition (default: 0.9)
         basic_transition_variance_threshold: Std confidence threshold for basic transition (default: 0.12)
+        auto_thresholds: Automatically calculate thresholds based on dataset characteristics (default: False)
+        estimated_positive_pct: Estimated percentage of positive samples (0.0-1.0). Used with auto_thresholds.
 
     Returns:
         list: Paths to training sets created during the workflow
@@ -220,6 +224,8 @@ def run_automated_workflow(
                 basic_transition_f1_threshold=basic_transition_f1_threshold,
                 basic_transition_confidence_threshold=basic_transition_confidence_threshold,
                 basic_transition_variance_threshold=basic_transition_variance_threshold,
+                auto_thresholds=auto_thresholds,
+                estimated_positive_pct=estimated_positive_pct,
             )
             print(f"   ✅ Generated candidates: {candidates_file}")
         except Exception as e:
@@ -391,6 +397,16 @@ Prerequisites:
         default=0.12,
         help="Std confidence threshold for basic transition (default: 0.12)",
     )
+    parser.add_argument(
+        "--auto-thresholds",
+        action="store_true",
+        help="Automatically calculate BasicTransition thresholds based on dataset characteristics",
+    )
+    parser.add_argument(
+        "--estimated-positive-pct",
+        type=float,
+        help="Estimated percentage of positive samples in dataset (0.0-1.0). Used with --auto-thresholds. If not specified, uses dataset defaults.",
+    )
 
     args = parser.parse_args()
 
@@ -427,6 +443,8 @@ Prerequisites:
             basic_transition_f1_threshold=args.basic_transition_f1_threshold,
             basic_transition_confidence_threshold=args.basic_transition_confidence_threshold,
             basic_transition_variance_threshold=args.basic_transition_variance_threshold,
+            auto_thresholds=args.auto_thresholds,
+            estimated_positive_pct=args.estimated_positive_pct,
         )
 
         if training_sets:
