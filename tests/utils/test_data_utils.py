@@ -31,23 +31,7 @@ def sample_mono_batch():
     ]
 
 
-@pytest.fixture
-def sample_stereo_batch():
-    """Create sample batch with stereo spectrograms."""
-    return [
-        {
-            "data": torch.tensor([[[1.0, 2.0]], [[3.0, 4.0]]]),  # 2 channels
-            "label": 1,
-            "filename": "stereo1.pt",
-            "filepath": "path/stereo1.pt",
-        },
-        {
-            "data": torch.tensor([[[5.0, 6.0]], [[7.0, 8.0]]]),  # 2 channels
-            "label": 0,
-            "filename": "stereo2.pt",
-            "filepath": "path/stereo2.pt",
-        },
-    ]
+
 
 
 # Entropy function tests
@@ -148,22 +132,7 @@ def test_simple_collate_basic_functionality(sample_mono_batch):
     assert result["filepath"] == ["path/test1.pt", "path/test2.pt"]
 
 
-def test_simple_collate_converts_stereo_to_mono(sample_stereo_batch):
-    """Test that stereo spectrograms are converted to mono by averaging."""
-    result = simple_collate_fn(sample_stereo_batch)
 
-    # Should average the channels:
-    # First sample: (1+3)/2=2, (2+4)/2=3
-    # Second sample: (5+7)/2=6, (6+8)/2=7
-    expected_data = torch.tensor(
-        [
-            [[[2.0, 3.0]]],  # First sample, mono
-            [[[6.0, 7.0]]],  # Second sample, mono
-        ]
-    )
-
-    assert result["data"].shape == (2, 1, 1, 2)
-    assert torch.allclose(result["data"], expected_data)
 
 
 def test_simple_collate_single_item():

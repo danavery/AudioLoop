@@ -13,7 +13,7 @@ def simple_collate_fn(batch):
     Collate function for fixed-length spectrograms.
 
     Used throughout the pipeline where spectrograms are expected to be the same size.
-    Converts stereo to mono by averaging channels.
+    All spectrograms are expected to be mono (single channel).
 
     Args:
         batch: List of dataset items with keys: data, label, filename, filepath
@@ -25,15 +25,8 @@ def simple_collate_fn(batch):
     data_list = [item["data"] for item in batch]
     labels = torch.tensor([item["label"] for item in batch])
 
-    # Convert to mono by averaging channels if stereo
-    mono_data = []
-    for spec in data_list:
-        if spec.shape[0] > 1:
-            spec = spec.mean(dim=0, keepdim=True)  # Average channels, keep dimension
-        mono_data.append(spec)
-
-    # Stack the spectrograms (they should all be the same size now)
-    data_tensor = torch.stack(mono_data)
+    # Stack the spectrograms (they should all be the same size)
+    data_tensor = torch.stack(data_list)
 
     # Return in the same format as the original batch
     return {

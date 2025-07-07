@@ -465,6 +465,10 @@ class FSD50KProcessor:
             # Load audio
             waveform, sample_rate = torchaudio.load(audio_path)
 
+            # Convert stereo to mono by averaging channels
+            if waveform.shape[0] > 1:
+                waveform = waveform.mean(dim=0, keepdim=True)
+
             # Create spectrogram
             spec = self.spec_transform(waveform)
 
