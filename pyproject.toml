@@ -14,6 +14,13 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "pytest-mock>=3.10",
+]
+
 
 [tool.ruff]
 line-length = 100
@@ -25,3 +32,7 @@ ignore = ["RET504", "E501"]
 
 [tool.ruff.lint.per-file-ignores]
 "audioloop/label_audio.py" = ["RET508"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v --tb=short"

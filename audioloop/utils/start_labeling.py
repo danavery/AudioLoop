@@ -106,7 +106,6 @@ def create_training_set(
     class_name: str = "siren",
     dataset_name: str = "urbansound8k",
     output_path: str = "training_sets/training_set_v1.csv",
-    run: int = 1,
     positive_percentage: float = 0.5,
     **kwargs,
 ) -> tuple[list[str], list[str]]:
@@ -117,7 +116,6 @@ def create_training_set(
         class_name: Class name for positive class
         dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
         output_path: Path to save training set CSV
-        run: Run number for training set versioning
         positive_percentage: Percentage of samples that should be positive (0.0-1.0)
         **kwargs: Additional dataset-specific parameters
     """
@@ -129,8 +127,8 @@ def create_training_set(
     )
 
     # Format entries
-    positive_entries = [f"{p},1,{run}" for p in positives]
-    negative_entries = [f"{n},0,{run}" for n in negatives]
+    positive_entries = [f"{p},1" for p in positives]
+    negative_entries = [f"{n},0" for n in negatives]
     all_entries = positive_entries + negative_entries
 
     # Shuffle and write
@@ -142,7 +140,7 @@ def create_training_set(
         os.makedirs(output_dir, exist_ok=True)
 
     with open(output_path, "w") as f:
-        f.write("filepath,label,run\n")
+        f.write("filepath,label\n")
         f.write("\n".join(all_entries))
 
     print(f"Created training set: {output_path}")
@@ -213,7 +211,6 @@ Examples:
         help="Percentage positive (0.0-1.0, default 0.75)",
     )
     parser.add_argument("--output", default="training_sets/training_set_v1.csv", help="Output path")
-    parser.add_argument("--run", type=int, default=1, help="Run number for versioning")
 
     # Dataset-specific parameters
     parser.add_argument("--metadata-csv", help="Path to metadata CSV (UrbanSound8K)")
@@ -265,7 +262,6 @@ Examples:
                 class_name=args.class_name,
                 dataset_name=dataset_name,
                 output_path=args.output,
-                run=args.run,
                 positive_percentage=args.positive_pct,
                 **dataset_kwargs,
             )

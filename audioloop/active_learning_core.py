@@ -126,7 +126,6 @@ def run_binary_inference(
             {
                 "filepath": spec_path,
                 "label": int(is_positive),
-                "run": 1,
                 "original_class": original_class,
                 "filename": spec_filename,
             }

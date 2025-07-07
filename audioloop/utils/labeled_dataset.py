@@ -11,7 +11,7 @@ class LabeledDataset(torch.utils.data.Dataset):
         Dataset for loading labeled audio files.
 
         Args:
-            labels_file: Path to CSV file with format: filepath,label,run
+            labels_file: Path to CSV file with format: filepath,label
             root_dir: Root directory for audio files (legacy parameter for compatibility)
             meta_csv: Metadata CSV file (legacy parameter for compatibility)
             transform: Transform to apply to audio data
@@ -30,14 +30,13 @@ class LabeledDataset(torch.utils.data.Dataset):
             for row in csv_reader:
                 if len(row) >= 2:  # At minimum need filepath and label
                     filepath, label = row[0], row[1]
-                    run = row[2] if len(row) > 2 else "1"
-                    self.labels.append((filepath, int(label), run))
+                    self.labels.append((filepath, int(label)))
 
     def __len__(self):
         return len(self.labels)
 
     def __getitem__(self, idx):
-        filepath, label, run = self.labels[idx]
+        filepath, label = self.labels[idx]
 
         # Load audio file
         if not os.path.exists(filepath):
@@ -57,7 +56,6 @@ class LabeledDataset(torch.utils.data.Dataset):
             "label": label,
             "filename": filename,
             "filepath": filepath,
-            "run": run,
         }
 
 

@@ -39,7 +39,6 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None):
                         {
                             "filename": filename,
                             "label": int(row[1]),
-                            "run": row[2] if len(row) > 2 else "1",
                         }
                     )
         print(f"Loaded {len(all_data)} samples from {original_csv}")
@@ -72,10 +71,7 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None):
                     print(f"Warning: Invalid label '{label}' for {filename}, skipping")
                     continue
 
-                # Get run number from row if available
-                run = row.get("run", "1")
-
-                all_data.append({"filename": filename, "label": label_int, "run": run})
+                all_data.append({"filename": filename, "label": label_int})
                 new_count += 1
             except ValueError:
                 print(f"Warning: Invalid label '{label}' for {filename}, skipping")
@@ -88,7 +84,7 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None):
 
     # Write merged training set
     with open(output_csv, "w", newline="") as f:
-        fieldnames = ["filename", "label", "run"]
+        fieldnames = ["filename", "label"]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(all_data)

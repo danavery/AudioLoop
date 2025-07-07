@@ -9,9 +9,9 @@ class SpectrogramDataset(torch.utils.data.Dataset):
     Unified dataset for loading precomputed spectrograms from CSV files.
 
     Handles multiple CSV formats:
-    - Training format: filepath,label,run
+    - Training format: filepath,label
     - Binary labels format: filename,label,original_class
-    - Extended format: filename,label,run,original_class (with optional fields)
+    - Extended format: filename,label,original_class (with optional fields)
 
     The dataset automatically detects the CSV format and adapts accordingly.
     """
@@ -51,7 +51,6 @@ class SpectrogramDataset(torch.utils.data.Dataset):
                     "filename",
                     "filepath",
                     "label",
-                    "run",
                     "original_class",
                     "is_positive",
                 ]
@@ -91,7 +90,6 @@ class SpectrogramDataset(torch.utils.data.Dataset):
             return None
 
         # Optional fields
-        run = row.get("run", "1")
         original_class = int(row["original_class"]) if "original_class" in row else None
 
         # Build spectrogram path
@@ -102,7 +100,6 @@ class SpectrogramDataset(torch.utils.data.Dataset):
             "filename": filename,
             "spec_filepath": spec_filepath,
             "label": label,
-            "run": run,
             "original_class": original_class,
         }
 
@@ -111,10 +108,9 @@ class SpectrogramDataset(torch.utils.data.Dataset):
         if len(row) < 2:
             return None
 
-        # Legacy format: filepath,label,run
+        # Legacy format: filepath,label
         filepath = row[0]
         label = int(row[1])
-        run = row[2] if len(row) > 2 else "1"
 
         filename = os.path.basename(filepath)
         spec_filename = filename.replace(".wav", ".pt")
@@ -124,7 +120,6 @@ class SpectrogramDataset(torch.utils.data.Dataset):
             "filename": filename,
             "spec_filepath": spec_filepath,
             "label": label,
-            "run": run,
             "original_class": None,
         }
 
@@ -152,7 +147,6 @@ class SpectrogramDataset(torch.utils.data.Dataset):
             return None
 
         # Optional fields
-        run = entry.get("run", "1")
         original_class = int(entry["original_class"]) if "original_class" in entry else None
 
         # Build spectrogram path
@@ -163,7 +157,6 @@ class SpectrogramDataset(torch.utils.data.Dataset):
             "filename": filename,
             "spec_filepath": spec_filepath,
             "label": label,
-            "run": run,
             "original_class": original_class,
         }
 
@@ -186,7 +179,6 @@ class SpectrogramDataset(torch.utils.data.Dataset):
             "label": sample["label"],
             "filename": sample["filename"],
             "filepath": spec_filepath,
-            "run": sample["run"],
         }
 
         # Only include original_class if it exists

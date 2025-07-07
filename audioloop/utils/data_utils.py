@@ -16,7 +16,7 @@ def simple_collate_fn(batch):
     Converts stereo to mono by averaging channels.
 
     Args:
-        batch: List of dataset items with keys: data, label, filename, filepath, run
+        batch: List of dataset items with keys: data, label, filename, filepath
 
     Returns:
         dict: Batched data with tensors for data and labels
@@ -41,7 +41,6 @@ def simple_collate_fn(batch):
         "label": labels,
         "filename": [item["filename"] for item in batch],
         "filepath": [item["filepath"] for item in batch],
-        "run": [item.get("run", "1") for item in batch],
     }
 
 
