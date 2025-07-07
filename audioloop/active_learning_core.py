@@ -12,7 +12,7 @@ from .utils.candidate_selection import (
     print_selection_statistics,
     save_candidates,
 )
-from .utils.data_utils import entropy, get_device, variable_length_collate_fn
+from .utils.data_utils import entropy, get_device, simple_collate_fn
 from .utils.dataset_utils import get_dataset_processor
 from .utils.spectrogram_dataset import SpectrogramDataset
 
@@ -158,7 +158,7 @@ def run_binary_inference(
         num_workers=2,  # Enable parallel loading
         pin_memory=torch.cuda.is_available(),  # Enable GPU memory pinning
         persistent_workers=True,  # Keep workers alive
-        collate_fn=variable_length_collate_fn,
+        collate_fn=simple_collate_fn,
     )
 
     # Run inference and collect results

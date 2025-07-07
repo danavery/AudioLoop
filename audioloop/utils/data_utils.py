@@ -10,9 +10,9 @@ import torch
 
 def simple_collate_fn(batch):
     """
-    Simple collate function for fixed-length spectrograms.
+    Collate function for fixed-length spectrograms.
 
-    Used in training where spectrograms are expected to be the same size.
+    Used throughout the pipeline where spectrograms are expected to be the same size.
     Converts stereo to mono by averaging channels.
 
     Args:
@@ -34,54 +34,6 @@ def simple_collate_fn(batch):
 
     # Stack the spectrograms (they should all be the same size now)
     data_tensor = torch.stack(mono_data)
-
-    # Return in the same format as the original batch
-    return {
-        "data": data_tensor,
-        "label": labels,
-        "filename": [item["filename"] for item in batch],
-        "filepath": [item["filepath"] for item in batch],
-    }
-
-
-def variable_length_collate_fn(batch):
-    """
-    Collate function for variable-length spectrograms.
-
-    Used in inference where spectrograms may have different time lengths.
-    Pads all spectrograms to the maximum length in the batch.
-
-    Args:
-        batch: List of dataset items with keys: data, label, filename, filepath
-
-    Returns:
-        dict: Batched data with padded tensors
-    """
-    # Extract data and other fields
-    data_list = [item["data"] for item in batch]
-    labels = torch.tensor([item["label"] for item in batch])
-
-    # Handle different channel dimensions and time lengths
-    max_time_frames = max(spec.shape[-1] for spec in data_list)
-
-    padded_data = []
-    for spec in data_list:
-        # Convert to mono by averaging channels if stereo
-        if spec.shape[0] > 1:
-            spec = spec.mean(dim=0, keepdim=True)  # Average channels, keep dimension
-
-        # Pad the time dimension (last dimension) to max_time_frames
-        pad_size = max_time_frames - spec.shape[-1]
-        if pad_size > 0:
-            # Pad with zeros on the right side of the time dimension
-            pad_tuple = (0, pad_size)  # (left_pad, right_pad) for last dimension
-            padded_spec = torch.nn.functional.pad(spec, pad_tuple, mode="constant", value=0)
-        else:
-            padded_spec = spec
-        padded_data.append(padded_spec)
-
-    # Stack the padded spectrograms
-    data_tensor = torch.stack(padded_data)
 
     # Return in the same format as the original batch
     return {
