@@ -441,11 +441,20 @@ def test_basic_transition_no_partial_overrides():
 
 def test_basic_transition_auto_thresholds_with_manual_conflict():
     """Test that auto_thresholds=True with manual thresholds raises ValueError."""
-    with pytest.raises(ValueError, match="Cannot specify both auto_thresholds=True and manual thresholds"):
+    with pytest.raises(
+        ValueError, match="Cannot specify both auto_thresholds=True and manual thresholds"
+    ):
         BasicTransitionStrategy(auto_thresholds=True, f1_threshold=0.4)
 
-    with pytest.raises(ValueError, match="Cannot specify both auto_thresholds=True and manual thresholds"):
-        BasicTransitionStrategy(auto_thresholds=True, f1_threshold=0.4, confidence_threshold=0.95, variance_threshold=0.08)
+    with pytest.raises(
+        ValueError, match="Cannot specify both auto_thresholds=True and manual thresholds"
+    ):
+        BasicTransitionStrategy(
+            auto_thresholds=True,
+            f1_threshold=0.4,
+            confidence_threshold=0.95,
+            variance_threshold=0.08,
+        )
 
 
 def test_basic_transition_behavior_with_defaults():

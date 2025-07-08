@@ -5,8 +5,8 @@ This module contains function-based tests for the core data utilities
 used throughout the AudioLoop active learning framework.
 """
 
-import torch
 import pytest
+import torch
 
 from audioloop.utils.data_utils import entropy, get_device, simple_collate_fn
 
@@ -29,9 +29,6 @@ def sample_mono_batch():
             "filepath": "path/test2.pt",
         },
     ]
-
-
-
 
 
 # Entropy function tests
@@ -130,9 +127,6 @@ def test_simple_collate_basic_functionality(sample_mono_batch):
     assert torch.equal(result["label"], torch.tensor([1, 0]))
     assert result["filename"] == ["test1.pt", "test2.pt"]
     assert result["filepath"] == ["path/test1.pt", "path/test2.pt"]
-
-
-
 
 
 def test_simple_collate_single_item():
