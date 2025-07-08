@@ -18,3 +18,4 @@ training_sets/
 CLAUDE.md
 *png
 .ropeproject
+.coverage

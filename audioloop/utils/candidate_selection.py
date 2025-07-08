@@ -46,6 +46,10 @@ class CandidateSelectionStrategy(ABC):
         """Return strategy name for logging."""
         return self.__class__.__name__
 
+    def get_active_strategy_name(self) -> str:
+        """Return active strategy name for user-facing output. Override for dynamic strategies."""
+        return self.get_name()
+
 
 class ConfidenceStrategy(CandidateSelectionStrategy):
     """Select candidates with highest confidence scores."""
@@ -164,40 +168,45 @@ class BasicTransitionStrategy(CandidateSelectionStrategy):
         estimated_positive_pct: float = 0.05,
         training_set_size: int | None = None,
     ):
-        # Auto-calculate thresholds if requested or if any threshold is None
-        if auto_thresholds or any(
-            t is None for t in [f1_threshold, confidence_threshold, variance_threshold]
-        ):
+        # Validate threshold specification
+        provided_thresholds = [f1_threshold, confidence_threshold, variance_threshold]
+        num_provided = sum(1 for t in provided_thresholds if t is not None)
+
+        if auto_thresholds and num_provided > 0:
+            raise ValueError("Cannot specify both auto_thresholds=True and manual thresholds")
+        if 0 < num_provided < 3:
+            raise ValueError(
+                "Must specify all three thresholds (f1_threshold, confidence_threshold, variance_threshold) "
+                "or none of them. Use auto_thresholds=True for automatic calculation."
+            )
+
+        # Apply validated threshold configuration
+        if auto_thresholds:
+            # Auto-calculate all thresholds
             from .adaptive_thresholds import threshold_calculator
 
-            calc_f1, calc_conf, calc_var = threshold_calculator.calculate_thresholds(
-                estimated_positive_pct, training_set_size
+            self.f1_threshold, self.confidence_threshold, self.variance_threshold = (
+                threshold_calculator.calculate_thresholds(estimated_positive_pct, training_set_size)
             )
 
-            self.f1_threshold = f1_threshold if f1_threshold is not None else calc_f1
-            self.confidence_threshold = (
-                confidence_threshold if confidence_threshold is not None else calc_conf
+            # Print analysis for auto-calculated thresholds
+            threshold_calculator.print_analysis(
+                estimated_positive_pct,
+                self.f1_threshold,
+                self.confidence_threshold,
+                self.variance_threshold,
+                training_set_size,
             )
-            self.variance_threshold = (
-                variance_threshold if variance_threshold is not None else calc_var
-            )
-
-            # Print analysis if fully auto
-            if auto_thresholds:
-                threshold_calculator.print_analysis(
-                    estimated_positive_pct,
-                    self.f1_threshold,
-                    self.confidence_threshold,
-                    self.variance_threshold,
-                    training_set_size,
-                )
+        elif num_provided == 3:
+            # Use all provided thresholds
+            self.f1_threshold = f1_threshold
+            self.confidence_threshold = confidence_threshold
+            self.variance_threshold = variance_threshold
         else:
-            # Use provided thresholds or defaults
-            self.f1_threshold = f1_threshold if f1_threshold is not None else 0.2
-            self.confidence_threshold = (
-                confidence_threshold if confidence_threshold is not None else 0.9
-            )
-            self.variance_threshold = variance_threshold if variance_threshold is not None else 0.12
+            # Use hard-coded defaults (no manual thresholds provided)
+            self.f1_threshold = 0.2
+            self.confidence_threshold = 0.9
+            self.variance_threshold = 0.12
 
         # Delegate to existing strategies
         self.confidence_strategy = ConfidenceStrategy()
@@ -291,6 +300,9 @@ class BasicTransitionStrategy(CandidateSelectionStrategy):
         )
 
     def get_name(self) -> str:
+        return "Basic Transition"
+
+    def get_active_strategy_name(self) -> str:
         return f"Basic Transition ({self.current_strategy_name.title()}-Based)"
 
 

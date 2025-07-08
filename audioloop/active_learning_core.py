@@ -358,7 +358,7 @@ def run_active_learning_cycle(
 
     strategy = create_strategy(selection_mode, **strategy_kwargs)
 
-    print(f"Using strategy: {strategy.get_name()}")
+    print(f"Using strategy: {strategy.get_active_strategy_name()}")
     predictions = load_predictions(predictions_file)
     candidates = strategy.select_candidates(
         predictions=predictions,
@@ -372,7 +372,7 @@ def run_active_learning_cycle(
     print_selection_statistics(
         all_predictions=predictions,
         selected_candidates=candidates,
-        strategy_name=strategy.get_name(),
+        strategy_name=strategy.get_active_strategy_name(),
         positive_class_name=positive_class_name,
         negative_class_name=negative_class_name,
         min_confidence=min_confidence,
