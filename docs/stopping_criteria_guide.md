@@ -76,11 +76,11 @@ for epoch in range(1000):
 
 ## Integration with AudioLoop
 
-The stopping criteria integrate with AudioLoop's training system through the `simple_train.py` module:
+The stopping criteria integrate with AudioLoop's training system through the `train.py` module:
 
 ```python
 from audioloop.utils.stopping_criteria import PlateauCriterion
-from audioloop.simple_train import run_training
+from audioloop.training_core import run_training
 
 # Use custom stopping criterion
 stopping_criterion = PlateauCriterion(patience=30, min_delta=0.01)

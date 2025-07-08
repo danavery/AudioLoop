@@ -30,7 +30,7 @@ from audioloop.label_audio import SimpleAudioLabeler
 from audioloop.merge_labels import merge_training_sets
 
 # Import the APIs from the existing modules
-from audioloop.simple_train import run_training
+from audioloop.training_core import run_training
 
 
 def auto_label_candidates(candidates_file, dataset_name="urbansound8k", audio_dir=None):

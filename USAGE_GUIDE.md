@@ -104,10 +104,10 @@ python -m audioloop.utils.start_labeling --class-name siren --metadata-csv /path
 ### Training Models
 ```bash
 # Train model (version auto-detected from filename)
-python -m audioloop.simple_train training_sets/training_set_v1.csv
+python -m audioloop.train training_sets/training_set_v1.csv
 
 # Train with explicit version and parameters
-python -m audioloop.simple_train training_sets/training_set_v1.csv -v 1 --epochs 500 --batch-size 64
+python -m audioloop.train training_sets/training_set_v1.csv -v 1 --epochs 500 --batch-size 64
 ```
 
 ### Active Learning Workflow
@@ -202,19 +202,19 @@ export AUDIOLOOP_DATASET=urbansound8k  # or fsd50k
 python -m audioloop.utils.start_labeling --class-name siren --n 40 --output training_sets/training_set_v1.csv
 
 # Cycle 1: Initial training
-python -m audioloop.simple_train training_sets/training_set_v1.csv
+python -m audioloop.train training_sets/training_set_v1.csv
 python -m audioloop.active_learning --class-name siren --model outputs/model_v1.pt
 python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --audio-dir data/urbansound8k
 python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv
 
 # Cycle 2: Improved model
-python -m audioloop.simple_train training_sets/training_set_v2.csv
+python -m audioloop.train training_sets/training_set_v2.csv
 python -m audioloop.active_learning --class-name siren --model outputs/model_v2.pt
 python -m audioloop.label_audio outputs/labeling_candidates_v2.csv --audio-dir data/urbansound8k
 python -m audioloop.merge_labels training_sets/training_set_v2.csv outputs/labeling_candidates_v2.csv
 
 # Cycle 3: Final iteration
-python -m audioloop.simple_train training_sets/training_set_v3.csv
+python -m audioloop.train training_sets/training_set_v3.csv
 python -m audioloop.active_learning --class-name siren --model outputs/model_v3.pt
 ```
 
@@ -224,7 +224,7 @@ python -m audioloop.active_learning --class-name siren --model outputs/model_v3.
 python -m audioloop.utils.start_labeling --class-name gun_shot --n 50 --positive-pct 0.7
 
 # Train initial model
-python -m audioloop.simple_train training_sets/training_set_v1.csv
+python -m audioloop.train training_sets/training_set_v1.csv
 
 # Begin active learning
 python -m audioloop.active_learning --class-name gun_shot --model outputs/model_v1.pt
@@ -246,8 +246,8 @@ python -m audioloop.utils.start_labeling --class-name Siren --n 60
 python -m audioloop.create_all_specs
 
 # Compare performance across datasets
-python -m audioloop.simple_train training_sets/training_set_v1.csv  # UrbanSound8K
-python -m audioloop.simple_train training_sets/training_set_v2.csv  # FSD50K
+python -m audioloop.train training_sets/training_set_v1.csv  # UrbanSound8K
+python -m audioloop.train training_sets/training_set_v2.csv  # FSD50K
 ```
 
 ### Automated Workflow
@@ -288,7 +288,7 @@ predictions_file, candidates_file = run_active_learning_for_class(
 
 ### Training Models
 ```python
-from audioloop.simple_train import run_training
+from audioloop.training_core import run_training
 
 accuracy = run_training(
     labels_file='training_sets/training_set_v1.csv',
@@ -450,7 +450,7 @@ python -m audioloop.utils.start_labeling --list-classes  # See available classes
 python -m audioloop.utils.start_labeling --class-name rare_class --n 10  # Reduce sample count
 
 # Model not found
-python -m audioloop.simple_train training_sets/training_set_v1.csv  # Train first
+python -m audioloop.train training_sets/training_set_v1.csv  # Train first
 
 # Audio won't play
 python -m audioloop.label_audio file.csv --audio-dir /full/path/to/audio

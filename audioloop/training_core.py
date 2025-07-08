@@ -1,7 +1,5 @@
-import argparse
 import os
 import random
-import re
 import time
 
 import torch
@@ -12,10 +10,11 @@ from torch.utils.data import DataLoader
 from .models.cnn_5layer import SoundCNN
 from .utils.data_utils import get_device, simple_collate_fn
 from .utils.spectrogram_dataset import SpectrogramDataset
-from .utils.stopping_criteria import AccuracyCriterion, PlateauCriterion
+from .utils.stopping_criteria import PlateauCriterion
 
 
 def set_seed(seed):
+    """Set random seed for reproducible training."""
     random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
@@ -25,6 +24,7 @@ def set_seed(seed):
 
 
 def train_epoch(model, train_loader, optimizer, criterion, device):
+    """Train model for one epoch."""
     model.train()
     running_loss = 0.0
     correct = 0
@@ -70,6 +70,24 @@ def run_training(
     use_batchnorm=None,
     stopping_criterion=None,
 ):
+    """
+    Run training for a binary audio classification model.
+
+    Args:
+        labels_file: Path to CSV file with training labels
+        max_epochs: Maximum number of training epochs
+        seed: Random seed for reproducibility
+        batch_size: Training batch size
+        learning_rate: Learning rate for optimizer
+        specs_dir: Directory containing spectrogram files
+        model_path: Path to save trained model (auto-generated if None)
+        version: Model version number (for auto-generated paths)
+        use_batchnorm: Whether to use BatchNorm (auto-decided if None)
+        stopping_criterion: Training stopping criterion (PlateauCriterion if None)
+
+    Returns:
+        Final training accuracy
+    """
     device = get_device()
     print(f"Using device: {device}")
 
@@ -94,7 +112,7 @@ def run_training(
         batch_size=batch_size,
         shuffle=True,
         num_workers=2,
-        persistent_workers=True,  # Keep workers alive between epochs  # Set to 0 to avoid hanging with persistent workers
+        persistent_workers=True,  # Keep workers alive between epochs
         pin_memory=torch.cuda.is_available(),
         collate_fn=simple_collate_fn,
     )
@@ -153,8 +171,16 @@ def run_training(
                 f"Loss: {avg_loss:.4f} - Accuracy: {accuracy:.4f} ({accuracy * 100:.2f}%)"
             )
 
-        # Check stopping criterion
-        if stopping_criterion.should_stop(epoch, accuracy, avg_loss):
+        # Check stopping criterion (this updates internal state)
+        should_stop = stopping_criterion.should_stop(epoch, accuracy, avg_loss)
+
+        # Update best model state if criterion indicates we should
+        if stopping_criterion.should_update_best_model():
+            stopping_criterion.update_best_model(model.state_dict().copy())
+            print(f"    💾 Best model updated (epoch {epoch + 1})")
+
+        # Stop if criterion says to stop
+        if should_stop:
             print()
             print("=" * 60)
             print(f"🛑 Stopping criterion met ({stopping_criterion.__class__.__name__})")
@@ -165,12 +191,20 @@ def run_training(
     else:
         print(f"\nTraining completed {max_epochs} epochs. Final accuracy: {accuracy:.4f}")
 
-    # Always save the final model regardless of how training ended
+    # Save the best model state if available, otherwise save final model
+    # This ensures that when early stopping triggers (e.g., patience exhausted),
+    # we save the model from the epoch with the best performance, not the final epoch
     os.makedirs("outputs", exist_ok=True)
     if model_path is None:
         model_path = f"outputs/model_v{version}.pt"
-    torch.save(model.state_dict(), model_path)
-    print(f"Model saved to: {model_path}")
+
+    best_model_state = stopping_criterion.get_best_model_state()
+    if best_model_state is not None:
+        torch.save(best_model_state, model_path)
+        print(f"✅ Best model saved to: {model_path}")
+    else:
+        torch.save(model.state_dict(), model_path)
+        print(f"📁 Final model saved to: {model_path}")
 
     # Clean up and return
     del train_loader
@@ -178,91 +212,3 @@ def run_training(
     torch.cuda.empty_cache() if torch.cuda.is_available() else None
 
     return accuracy
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train a binary audio classification model")
-    parser.add_argument("labels_file", help="Path to CSV file with training labels")
-    parser.add_argument(
-        "-o", "--output", help="Path to save trained model (default: auto-generated in outputs/)"
-    )
-    parser.add_argument(
-        "-v",
-        "--version",
-        type=int,
-        help="Model version number (default: auto-detected from training set filename)",
-    )
-    parser.add_argument(
-        "-e", "--epochs", type=int, default=1000, help="Maximum training epochs (default: 1000)"
-    )
-    parser.add_argument("-s", "--seed", type=int, default=42, help="Random seed (default: 42)")
-    parser.add_argument("-b", "--batch-size", type=int, default=32, help="Batch size (default: 32)")
-    parser.add_argument(
-        "-lr", "--learning-rate", type=float, default=0.001, help="Learning rate (default: 0.001)"
-    )
-    parser.add_argument(
-        "--specs-dir",
-        default="data/all_specs",
-        help="Directory containing spectrogram files (default: data/all_specs)",
-    )
-    parser.add_argument(
-        "--no-batchnorm",
-        action="store_true",
-        help="Disable BatchNorm (auto-disabled for <100 samples)",
-    )
-    parser.add_argument(
-        "--stopping-criterion",
-        choices=["accuracy", "plateau"],
-        default="plateau",
-        help="Stopping criterion to use (default: plateau)",
-    )
-    parser.add_argument(
-        "--patience",
-        type=int,
-        default=20,
-        help="Patience for plateau stopping criterion (default: 20)",
-    )
-    parser.add_argument(
-        "--min-delta",
-        type=float,
-        default=0.01,
-        help="Minimum delta for plateau stopping criterion (default: 0.01)",
-    )
-
-    args = parser.parse_args()
-
-    # Auto-detect version from training set filename if not specified
-    if args.version is None:
-        # Try to extract version from filename like training_set_v2.csv
-        match = re.search(r"_v(\d+)\.csv$", args.labels_file)
-        if match:
-            args.version = int(match.group(1))
-            print(f"Auto-detected version {args.version} from training set filename")
-        else:
-            args.version = 1
-            print("Could not detect version from filename, defaulting to version 1")
-
-    # Create stopping criterion based on CLI arguments
-    if args.stopping_criterion == "accuracy":
-        stopping_criterion = AccuracyCriterion(max_epochs=args.epochs)
-    elif args.stopping_criterion == "plateau":
-        stopping_criterion = PlateauCriterion(
-            patience=args.patience, min_delta=args.min_delta, max_epochs=args.epochs
-        )
-    else:
-        stopping_criterion = PlateauCriterion(max_epochs=args.epochs)
-
-    # Run training with CLI arguments
-    accuracy = run_training(
-        labels_file=args.labels_file,
-        max_epochs=args.epochs,
-        seed=args.seed,
-        batch_size=args.batch_size,
-        learning_rate=args.learning_rate,
-        specs_dir=args.specs_dir,
-        model_path=args.output,
-        version=args.version,
-        use_batchnorm=False if args.no_batchnorm else None,
-        stopping_criterion=stopping_criterion,
-    )
-    print(f"\nFinal training accuracy: {accuracy:.4f}")

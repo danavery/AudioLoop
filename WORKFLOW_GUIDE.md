@@ -67,7 +67,7 @@ AudioLoop uses consistent versioning across all artifacts:
 ```bash
 # === CYCLE 1: Initial Training ===
 # 1. Train initial model (auto-detects v1 from filename)
-python -m audioloop.simple_train training_sets/training_set_v1.csv
+python -m audioloop.train training_sets/training_set_v1.csv
 # → Creates: outputs/model_v1.pt
 
 # 2. Run active learning (creates complete inference record and candidates)
@@ -83,7 +83,7 @@ python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/label
 
 # === CYCLE 2: Improved Model ===
 # 5. Train improved model
-python -m audioloop.simple_train training_sets/training_set_v2.csv
+python -m audioloop.train training_sets/training_set_v2.csv
 # → Creates: outputs/model_v2.pt
 
 # 6. Run active learning cycle 2
@@ -99,7 +99,7 @@ python -m audioloop.merge_labels training_sets/training_set_v2.csv outputs/label
 
 # === CYCLE 3: Final Iteration ===
 # 9. Train final model
-python -m audioloop.simple_train training_sets/training_set_v3.csv
+python -m audioloop.train training_sets/training_set_v3.csv
 # → Creates: outputs/model_v3.pt
 
 # 10. Final active learning cycle
@@ -114,14 +114,14 @@ AudioLoop automatically detects versions from filenames:
 ### Training Models
 ```bash
 # Version auto-detected from training_set_v{N}.csv
-python -m audioloop.simple_train training_sets/training_set_v1.csv
+python -m audioloop.train training_sets/training_set_v1.csv
 # → Creates: outputs/model_v1.pt
 
-python -m audioloop.simple_train training_sets/training_set_v2.csv  
+python -m audioloop.train training_sets/training_set_v2.csv  
 # → Creates: outputs/model_v2.pt
 
 # Override auto-detection
-python -m audioloop.simple_train training_sets/training_set_v1.csv -v 5
+python -m audioloop.train training_sets/training_set_v1.csv -v 5
 # → Creates: outputs/model_v5.pt
 ```
 
@@ -195,8 +195,8 @@ training_set_v3.csv → model_v3.pt → predictions_v3.csv → training_set_v4.c
 ### Pattern 2: Branching for Experiments
 ```bash
 # Create experimental branches
-python -m audioloop.simple_train training_sets/training_set_v2.csv -v 2a
-python -m audioloop.simple_train training_sets/training_set_v2.csv -v 2b --epochs 1000
+python -m audioloop.train training_sets/training_set_v2.csv -v 2a
+python -m audioloop.train training_sets/training_set_v2.csv -v 2b --epochs 1000
 
 # Compare results
 python -m audioloop.active_learning --model outputs/model_v2a.pt --run-number 2a
@@ -222,7 +222,7 @@ python -m audioloop.active_learning --class-name siren --run-number 1
 | File Type | Pattern | Auto-Generated | Example |
 |-----------|---------|----------------|---------|
 | Training Set | `training_sets/training_set_v{N}.csv` | By merge_labels | `training_sets/training_set_v1.csv` |
-| Model | `outputs/model_v{N}.pt` | By simple_train | `outputs/model_v1.pt` |
+| Model | `outputs/model_v{N}.pt` | By train | `outputs/model_v1.pt` |
 | Predictions | `outputs/predictions_v{N}.csv` | By active_learning | `outputs/predictions_v1.csv` |
 | Candidates | `outputs/labeling_candidates_v{N}.csv` | By active_learning | `outputs/labeling_candidates_v1.csv` |
 | Binary Labels | `outputs/binary_labels_v{N}.csv` | By active_learning | `outputs/binary_labels_v1.csv` |
@@ -264,11 +264,11 @@ print(f'V2 accuracy: {v2.correct.mean():.3f}')
 ### Custom Training Parameters
 ```bash
 # Version with specific hyperparameters
-python -m audioloop.simple_train training_sets/training_set_v1.csv \
+python -m audioloop.train training_sets/training_set_v1.csv \
     -v 1_lr001 --learning-rate 0.001 --epochs 500
 # → Creates: outputs/model_v1_lr001.pt
 
-python -m audioloop.simple_train training_sets/training_set_v1.csv \
+python -m audioloop.train training_sets/training_set_v1.csv \
     -v 1_lr0001 --learning-rate 0.0001 --epochs 1000
 # → Creates: outputs/model_v1_lr0001.pt
 ```
@@ -308,7 +308,7 @@ mv outputs/labeling_candidates_v1.csv outputs/dog_bark/
 ```bash
 # Error: Model outputs/model_v2.pt not found
 # Solution: Train the model first
-python -m audioloop.simple_train training_sets/training_set_v2.csv
+python -m audioloop.train training_sets/training_set_v2.csv
 
 # Error: No training_set_v3.csv after merge
 # Solution: Check that merge completed successfully

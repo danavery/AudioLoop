@@ -140,7 +140,7 @@ if __name__ == "__main__":
     print("   → Creates training_sets/training_set_v2.csv with combined data")
     print()
     print("4. Train model and run next cycle:")
-    print("   python -m audioloop.simple_train training_sets/training_set_v2.csv -v 2")
+    print("   python -m audioloop.train training_sets/training_set_v2.csv -v 2")
     print("   python -m audioloop.active_learning --class-name siren --run-number 2")
     print()
 

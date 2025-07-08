@@ -130,7 +130,7 @@ def integration_example(class_name):
 
     if processed_count > 0:
         print("\n3. Next steps for full AudioLoop workflow:")
-        print(f"   • Train model: python -m audioloop.simple_train {labels_csv}")
+        print(f"   • Train model: python -m audioloop.train {labels_csv}")
         print(
             f"   • Run active learning: python -m audioloop.active_learning --model outputs/model_v1.pt --class-name {class_name}"
         )

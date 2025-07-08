@@ -31,7 +31,7 @@ uv sync
 python -m audioloop.create_all_specs
 
 # Train initial model
-python -m audioloop.simple_train training_sets/training_set_v1.csv
+python -m audioloop.train training_sets/training_set_v1.csv
 
 # Run active learning cycle (with auto-calculated thresholds for imbalanced datasets)
 python -m audioloop.active_learning --class-name siren --run-number 1 --selection-mode basic_transition --auto-thresholds
@@ -61,7 +61,8 @@ audioloop/
 ├── audioloop/                    # Main package
 │   ├── active_learning.py        # CLI interface for active learning
 │   ├── active_learning_core.py   # Core active learning pipeline
-│   ├── simple_train.py          # Model training with versioning
+│   ├── train.py                 # CLI interface for model training
+│   ├── training_core.py         # Core training logic with versioning
 │   ├── label_audio.py           # Terminal-based audio labeling
 │   ├── merge_labels.py          # Label management utilities
 │   ├── create_all_specs.py      # Audio preprocessing

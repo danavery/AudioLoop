@@ -155,7 +155,7 @@ def run_complete_workflow(
             if not os.path.exists(next_model):
                 print(f"   ⚠️ Model {next_model} not found")
                 print(
-                    f"   💡 Train it with: python -m audioloop.simple_train {new_training_set} -v {cycle + 1}"
+                    f"   💡 Train it with: python -m audioloop.train {new_training_set} -v {cycle + 1}"
                 )
                 if not simulate_human:
                     input("   Press Enter when model training is complete...")
@@ -221,7 +221,7 @@ Examples:
     if not os.path.exists(args.model):
         print(f"❌ Model not found: {args.model}")
         print("💡 Train an initial model first:")
-        print("   python -m audioloop.simple_train training_sets/training_set_v1.csv -v 1")
+        print("   python -m audioloop.train training_sets/training_set_v1.csv -v 1")
         return 1
 
     # Run the workflow

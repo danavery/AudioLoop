@@ -115,8 +115,8 @@ python fsd50k_example.py --class Guitar --output outputs/fsd50k_guitar.csv
 # 2. Generate spectrograms for FSD50K
 python -m audioloop.create_all_specs --dataset fsd50k
 
-# 3. Train model (modify simple_train.py to use FSD50K processor)
-python -m audioloop.simple_train outputs/fsd50k_guitar.csv
+# 3. Train model (modify train.py to use FSD50K processor)
+python -m audioloop.train outputs/fsd50k_guitar.csv
 
 # 4. Run active learning (modify to use FSD50K processor)
 python -m audioloop.active_learning --model outputs/model_v1.pt --class-name Guitar
@@ -163,7 +163,7 @@ Fields:
 To fully integrate FSD50K with existing AudioLoop workflow:
 
 ### 1. Modify Training Scripts
-Update `simple_train.py` to accept dataset type parameter:
+Update `train.py` to accept dataset type parameter:
 ```python
 # Add dataset parameter
 parser.add_argument('--dataset', choices=['urbansound8k', 'fsd50k'], default='urbansound8k')
