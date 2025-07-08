@@ -1,0 +1,928 @@
+"""
+Tests for training stopping criteria.
+
+This module tests the pluggable stopping criteria architecture for AudioLoop models.
+"""
+
+import pytest
+
+from audioloop.utils.stopping_criteria import (
+    AccuracyCriterion,
+    PlateauCriterion,
+    TrainingStoppingCriterion,
+)
+
+# Test constants
+DEFAULT_MAX_EPOCHS = 1000
+DEFAULT_PATIENCE = 50
+DEFAULT_MIN_DELTA = 0.01
+PERFECT_ACCURACY = 1.0
+
+# Common test values
+TYPICAL_ACCURACY = 0.8
+TYPICAL_LOSS = 0.3
+HIGH_ACCURACY = 0.95
+LOW_ACCURACY = 0.5
+HIGH_LOSS = 0.8
+LOW_LOSS = 0.1
+
+
+@pytest.fixture
+def training_sequence():
+    """Realistic training sequence with plateauing loss."""
+    return [
+        (0, 0.5, 0.8),  # Initial
+        (1, 0.6, 0.7),  # Good improvement
+        (2, 0.65, 0.68),  # Small improvement (less than min_delta)
+        (3, 0.7, 0.69),  # No improvement (worse)
+        (4, 0.72, 0.685),  # Tiny improvement (less than min_delta)
+        (5, 0.75, 0.69),  # No improvement
+    ]
+
+
+def assert_stops_at_perfect_accuracy(criterion):
+    """Helper to verify criterion stops at 100% accuracy."""
+    test_cases = [
+        (0, PERFECT_ACCURACY, 0.1),
+        (50, PERFECT_ACCURACY, 0.05),
+        (999, PERFECT_ACCURACY, 0.0),
+    ]
+
+    for epoch, accuracy, loss in test_cases:
+        assert criterion.should_stop(epoch=epoch, train_accuracy=accuracy, train_loss=loss)
+
+
+def assert_ignores_validation_metrics(criterion, epoch=50):
+    """Helper to verify criterion ignores validation metrics."""
+    result_without_val = criterion.should_stop(
+        epoch=epoch, train_accuracy=TYPICAL_ACCURACY, train_loss=TYPICAL_LOSS
+    )
+    result_with_val = criterion.should_stop(
+        epoch=epoch,
+        train_accuracy=TYPICAL_ACCURACY,
+        train_loss=TYPICAL_LOSS,
+        val_accuracy=0.6,
+        val_loss=0.5,
+    )
+    assert result_without_val == result_with_val
+
+
+class TestTrainingStoppingCriterion:
+    """Test the abstract base class."""
+
+    def test_cannot_instantiate_abstract_class(self):
+        """Test that TrainingStoppingCriterion cannot be instantiated directly."""
+        with pytest.raises(TypeError):
+            TrainingStoppingCriterion()  # type: ignore[abstract]
+
+    def test_reset_has_default_implementation(self):
+        """Test that reset() has a default no-op implementation."""
+
+        class ConcreteTestCriterion(TrainingStoppingCriterion):
+            def should_stop(
+                self, epoch, train_accuracy, train_loss, val_accuracy=None, val_loss=None
+            ):
+                return False
+
+            def should_update_best_model(self):
+                return False
+
+            def update_best_model(self, model_state):
+                pass
+
+            def get_best_model_state(self):
+                return None
+
+        criterion = ConcreteTestCriterion()
+        criterion.reset()  # Should not raise
+
+
+class TestAccuracyCriterionBestModelSaving:
+    """Test best model saving behavior for AccuracyCriterion."""
+
+    def test_saves_best_model_at_perfect_accuracy(self):
+        """Test that AccuracyCriterion saves model when hitting 100% accuracy."""
+        criterion = AccuracyCriterion(max_epochs=100)
+        criterion.reset()
+
+        # Should not update best model for regular accuracy
+        should_stop = criterion.should_stop(0, 0.8, 0.5)
+        assert not should_stop
+        assert not criterion.should_update_best_model()
+
+        # Should update best model when hitting 100% accuracy
+        should_stop = criterion.should_stop(1, 1.0, 0.1)
+        assert should_stop
+        assert criterion.should_update_best_model()
+
+        # Simulate saving the model
+        model_state = {"dummy": "state"}
+        criterion.update_best_model(model_state)
+
+        # Should be able to retrieve the best model
+        best_state = criterion.get_best_model_state()
+        assert best_state == model_state
+
+    def test_no_best_model_without_perfect_accuracy(self):
+        """Test that no best model is saved if perfect accuracy is never reached."""
+        criterion = AccuracyCriterion(max_epochs=3)
+        criterion.reset()
+
+        # Run through epochs without hitting 100% accuracy
+        for epoch in range(3):
+            should_stop = criterion.should_stop(epoch, 0.8, 0.3)
+            if not should_stop:
+                assert not criterion.should_update_best_model()
+
+        # Should have no best model state
+        best_state = criterion.get_best_model_state()
+        assert best_state is None
+
+    def test_best_model_state_preserved_after_reset(self):
+        """Test that reset() clears the best model state."""
+        criterion = AccuracyCriterion(max_epochs=100)
+        criterion.reset()
+
+        # Save a model at perfect accuracy
+        criterion.should_stop(0, 1.0, 0.1)
+        criterion.update_best_model({"saved": "state"})
+        assert criterion.get_best_model_state() is not None
+
+        # Reset should clear the best model
+        criterion.reset()
+        assert criterion.get_best_model_state() is None
+
+    def test_should_update_best_model_resets_after_update(self):
+        """Test that should_update_best_model flag is reset after update."""
+        criterion = AccuracyCriterion(max_epochs=100)
+        criterion.reset()
+
+        # Hit perfect accuracy
+        criterion.should_stop(0, 1.0, 0.1)
+        assert criterion.should_update_best_model()
+
+        # Update the model
+        criterion.update_best_model({"state": "data"})
+
+        # Flag should be reset after update
+        assert not criterion.should_update_best_model()
+
+
+class TestAccuracyCriterion:
+    """Test the AccuracyCriterion stopping strategy."""
+
+    def test_has_correct_defaults(self):
+        """Test that AccuracyCriterion has correct default parameters."""
+        criterion = AccuracyCriterion()
+        assert criterion.max_epochs == DEFAULT_MAX_EPOCHS
+
+    def test_accepts_custom_max_epochs(self):
+        """Test that AccuracyCriterion accepts custom max_epochs."""
+        custom_epochs = 500
+        criterion = AccuracyCriterion(max_epochs=custom_epochs)
+        assert criterion.max_epochs == custom_epochs
+
+    def test_stops_at_perfect_accuracy(self):
+        """Test that AccuracyCriterion stops when training accuracy reaches 100%."""
+        criterion = AccuracyCriterion(max_epochs=100)
+        assert_stops_at_perfect_accuracy(criterion)
+
+    def test_stops_at_max_epochs(self):
+        """Test that AccuracyCriterion stops when max_epochs is reached."""
+        criterion = AccuracyCriterion(max_epochs=100)
+        # Should stop at max_epochs - 1 (0-based indexing)
+        assert criterion.should_stop(
+            epoch=99, train_accuracy=HIGH_ACCURACY, train_loss=TYPICAL_LOSS
+        )
+        assert criterion.should_stop(
+            epoch=100, train_accuracy=HIGH_ACCURACY, train_loss=TYPICAL_LOSS
+        )
+
+    def test_does_not_stop_early(self):
+        """Test that AccuracyCriterion does not stop before conditions are met."""
+        criterion = AccuracyCriterion(max_epochs=100)
+        early_stop_cases = [
+            (0, LOW_ACCURACY, HIGH_LOSS),
+            (50, TYPICAL_ACCURACY, TYPICAL_LOSS),
+            (98, 0.99, LOW_LOSS),
+        ]
+
+        for epoch, accuracy, loss in early_stop_cases:
+            assert not criterion.should_stop(epoch=epoch, train_accuracy=accuracy, train_loss=loss)
+
+    def test_ignores_validation_metrics(self):
+        """Test that AccuracyCriterion ignores validation metrics."""
+        criterion = AccuracyCriterion(max_epochs=100)
+        assert_ignores_validation_metrics(criterion)
+
+    def test_reset_is_no_op(self):
+        """Test that AccuracyCriterion reset() is a no-op."""
+        criterion = AccuracyCriterion(max_epochs=100)
+        result_before = criterion.should_stop(
+            epoch=50, train_accuracy=TYPICAL_ACCURACY, train_loss=TYPICAL_LOSS
+        )
+        criterion.reset()
+        result_after = criterion.should_stop(
+            epoch=50, train_accuracy=TYPICAL_ACCURACY, train_loss=TYPICAL_LOSS
+        )
+        assert result_before == result_after
+
+    def test_edge_cases(self):
+        """Test AccuracyCriterion edge cases."""
+        # Should stop immediately when max_epochs is 1
+        minimal_criterion = AccuracyCriterion(max_epochs=1)
+        assert minimal_criterion.should_stop(
+            epoch=0, train_accuracy=LOW_ACCURACY, train_loss=HIGH_LOSS
+        )
+
+        # Should not stop at 99.999% accuracy (not quite 100%)
+        almost_perfect_accuracy = 0.99999
+        criterion = AccuracyCriterion(max_epochs=100)
+        assert not criterion.should_stop(
+            epoch=50, train_accuracy=almost_perfect_accuracy, train_loss=LOW_LOSS
+        )
+
+
+class TestPlateauCriterion:
+    """Test the PlateauCriterion stopping strategy."""
+
+    def test_has_correct_defaults(self):
+        """Test that PlateauCriterion has reasonable default parameters."""
+        criterion = PlateauCriterion()
+        assert criterion.patience == DEFAULT_PATIENCE
+        assert criterion.min_delta == DEFAULT_MIN_DELTA
+        assert criterion.max_epochs == DEFAULT_MAX_EPOCHS
+        assert criterion.best_train_loss == float("inf")
+        assert criterion.epochs_without_improvement == 0
+
+    def test_accepts_custom_parameters(self):
+        """Test that PlateauCriterion accepts custom parameters."""
+        custom_patience = 20
+        custom_min_delta = 0.001
+        custom_max_epochs = 500
+
+        criterion = PlateauCriterion(
+            patience=custom_patience, min_delta=custom_min_delta, max_epochs=custom_max_epochs
+        )
+
+        assert criterion.patience == custom_patience
+        assert criterion.min_delta == custom_min_delta
+        assert criterion.max_epochs == custom_max_epochs
+
+    def test_stops_at_perfect_accuracy(self):
+        """Test that PlateauCriterion stops immediately at 100% accuracy."""
+        criterion = PlateauCriterion(patience=3, min_delta=0.01, max_epochs=100)
+        assert_stops_at_perfect_accuracy(criterion)
+
+    def test_stops_at_max_epochs(self):
+        """Test that PlateauCriterion stops when max_epochs is reached."""
+        criterion = PlateauCriterion(patience=10, max_epochs=100)
+
+        # Should stop at max_epochs - 1 (0-based indexing)
+        assert criterion.should_stop(
+            epoch=99, train_accuracy=TYPICAL_ACCURACY, train_loss=TYPICAL_LOSS
+        )
+        assert criterion.should_stop(
+            epoch=100, train_accuracy=TYPICAL_ACCURACY, train_loss=TYPICAL_LOSS
+        )
+
+    def test_tracks_best_loss(self):
+        """Test that PlateauCriterion tracks the best training loss."""
+        criterion = PlateauCriterion(patience=3, min_delta=0.01, max_epochs=100)
+        # First epoch should set best loss
+        assert not criterion.should_stop(epoch=0, train_accuracy=LOW_ACCURACY, train_loss=HIGH_LOSS)
+        assert criterion.best_train_loss == HIGH_LOSS
+        assert criterion.epochs_without_improvement == 0
+
+        # Improvement should reset counter
+        improved_loss = 0.7
+        assert not criterion.should_stop(epoch=1, train_accuracy=0.6, train_loss=improved_loss)
+        assert criterion.best_train_loss == improved_loss
+        assert criterion.epochs_without_improvement == 0
+
+    def test_counts_epochs_without_improvement(self):
+        """Test that PlateauCriterion counts epochs without improvement."""
+        criterion = PlateauCriterion(patience=3, min_delta=0.01, max_epochs=100)
+        # Set initial best loss
+        criterion.should_stop(epoch=0, train_accuracy=LOW_ACCURACY, train_loss=HIGH_LOSS)
+
+        # No improvement should increment counter
+        worse_loss = 0.81
+        assert not criterion.should_stop(epoch=1, train_accuracy=0.6, train_loss=worse_loss)
+        assert criterion.epochs_without_improvement == 1
+
+        even_worse_loss = 0.82
+        assert not criterion.should_stop(epoch=2, train_accuracy=0.65, train_loss=even_worse_loss)
+        assert criterion.epochs_without_improvement == 2
+
+    def test_stops_after_patience_exceeded(self):
+        """Test that PlateauCriterion stops after patience is exceeded."""
+        patience = 2
+        criterion = PlateauCriterion(patience=patience, min_delta=0.01, max_epochs=100)
+
+        # Set initial best loss
+        criterion.should_stop(epoch=0, train_accuracy=LOW_ACCURACY, train_loss=HIGH_LOSS)
+
+        # First epoch without improvement
+        assert not criterion.should_stop(epoch=1, train_accuracy=0.6, train_loss=0.81)
+
+        # Second epoch without improvement should trigger stop
+        assert criterion.should_stop(epoch=2, train_accuracy=0.65, train_loss=0.82)
+
+    def test_respects_min_delta_threshold(self):
+        """Test that PlateauCriterion respects min_delta threshold."""
+        min_delta = 0.05
+        criterion = PlateauCriterion(patience=3, min_delta=min_delta, max_epochs=100)
+
+        # Set initial best loss
+        initial_loss = HIGH_LOSS
+        criterion.should_stop(epoch=0, train_accuracy=LOW_ACCURACY, train_loss=initial_loss)
+
+        # Small improvement (less than min_delta) should not reset counter
+        small_improvement = initial_loss - 0.04  # Less than min_delta
+        assert not criterion.should_stop(epoch=1, train_accuracy=0.6, train_loss=small_improvement)
+        assert criterion.epochs_without_improvement == 1
+
+        # Large improvement (more than min_delta) should reset counter
+        large_improvement = initial_loss - 0.1  # More than min_delta
+        assert not criterion.should_stop(epoch=2, train_accuracy=0.7, train_loss=large_improvement)
+        assert criterion.epochs_without_improvement == 0
+        assert criterion.best_train_loss == large_improvement
+
+    def test_reset_restores_initial_state(self):
+        """Test that PlateauCriterion reset() properly resets internal state."""
+        criterion = PlateauCriterion(patience=2, min_delta=0.01, max_epochs=100)
+
+        # Change state
+        criterion.should_stop(epoch=0, train_accuracy=LOW_ACCURACY, train_loss=HIGH_LOSS)
+        criterion.should_stop(epoch=1, train_accuracy=0.6, train_loss=0.81)
+
+        # Verify state has changed
+        assert criterion.best_train_loss == HIGH_LOSS
+        assert criterion.epochs_without_improvement == 1
+
+        # Reset should restore initial state
+        criterion.reset()
+        assert criterion.best_train_loss == float("inf")
+        assert criterion.epochs_without_improvement == 0
+
+    def test_ignores_validation_metrics(self):
+        """Test that PlateauCriterion ignores validation metrics."""
+        criterion = PlateauCriterion(patience=3, min_delta=0.01, max_epochs=100)
+
+        result_without_val = criterion.should_stop(
+            epoch=0, train_accuracy=TYPICAL_ACCURACY, train_loss=TYPICAL_LOSS
+        )
+
+        criterion.reset()
+        result_with_val = criterion.should_stop(
+            epoch=0,
+            train_accuracy=TYPICAL_ACCURACY,
+            train_loss=TYPICAL_LOSS,
+            val_accuracy=0.6,
+            val_loss=0.5,
+        )
+        assert result_without_val == result_with_val
+
+    def test_complex_training_scenario(self, training_sequence):
+        """Test PlateauCriterion with a complex training scenario."""
+        criterion = PlateauCriterion(patience=3, min_delta=0.02, max_epochs=100)
+
+        results = []
+        for epoch, accuracy, loss in training_sequence:
+            should_stop = criterion.should_stop(
+                epoch=epoch, train_accuracy=accuracy, train_loss=loss
+            )
+            results.append(should_stop)
+
+        # Should stop after patience epochs without sufficient improvement
+        expected = [False, False, False, False, True, True]
+        assert results == expected
+
+    def test_edge_cases(self):
+        """Test PlateauCriterion edge cases."""
+        # Test with patience=0 (should stop immediately when no improvement)
+        zero_patience_criterion = PlateauCriterion(patience=0, min_delta=0.01, max_epochs=100)
+        assert zero_patience_criterion.should_stop(
+            epoch=0, train_accuracy=LOW_ACCURACY, train_loss=HIGH_LOSS
+        )
+
+        # Test with very small min_delta
+        tiny_delta_criterion = PlateauCriterion(patience=2, min_delta=0.0001, max_epochs=100)
+        tiny_delta_criterion.should_stop(epoch=0, train_accuracy=LOW_ACCURACY, train_loss=HIGH_LOSS)
+
+        # Improvement greater than min_delta should reset counter
+        small_improvement = HIGH_LOSS - 0.0002  # Greater than min_delta
+        assert not tiny_delta_criterion.should_stop(
+            epoch=1, train_accuracy=0.6, train_loss=small_improvement
+        )
+        assert tiny_delta_criterion.epochs_without_improvement == 0
+
+    def test_loss_equality_behavior(self):
+        """Test PlateauCriterion behavior when loss stays exactly the same."""
+        criterion = PlateauCriterion(patience=2, min_delta=0.01, max_epochs=100)
+
+        # Set initial loss
+        criterion.should_stop(epoch=0, train_accuracy=LOW_ACCURACY, train_loss=HIGH_LOSS)
+
+        # Exactly same loss should count as no improvement
+        assert not criterion.should_stop(epoch=1, train_accuracy=0.6, train_loss=HIGH_LOSS)
+        assert criterion.epochs_without_improvement == 1
+
+        # Still same loss should trigger stop after patience
+        assert criterion.should_stop(epoch=2, train_accuracy=0.65, train_loss=HIGH_LOSS)
+        assert criterion.epochs_without_improvement == 2
+
+    def test_increasing_loss_behavior(self):
+        """Test PlateauCriterion behavior when loss consistently increases."""
+        criterion = PlateauCriterion(patience=2, min_delta=0.01, max_epochs=100)
+
+        # Set initial loss
+        initial_loss = 0.5
+        criterion.should_stop(epoch=0, train_accuracy=LOW_ACCURACY, train_loss=initial_loss)
+
+        # Increasing loss should count as no improvement
+        assert not criterion.should_stop(epoch=1, train_accuracy=0.6, train_loss=0.6)
+        assert criterion.epochs_without_improvement == 1
+
+        assert criterion.should_stop(epoch=2, train_accuracy=0.65, train_loss=0.7)
+        assert criterion.epochs_without_improvement == 2
+
+
+class TestPlateauCriterionBestModelSaving:
+    """Test best model saving behavior for PlateauCriterion."""
+
+    def test_saves_best_model_on_loss_improvement(self):
+        """Test that PlateauCriterion saves model when loss improves."""
+        criterion = PlateauCriterion(patience=2, min_delta=0.01)
+        criterion.reset()
+
+        # First epoch - should save (first epoch is always best)
+        should_stop = criterion.should_stop(0, 0.8, 1.0)
+        assert not should_stop
+        assert criterion.should_update_best_model()
+
+        # Update model
+        model_state1 = {"epoch": 1, "loss": 1.0}
+        criterion.update_best_model(model_state1)
+        assert criterion.get_best_model_state() == model_state1
+
+        # Second epoch - better loss, should save
+        should_stop = criterion.should_stop(1, 0.85, 0.8)
+        assert not should_stop
+        assert criterion.should_update_best_model()
+
+        # Update model
+        model_state2 = {"epoch": 2, "loss": 0.8}
+        criterion.update_best_model(model_state2)
+        assert criterion.get_best_model_state() == model_state2
+
+        # Third epoch - worse loss, should not save
+        should_stop = criterion.should_stop(2, 0.9, 0.9)
+        assert not should_stop
+        assert not criterion.should_update_best_model()
+
+        # Best model should still be from epoch 2
+        assert criterion.get_best_model_state() == model_state2
+
+    def test_saves_best_model_at_perfect_accuracy(self):
+        """Test that PlateauCriterion saves model when hitting 100% accuracy."""
+        criterion = PlateauCriterion(patience=2, min_delta=0.01)
+        criterion.reset()
+
+        # Regular epoch
+        criterion.should_stop(0, 0.8, 1.0)
+        criterion.update_best_model({"epoch": 1})
+
+        # Hit perfect accuracy - should save and stop
+        should_stop = criterion.should_stop(1, 1.0, 0.5)
+        assert should_stop
+        assert criterion.should_update_best_model()
+
+        # Update model
+        perfect_model = {"epoch": 2, "accuracy": 1.0}
+        criterion.update_best_model(perfect_model)
+        assert criterion.get_best_model_state() == perfect_model
+
+    def test_respects_min_delta_for_best_model(self):
+        """Test that min_delta is respected for best model saving."""
+        criterion = PlateauCriterion(patience=3, min_delta=0.1)
+        criterion.reset()
+
+        # First epoch
+        criterion.should_stop(0, 0.8, 1.0)
+        criterion.update_best_model({"epoch": 1, "loss": 1.0})
+
+        # Small improvement (below min_delta) - should not save
+        should_stop = criterion.should_stop(1, 0.85, 0.95)
+        assert not should_stop
+        assert not criterion.should_update_best_model()
+
+        # Large improvement (above min_delta) - should save
+        should_stop = criterion.should_stop(2, 0.9, 0.8)
+        assert not should_stop
+        assert criterion.should_update_best_model()
+
+        # Update model
+        better_model = {"epoch": 3, "loss": 0.8}
+        criterion.update_best_model(better_model)
+        assert criterion.get_best_model_state() == better_model
+
+    def test_best_model_when_patience_exhausted(self):
+        """Test that best model is preserved when patience is exhausted."""
+        criterion = PlateauCriterion(patience=2, min_delta=0.01)
+        criterion.reset()
+
+        # Build up to patience exhaustion
+        losses = [1.0, 0.5, 0.6, 0.7, 0.8]  # Best at epoch 2
+        best_model = None
+
+        for epoch, loss in enumerate(losses):
+            should_stop = criterion.should_stop(epoch, 0.7, loss)
+
+            if criterion.should_update_best_model():
+                model_state = {"epoch": epoch + 1, "loss": loss}
+                criterion.update_best_model(model_state)
+                best_model = model_state
+
+            if should_stop:
+                break
+
+        # Should have stopped with best model from epoch 2
+        assert best_model is not None
+        assert best_model["epoch"] == 2
+        assert best_model["loss"] == 0.5
+        assert criterion.get_best_model_state() == best_model
+
+    def test_best_model_state_cleared_on_reset(self):
+        """Test that reset() clears the best model state."""
+        criterion = PlateauCriterion(patience=2, min_delta=0.01)
+        criterion.reset()
+
+        # Save a model
+        criterion.should_stop(0, 0.8, 1.0)
+        criterion.update_best_model({"saved": "state"})
+        assert criterion.get_best_model_state() is not None
+
+        # Reset should clear everything
+        criterion.reset()
+        assert criterion.get_best_model_state() is None
+        assert criterion.best_train_loss == float("inf")
+        assert criterion.epochs_without_improvement == 0
+
+    def test_should_update_best_model_flag_behavior(self):
+        """Test that should_update_best_model flag behaves correctly."""
+        criterion = PlateauCriterion(patience=2, min_delta=0.01)
+        criterion.reset()
+
+        # First epoch - should update
+        criterion.should_stop(0, 0.8, 1.0)
+        assert criterion.should_update_best_model()
+
+        # After update, flag should be reset
+        criterion.update_best_model({"state": "data"})
+        assert not criterion.should_update_best_model()
+
+        # Better loss - should update again
+        criterion.should_stop(1, 0.85, 0.8)
+        assert criterion.should_update_best_model()
+
+        # After update, flag should be reset again
+        criterion.update_best_model({"state": "data2"})
+        assert not criterion.should_update_best_model()
+
+        # Worse loss - should not update
+        criterion.should_stop(2, 0.9, 0.9)
+        assert not criterion.should_update_best_model()
+
+    def test_best_model_with_complex_loss_sequence(self):
+        """Test best model saving with complex loss progression."""
+        criterion = PlateauCriterion(patience=3, min_delta=0.05)
+        criterion.reset()
+
+        # Complex loss sequence with multiple improvements
+        loss_sequence = [
+            (0, 0.8, 1.0),  # First epoch - save
+            (1, 0.85, 0.8),  # Better - save
+            (2, 0.9, 0.7),  # Better - save
+            (3, 0.9, 0.75),  # Worse - don't save
+            (4, 0.9, 0.6),  # Better - save
+            (5, 0.9, 0.65),  # Worse - don't save
+            (6, 0.9, 0.70),  # Worse - don't save
+            (7, 0.9, 0.75),  # Worse - don't save (should stop)
+        ]
+
+        saved_models = []
+        for epoch, accuracy, loss in loss_sequence:
+            should_stop = criterion.should_stop(epoch, accuracy, loss)
+
+            if criterion.should_update_best_model():
+                model_state = {"epoch": epoch + 1, "loss": loss}
+                criterion.update_best_model(model_state)
+                saved_models.append(model_state)
+
+            if should_stop:
+                break
+
+        # Should have saved models from epochs 1, 2, 3, 5
+        assert len(saved_models) == 4
+        assert saved_models[0]["epoch"] == 1
+        assert saved_models[1]["epoch"] == 2
+        assert saved_models[2]["epoch"] == 3
+        assert saved_models[3]["epoch"] == 5
+
+        # Best model should be from epoch 5 (loss 0.6)
+        best_model = criterion.get_best_model_state()
+        assert best_model is not None
+        assert best_model["epoch"] == 5
+        assert best_model["loss"] == 0.6
+
+
+class TestBestModelSavingIntegration:
+    """Integration tests for best model saving across different criteria."""
+
+    def test_different_criteria_have_different_best_model_logic(self):
+        """Test that different criteria have different best model saving logic."""
+        accuracy_criterion = AccuracyCriterion(max_epochs=10)
+        plateau_criterion = PlateauCriterion(patience=2, min_delta=0.01)
+
+        # Reset both
+        accuracy_criterion.reset()
+        plateau_criterion.reset()
+
+        # Same epoch data, different behavior
+        epoch_data = (0, 0.8, 0.5)  # 80% accuracy, 0.5 loss
+
+        # AccuracyCriterion should not save (no perfect accuracy)
+        accuracy_criterion.should_stop(*epoch_data)
+        assert not accuracy_criterion.should_update_best_model()
+
+        # PlateauCriterion should save (first epoch is always best)
+        plateau_criterion.should_stop(*epoch_data)
+        assert plateau_criterion.should_update_best_model()
+
+        # Test perfect accuracy case
+        perfect_data = (1, 1.0, 0.3)  # 100% accuracy
+
+        # AccuracyCriterion should save (perfect accuracy)
+        accuracy_criterion.should_stop(*perfect_data)
+        assert accuracy_criterion.should_update_best_model()
+
+        # PlateauCriterion should also save (better loss)
+        plateau_criterion.should_stop(*perfect_data)
+        assert plateau_criterion.should_update_best_model()
+
+    def test_model_state_isolation(self):
+        """Test that different criteria maintain separate model states."""
+        criterion1 = PlateauCriterion(patience=2, min_delta=0.01)
+        criterion2 = PlateauCriterion(patience=3, min_delta=0.05)
+
+        criterion1.reset()
+        criterion2.reset()
+
+        # Save different models in each criterion
+        criterion1.should_stop(0, 0.5, 1.0)
+        criterion1.update_best_model({"criterion": 1, "data": "first"})
+
+        criterion2.should_stop(0, 0.6, 0.8)
+        criterion2.update_best_model({"criterion": 2, "data": "second"})
+
+        # Each should maintain its own state
+        assert criterion1.get_best_model_state() == {"criterion": 1, "data": "first"}
+        assert criterion2.get_best_model_state() == {"criterion": 2, "data": "second"}
+
+        # Resetting one should not affect the other
+        criterion1.reset()
+        assert criterion1.get_best_model_state() is None
+        assert criterion2.get_best_model_state() == {"criterion": 2, "data": "second"}
+
+
+class TestStoppingCriteriaIntegration:
+    """Integration tests for stopping criteria in realistic scenarios."""
+
+    def test_strategies_have_different_behavior(self, training_sequence):
+        """Test both criteria on the same training scenario to verify different behavior."""
+        accuracy_criterion = AccuracyCriterion(max_epochs=10)
+        plateau_criterion = PlateauCriterion(patience=3, min_delta=0.01, max_epochs=10)
+
+        # Extend training sequence for more epochs
+        extended_sequence = [
+            *training_sequence,
+            (6, 0.95, 0.694),
+            (7, 0.98, 0.695),
+            (8, 0.99, 0.696),
+            (9, 0.999, 0.697),
+        ]
+
+        accuracy_results = []
+        plateau_results = []
+
+        for epoch, accuracy, loss in extended_sequence:
+            accuracy_stop = accuracy_criterion.should_stop(
+                epoch=epoch, train_accuracy=accuracy, train_loss=loss
+            )
+            plateau_stop = plateau_criterion.should_stop(
+                epoch=epoch, train_accuracy=accuracy, train_loss=loss
+            )
+
+            accuracy_results.append(accuracy_stop)
+            plateau_results.append(plateau_stop)
+
+        # Accuracy criterion should only stop at max epochs (epoch 9)
+        assert accuracy_results == [False] * 9 + [True]
+
+        # Plateau criterion should stop earlier when loss stops improving
+        assert plateau_results[:6] == [False, False, False, False, False, True]
+
+
+class TestTrainingLoopIntegration:
+    """Integration tests that simulate actual training loop behavior."""
+
+    def test_training_loop_workflow_with_plateau_criterion(self):
+        """Test the complete training loop workflow with best model saving."""
+        criterion = PlateauCriterion(patience=2, min_delta=0.01)
+        criterion.reset()
+
+        # Simulate training loop with loss that improves then plateaus
+        training_data = [
+            (0, 0.5, 1.0),  # Epoch 1: initial
+            (1, 0.6, 0.8),  # Epoch 2: improve, save
+            (2, 0.7, 0.7),  # Epoch 3: improve, save
+            (3, 0.7, 0.75),  # Epoch 4: worse, don't save
+            (4, 0.7, 0.8),  # Epoch 5: worse, don't save (should stop)
+        ]
+
+        saved_models = []
+        final_epoch = -1
+        for epoch, accuracy, loss in training_data:
+            # This mirrors the actual training loop logic
+            should_stop = criterion.should_stop(epoch, accuracy, loss)
+
+            if criterion.should_update_best_model():
+                model_state = {"epoch": epoch + 1, "loss": loss, "accuracy": accuracy}
+                criterion.update_best_model(model_state)
+                saved_models.append(model_state)
+
+            if should_stop:
+                final_epoch = epoch
+                break
+
+        # Should have saved models from epochs 1, 2, 3 (not 4 or 5)
+        assert len(saved_models) == 3
+        assert saved_models[0]["epoch"] == 1
+        assert saved_models[1]["epoch"] == 2
+        assert saved_models[2]["epoch"] == 3
+
+        # Best model should be from epoch 3 (lowest loss)
+        best_model = criterion.get_best_model_state()
+        assert best_model is not None
+        assert best_model["epoch"] == 3
+        assert best_model["loss"] == 0.7
+
+        # Training should have stopped at epoch 5
+        assert final_epoch == 4  # 0-indexed, so epoch 5
+
+    def test_training_loop_workflow_with_accuracy_criterion(self):
+        """Test training loop workflow with AccuracyCriterion."""
+        criterion = AccuracyCriterion(max_epochs=10)
+        criterion.reset()
+
+        # Simulate training that hits perfect accuracy
+        training_data = [
+            (0, 0.7, 0.8),  # Epoch 1: regular
+            (1, 0.8, 0.6),  # Epoch 2: regular
+            (2, 0.9, 0.4),  # Epoch 3: regular
+            (3, 1.0, 0.2),  # Epoch 4: perfect accuracy!
+        ]
+
+        saved_models = []
+        for epoch, accuracy, loss in training_data:
+            should_stop = criterion.should_stop(epoch, accuracy, loss)
+
+            if criterion.should_update_best_model():
+                model_state = {"epoch": epoch + 1, "loss": loss, "accuracy": accuracy}
+                criterion.update_best_model(model_state)
+                saved_models.append(model_state)
+
+            if should_stop:
+                break
+
+        # Should have saved only the perfect accuracy model
+        assert len(saved_models) == 1
+        assert saved_models[0]["epoch"] == 4
+        assert saved_models[0]["accuracy"] == 1.0
+
+        # Best model should be the perfect accuracy model
+        best_model = criterion.get_best_model_state()
+        assert best_model is not None
+        assert best_model["epoch"] == 4
+        assert best_model["accuracy"] == 1.0
+
+    def test_no_best_model_when_max_epochs_reached(self):
+        """Test that no best model is saved when max epochs is reached without improvement."""
+        criterion = AccuracyCriterion(max_epochs=3)
+        criterion.reset()
+
+        # Simulate training that never hits perfect accuracy
+        training_data = [
+            (0, 0.7, 0.8),
+            (1, 0.75, 0.75),
+            (2, 0.8, 0.7),  # Max epochs reached
+        ]
+
+        saved_models = []
+        for epoch, accuracy, loss in training_data:
+            should_stop = criterion.should_stop(epoch, accuracy, loss)
+
+            if criterion.should_update_best_model():
+                model_state = {"epoch": epoch + 1, "loss": loss, "accuracy": accuracy}
+                criterion.update_best_model(model_state)
+                saved_models.append(model_state)
+
+            if should_stop:
+                break
+
+        # Should not have saved any models
+        assert len(saved_models) == 0
+
+        # Should have no best model
+        best_model = criterion.get_best_model_state()
+        assert best_model is None
+
+    def test_model_state_persistence_across_training_loop(self):
+        """Test that model state is properly maintained across training iterations."""
+        criterion = PlateauCriterion(patience=3, min_delta=0.01)
+        criterion.reset()
+
+        # First improvement - save model
+        criterion.should_stop(0, 0.5, 1.0)
+        assert criterion.should_update_best_model()
+        first_model = {"version": 1, "data": "first"}
+        criterion.update_best_model(first_model)
+
+        # Second improvement - save better model
+        criterion.should_stop(1, 0.6, 0.8)
+        assert criterion.should_update_best_model()
+        second_model = {"version": 2, "data": "second"}
+        criterion.update_best_model(second_model)
+
+        # No improvement - don't save
+        criterion.should_stop(2, 0.65, 0.85)
+        assert not criterion.should_update_best_model()
+
+        # Best model should still be the second one
+        best_model = criterion.get_best_model_state()
+        assert best_model == second_model
+
+        # Continue training - still no improvement
+        criterion.should_stop(3, 0.7, 0.9)
+        assert not criterion.should_update_best_model()
+
+        # Best model should still be preserved
+        best_model = criterion.get_best_model_state()
+        assert best_model == second_model
+
+    def test_training_loop_with_file_saving_simulation(self):
+        """Test simulating the actual file saving behavior from training loop."""
+
+        criterion = PlateauCriterion(patience=2, min_delta=0.01)
+        criterion.reset()
+
+        # Simulate training that finds best model then plateaus
+        training_data = [
+            (0, 0.6, 1.0),
+            (1, 0.7, 0.5),  # Best model
+            (2, 0.75, 0.6),  # Plateau starts
+            (3, 0.8, 0.65),  # Should stop
+        ]
+
+        final_epoch = -1
+        for epoch, accuracy, loss in training_data:
+            should_stop = criterion.should_stop(epoch, accuracy, loss)
+
+            if criterion.should_update_best_model():
+                # Simulate saving model state
+                model_state = {
+                    "epoch": epoch + 1,
+                    "loss": loss,
+                    "accuracy": accuracy,
+                    "model_weights": f"weights_epoch_{epoch + 1}",
+                }
+                criterion.update_best_model(model_state)
+
+            if should_stop:
+                final_epoch = epoch
+                break
+
+        # At end of training, save best model (not final model)
+        best_model_state = criterion.get_best_model_state()
+
+        # This simulates: torch.save(best_model_state, model_path)
+        assert best_model_state is not None
+        assert best_model_state["epoch"] == 2  # Best was epoch 2
+        assert best_model_state["loss"] == 0.5  # Best loss
+        assert best_model_state["model_weights"] == "weights_epoch_2"
+
+        # Training stopped at epoch 4, but we save model from epoch 2
+        assert final_epoch == 3  # 0-indexed epoch 4
+        assert best_model_state["epoch"] != final_epoch + 1  # Not the final epoch

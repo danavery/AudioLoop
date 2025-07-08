@@ -6,6 +6,7 @@ following the Strategy pattern.
 """
 
 from abc import ABC, abstractmethod
+from typing import Any
 
 
 class TrainingStoppingCriterion(ABC):
@@ -35,6 +36,36 @@ class TrainingStoppingCriterion(ABC):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def update_best_model(self, model_state: Any) -> None:
+        """
+        Update the best model state if current model is better.
+
+        Args:
+            model_state: Current model state dict to potentially save
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_best_model_state(self) -> Any | None:
+        """
+        Get the best model state seen so far.
+
+        Returns:
+            Best model state dict, or None if no best model tracked
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def should_update_best_model(self) -> bool:
+        """
+        Check if the current model should be saved as the best model.
+
+        Returns:
+            True if current model should be saved as best, False otherwise
+        """
+        raise NotImplementedError
+
     def reset(self) -> None:
         """Reset any internal state for a new training run."""
         return
@@ -49,6 +80,7 @@ class AccuracyCriterion(TrainingStoppingCriterion):
             max_epochs: Maximum number of epochs to train
         """
         self.max_epochs = max_epochs
+        self.best_model_state = None
 
     def should_stop(
         self,
@@ -58,8 +90,36 @@ class AccuracyCriterion(TrainingStoppingCriterion):
         val_accuracy: float | None = None,
         val_loss: float | None = None,
     ) -> bool:
-        # Stop if we've reached 100% accuracy or max epochs
-        return train_accuracy >= 1.0 or epoch >= self.max_epochs - 1
+        # Mark that we should save this model if we hit 100% accuracy
+        if train_accuracy >= 1.0:
+            self._should_update_best_model = True
+            return True
+
+        # Stop if max epochs reached
+        if epoch >= self.max_epochs - 1:
+            self._should_update_best_model = False
+            return True
+
+        self._should_update_best_model = False
+        return False
+
+    def should_update_best_model(self) -> bool:
+        """Check if the current model should be saved as the best model."""
+        return getattr(self, "_should_update_best_model", False)
+
+    def update_best_model(self, model_state: Any) -> None:
+        """Update best model state when accuracy reaches 100%."""
+        self.best_model_state = model_state
+        self._should_update_best_model = False
+
+    def get_best_model_state(self) -> Any | None:
+        """Get the best model state seen so far."""
+        return self.best_model_state
+
+    def reset(self) -> None:
+        """Reset internal state for a new training run."""
+        self.best_model_state = None
+        self._should_update_best_model = False
 
 
 class PlateauCriterion(TrainingStoppingCriterion):
@@ -77,6 +137,7 @@ class PlateauCriterion(TrainingStoppingCriterion):
         self.max_epochs = max_epochs
         self.best_train_loss = float("inf")
         self.epochs_without_improvement = 0
+        self.best_model_state = None
 
     def should_stop(
         self,
@@ -88,19 +149,39 @@ class PlateauCriterion(TrainingStoppingCriterion):
     ) -> bool:
         # Stop immediately if we hit 100% accuracy (best case scenario)
         if train_accuracy >= 1.0:
+            # Mark that we should save this model as the best (perfect accuracy)
+            self._should_update_best_model = True
             return True
 
         # Check if training loss improved
         if train_loss < self.best_train_loss - self.min_delta:
             self.best_train_loss = train_loss
             self.epochs_without_improvement = 0
+            # Mark that we have a new best model (caller should update model state)
+            self._should_update_best_model = True
         else:
             self.epochs_without_improvement += 1
+            self._should_update_best_model = False
 
         # Stop if patience exceeded or max epochs reached
         return self.epochs_without_improvement >= self.patience or epoch >= self.max_epochs - 1
+
+    def should_update_best_model(self) -> bool:
+        """Check if the current model should be saved as the best model."""
+        return getattr(self, "_should_update_best_model", False)
+
+    def update_best_model(self, model_state: Any) -> None:
+        """Update best model state when loss improves."""
+        self.best_model_state = model_state
+        self._should_update_best_model = False
+
+    def get_best_model_state(self) -> Any | None:
+        """Get the best model state seen so far."""
+        return self.best_model_state
 
     def reset(self) -> None:
         """Reset internal state for a new training run."""
         self.best_train_loss = float("inf")
         self.epochs_without_improvement = 0
+        self.best_model_state = None
+        self._should_update_best_model = False
