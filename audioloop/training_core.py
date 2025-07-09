@@ -1,4 +1,3 @@
-import os
 import random
 import time
 from pathlib import Path
@@ -10,7 +9,6 @@ from torch.utils.data import DataLoader
 
 from .models.cnn_5layer import SoundCNN
 from .utils.data_utils import get_device, simple_collate_fn
-
 from .utils.spectrogram_dataset import SpectrogramDataset
 from .utils.stopping_criteria import PlateauCriterion
 

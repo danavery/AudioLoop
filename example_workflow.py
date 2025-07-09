@@ -9,10 +9,10 @@ This script demonstrates the full active learning cycle including:
 4. Running subsequent cycles
 
 NOTE: For convenience, consider the automated workflow instead:
-    python automated_workflow.py --class-name siren --cycles 2 --auto-label
+    python automated_workflow.py --class-name Drill --cycles 2 --auto-label
 
 Usage:
-    python example_workflow.py --class-name siren --cycles 2
+    python example_workflow.py --class-name Drill --cycles 2
 """
 
 import argparse
@@ -174,19 +174,19 @@ def main():
         epilog="""
 Examples:
   # Run 2 cycles with simulated human labeling
-  python example_workflow.py --class-name siren --cycles 2
+  python example_workflow.py --class-name Drill --cycles 2
 
   # Run 3 cycles with manual human labeling
-  python example_workflow.py --class-name dog_bark --cycles 3 --no-simulate
+  python example_workflow.py --class-name Speech --cycles 3 --no-simulate
 
   # Use custom initial model
-  python example_workflow.py --class-name gun_shot --model outputs/custom_model.pt
+  python example_workflow.py --class-name Music --model outputs/custom_model.pt
 
   # Use basic transition strategy
-  python example_workflow.py --class-name siren --cycles 2 --selection-mode basic_transition
+  python example_workflow.py --class-name Drill --cycles 2 --selection-mode basic_transition
 
   # Use entropy-based selection
-  python example_workflow.py --class-name dog_bark --cycles 3 --selection-mode entropy
+  python example_workflow.py --class-name Speech --cycles 2 --selection-mode entropy
         """,
     )
 

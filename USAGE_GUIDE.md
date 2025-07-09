@@ -51,8 +51,8 @@ python automated_workflow.py --class-name Drill --cycles 2 --dataset fsd50k --au
 ### Environment Variable Setup
 ```bash
 # Set default dataset for all commands (optional)
-export AUDIOLOOP_DATASET=fsd50k     # Use FSD50K as default
-export AUDIOLOOP_DATASET=urbansound8k  # Use UrbanSound8K as default (default behavior)
+export AUDIOLOOP_DATASET=fsd50k     # Use FSD50K as default (default behavior)
+export AUDIOLOOP_DATASET=urbansound8k  # Use UrbanSound8K as default
 
 # Unset to return to default behavior
 unset AUDIOLOOP_DATASET
@@ -60,42 +60,42 @@ unset AUDIOLOOP_DATASET
 
 ### Data Preparation
 ```bash
-# Generate spectrograms for entire UrbanSound8K dataset (one-time setup)
+# Generate spectrograms for entire FSD50K dataset (one-time setup)
 python -m audioloop.create_all_specs
 
-# Generate spectrograms for FSD50K dataset
-python -m audioloop.create_all_specs --dataset fsd50k
+# Generate spectrograms for UrbanSound8K dataset
+python -m audioloop.create_all_specs --dataset urbansound8k
 
 # With environment variable set, no need to specify --dataset
-export AUDIOLOOP_DATASET=fsd50k
-python -m audioloop.create_all_specs  # Automatically uses FSD50K
+export AUDIOLOOP_DATASET=urbansound8k
+python -m audioloop.create_all_specs  # Automatically uses UrbanSound8K
 ```
 
 ### Creating Initial Training Sets
 ```bash
-# Create UrbanSound8K training set (default)
-python -m audioloop.utils.start_labeling --class-name siren --n 40
+# Create FSD50K training set (default)
+python -m audioloop.utils.start_labeling --class-name Drill --n 50
 
-# Create FSD50K training set
-python -m audioloop.utils.start_labeling --dataset fsd50k --class-name Drill --n 50
+# Create UrbanSound8K training set
+python -m audioloop.utils.start_labeling --dataset urbansound8k --class-name siren --n 40
 
 # Using environment variable (simpler workflow)
-export AUDIOLOOP_DATASET=fsd50k
-python -m audioloop.utils.start_labeling --class-name Drill --n 50  # Automatically uses FSD50K
-python -m audioloop.utils.start_labeling --list-classes              # Lists FSD50K classes
+export AUDIOLOOP_DATASET=urbansound8k
+python -m audioloop.utils.start_labeling --class-name siren --n 40  # Automatically uses UrbanSound8K
+python -m audioloop.utils.start_labeling --list-classes              # Lists UrbanSound8K classes
 
 # Create with custom parameters
-python -m audioloop.utils.start_labeling --class-name dog_bark --n 60 --positive-pct 0.8 --output training_sets/training_set_v2.csv
+python -m audioloop.utils.start_labeling --class-name Speech --n 60 --positive-pct 0.8 --output training_sets/training_set_v2.csv
 
-# List available classes for UrbanSound8K
+# List available classes for FSD50K
 python -m audioloop.utils.start_labeling --list-classes
 
-# List available classes for FSD50K  
-python -m audioloop.utils.start_labeling --dataset fsd50k --list-classes
+# List available classes for UrbanSound8K  
+python -m audioloop.utils.start_labeling --dataset urbansound8k --list-classes
 
 # CLI override still works
-export AUDIOLOOP_DATASET=fsd50k
-python -m audioloop.utils.start_labeling --dataset urbansound8k --class-name siren  # Uses UrbanSound8K despite env var
+export AUDIOLOOP_DATASET=urbansound8k
+python -m audioloop.utils.start_labeling --dataset fsd50k --class-name Drill  # Uses FSD50K despite env var
 
 # Use custom dataset paths
 python -m audioloop.utils.start_labeling --class-name siren --metadata-csv /path/to/UrbanSound8K.csv --audio-root /path/to/audio
@@ -312,15 +312,15 @@ print(f"Created: {new_training_set}")
 ```python
 from audioloop.utils.start_labeling import create_training_set
 
-# Create for UrbanSound8K (default)
-create_training_set(class_name="dog_bark", n=15)
-create_training_set(class_name="gun_shot", output_path="training_sets/gunshot_v1.csv")
+# Create for FSD50K (default)
+create_training_set(class_name="Drill", n=50)
+create_training_set(class_name="Speech", output_path="training_sets/speech_v1.csv")
 
-# Create for FSD50K
+# Create for UrbanSound8K
 create_training_set(
-    class_name="Drill", 
-    dataset_name="fsd50k", 
-    n=50, 
+    class_name="dog_bark", 
+    dataset_name="urbansound8k", 
+    n=15,
     positive_percentage=0.8
 )
 
@@ -340,9 +340,9 @@ create_training_set(
 ### Environment Variable
 ```bash
 # Set default dataset for all commands
-export AUDIOLOOP_DATASET=urbansound8k  # Default dataset (optional)
-export AUDIOLOOP_DATASET=fsd50k        # Use FSD50K as default
-unset AUDIOLOOP_DATASET                # Return to system default (urbansound8k)
+export AUDIOLOOP_DATASET=fsd50k        # Default dataset (optional)
+export AUDIOLOOP_DATASET=urbansound8k  # Use UrbanSound8K as default
+unset AUDIOLOOP_DATASET                # Return to system default (fsd50k)
 
 # Invalid values show helpful error messages
 export AUDIOLOOP_DATASET=invalid_name  # Will show error with supported options

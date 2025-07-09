@@ -4,7 +4,6 @@ import re
 from .training_core import run_training, set_seed, train_epoch
 from .utils.stopping_criteria import AccuracyCriterion, PlateauCriterion
 
-
 # Re-export for backward compatibility
 __all__ = ["main", "run_training", "set_seed", "train_epoch"]
 
@@ -14,7 +13,9 @@ def main():
     parser = argparse.ArgumentParser(description="Train a binary audio classification model")
     parser.add_argument("labels_file", help="Path to CSV file with training labels")
     parser.add_argument(
-        "-o", "--output", help="Path to save trained model (default: auto-generated in outputs/ or outputs_experiment/)"
+        "-o",
+        "--output",
+        help="Path to save trained model (default: auto-generated in outputs/ or outputs_experiment/)",
     )
     parser.add_argument(
         "-v",
@@ -90,11 +91,17 @@ def main():
         stopping_criterion = AccuracyCriterion(max_epochs=args.epochs)
     elif args.stopping_criterion == "plateau":
         stopping_criterion = PlateauCriterion(
-            patience=args.patience, min_delta=args.min_delta, max_epochs=args.epochs, accuracy_floor=args.accuracy_floor
+            patience=args.patience,
+            min_delta=args.min_delta,
+            max_epochs=args.epochs,
+            accuracy_floor=args.accuracy_floor,
         )
     else:
         stopping_criterion = PlateauCriterion(
-            patience=args.patience, min_delta=args.min_delta, max_epochs=args.epochs, accuracy_floor=args.accuracy_floor
+            patience=args.patience,
+            min_delta=args.min_delta,
+            max_epochs=args.epochs,
+            accuracy_floor=args.accuracy_floor,
         )
 
     # Use experiment-aware model path if output not specified

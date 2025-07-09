@@ -505,19 +505,19 @@ def main():
         epilog=f"""
 Example workflows:
 
-UrbanSound8K (default):
-  # Use default dataset (or set AUDIOLOOP_DATASET=urbansound8k)
+FSD50K (default):
+  # Use default dataset (or set AUDIOLOOP_DATASET=fsd50k)
   python -m audioloop.label_audio outputs/labeling_candidates_v1.csv
 
   # Explicit dataset specification
-  python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --dataset urbansound8k --audio-dir data/urbansound8k
+  python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --dataset fsd50k --audio-dir data/FSD50K/FSD50K.dev_audio
 
-FSD50K:
+UrbanSound8K:
   # Set environment variable
-  AUDIOLOOP_DATASET=fsd50k python -m audioloop.label_audio outputs/labeling_candidates_v1.csv
+  AUDIOLOOP_DATASET=urbansound8k python -m audioloop.label_audio outputs/labeling_candidates_v1.csv
 
   # Explicit dataset specification
-  python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --dataset fsd50k --audio-dir data/FSD50K/FSD50K.dev_audio
+  python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --dataset urbansound8k --audio-dir data/urbansound8k
 
 Full workflow example:
   # Run active learning to generate candidates

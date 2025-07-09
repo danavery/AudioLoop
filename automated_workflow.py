@@ -33,8 +33,7 @@ from audioloop.merge_labels import merge_training_sets
 from audioloop.training_core import run_training
 
 
-
-def auto_label_candidates(candidates_file, dataset_name="urbansound8k", audio_dir=None):
+def auto_label_candidates(candidates_file, dataset_name="fsd50k", audio_dir=None):
     """
     Automatically label candidates using the auto-label functionality.
 
@@ -208,14 +207,16 @@ def run_automated_workflow(
             # Create stopping criterion
             if stopping_criterion == "accuracy":
                 from audioloop.utils.stopping_criteria import AccuracyCriterion
+
                 criterion = AccuracyCriterion(max_epochs=epochs)
             else:  # plateau
                 from audioloop.utils.stopping_criteria import PlateauCriterion
+
                 criterion = PlateauCriterion(
                     patience=patience,
                     min_delta=min_delta,
                     max_epochs=epochs,
-                    accuracy_floor=accuracy_floor
+                    accuracy_floor=accuracy_floor,
                 )
 
             final_accuracy = run_training(
@@ -316,32 +317,33 @@ def main():
         epilog="""
 Examples:
   # Fully automated workflow (auto-labeling for testing)
-  python automated_workflow.py --class-name siren --cycles 3 --auto-label
+  # Fully automated (auto-labeling for testing/development)
+  python automated_workflow.py --class-name Drill --cycles 3 --auto-label
 
   # Semi-automated (pause for manual labeling)
-  python automated_workflow.py --class-name dog_bark --cycles 2
+  python automated_workflow.py --class-name Speech --cycles 2
 
   # Custom training parameters
-  python automated_workflow.py --class-name gun_shot --cycles 3 --epochs 500 --batch-size 64
+  python automated_workflow.py --class-name Music --cycles 3 --epochs 500 --batch-size 64
 
   # Custom stopping criteria
-  python automated_workflow.py --class-name siren --cycles 2 --accuracy-floor 0.95 --patience 30
+  python automated_workflow.py --class-name Drill --cycles 2 --accuracy-floor 0.95 --patience 30
 
   # Custom active learning parameters
-  python automated_workflow.py --class-name jackhammer --cycles 2 --candidates 100 --positive-pct 0.8
+  python automated_workflow.py --class-name Explosion --cycles 2 --candidates 100 --positive-pct 0.8
 
-  # FSD50K dataset
-  python automated_workflow.py --class-name Drill --cycles 2 --dataset fsd50k --auto-label
+  # UrbanSound8K dataset
+  python automated_workflow.py --class-name siren --cycles 2 --dataset urbansound8k --auto-label
 
   # Use basic transition strategy
-  python automated_workflow.py --class-name siren --cycles 3 --selection-mode basic_transition --auto-label
+  python automated_workflow.py --class-name Drill --cycles 3 --selection-mode basic_transition --auto-label
 
   # Use entropy-based selection
-  python automated_workflow.py --class-name dog_bark --cycles 2 --selection-mode entropy
+  python automated_workflow.py --class-name Speech --cycles 2 --selection-mode entropy
 
 Prerequisites:
   1. Run: python -m audioloop.create_all_specs  (one-time setup)
-  2. Run: python -m audioloop.utils.start_labeling --class-name <CLASS_NAME> --n 40
+  2. Run: python -m audioloop.utils.start_labeling --class-name <CLASS_NAME> --n 50
         """,
     )
 
@@ -363,9 +365,9 @@ Prerequisites:
     # Dataset parameters
     parser.add_argument(
         "--dataset",
-        default="urbansound8k",
+        default="fsd50k",
         choices=["urbansound8k", "fsd50k"],
-        help="Dataset name (default: urbansound8k)",
+        help="Dataset name (default: fsd50k)",
     )
     parser.add_argument(
         "--audio-dir", help="Custom audio directory (uses dataset default if not specified)"

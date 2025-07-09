@@ -263,11 +263,11 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Process UrbanSound8K dataset (default)
+  # Process FSD50K dataset (default)
   python -m audioloop.create_all_specs
 
-  # Process FSD50K dataset
-  python -m audioloop.create_all_specs --dataset fsd50k
+  # Process UrbanSound8K dataset
+  python -m audioloop.create_all_specs --dataset urbansound8k
 
   # Process without clearing existing spectrograms
   python -m audioloop.create_all_specs --no-clear

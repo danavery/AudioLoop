@@ -4,7 +4,7 @@ from typing import Literal
 
 DatasetType = Literal["urbansound8k", "fsd50k"]
 
-DEFAULT_DATASET: DatasetType = "urbansound8k"
+DEFAULT_DATASET: DatasetType = "fsd50k"
 SUPPORTED_DATASETS = ["urbansound8k", "fsd50k"]
 
 
@@ -13,7 +13,7 @@ def get_default_dataset() -> DatasetType:
 
     Returns:
         Dataset name, either from AUDIOLOOP_DATASET environment variable
-        or the default 'urbansound8k'
+        or the default 'fsd50k'
 
     Raises:
         ValueError: If AUDIOLOOP_DATASET is set to an unsupported value

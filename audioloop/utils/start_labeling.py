@@ -178,17 +178,17 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Create UrbanSound8K training set (default)
-  python -m audioloop.utils.start_labeling --class-name siren --n 40
+  # Create FSD50K training set (default)
+  python -m audioloop.utils.start_labeling --class-name Drill --n 50
 
-  # Create FSD50K training set
-  python -m audioloop.utils.start_labeling --dataset fsd50k --class-name Drill --n 50
-
-  # List available classes for UrbanSound8K
-  python -m audioloop.utils.start_labeling --list-classes
+  # Create UrbanSound8K training set
+  python -m audioloop.utils.start_labeling --dataset urbansound8k --class-name siren --n 40
 
   # List available classes for FSD50K
-  python -m audioloop.utils.start_labeling --dataset fsd50k --list-classes
+  python -m audioloop.utils.start_labeling --list-classes
+
+  # List available classes for UrbanSound8K
+  python -m audioloop.utils.start_labeling --dataset urbansound8k --list-classes
 
   # Use custom paths
   python -m audioloop.utils.start_labeling --dataset urbansound8k --class-name dog_bark \\

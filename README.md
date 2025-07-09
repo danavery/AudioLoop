@@ -13,13 +13,13 @@ uv sync
 python -m audioloop.create_all_specs
 
 # Create initial training set
-python -m audioloop.utils.start_labeling --class-name siren --n 40
+python -m audioloop.utils.start_labeling --class-name Drill --n 50
 
 # Run fully automated workflow (auto-labeling for testing)
-python automated_workflow.py --class-name siren --cycles 3 --auto-label
+python automated_workflow.py --class-name Drill --cycles 3 --auto-label
 
 # Run semi-automated workflow (pause for human labeling)
-python automated_workflow.py --class-name siren --cycles 2
+python automated_workflow.py --class-name Drill --cycles 2
 ```
 
 ### Manual Workflow (Step-by-step)
@@ -34,10 +34,10 @@ python -m audioloop.create_all_specs
 python -m audioloop.train training_sets/training_set_v1.csv
 
 # Run active learning cycle (with auto-calculated thresholds for imbalanced datasets)
-python -m audioloop.active_learning --class-name siren --run-number 1 --selection-mode basic_transition --auto-thresholds
+python -m audioloop.active_learning --class-name Drill --run-number 1 --selection-mode basic_transition --auto-thresholds
 
 # Label audio samples interactively
-python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --audio-dir data/urbansound8k
+python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --audio-dir data/FSD50K/FSD50K.dev_audio
 
 # Merge human labels back into training set
 python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv
@@ -87,17 +87,17 @@ audioloop/
 
 ## Supported Datasets
 
-### UrbanSound8K (Primary)
-- **Classes**: 10 urban sound categories
-- **Samples**: ~8,700 audio files
-- **Binary Tasks**: Any class vs. all others
-- **Examples**: siren detection, dog bark detection, gunshot detection
-
-### FSD50K (Extended)
+### FSD50K (Primary)
 - **Classes**: 200 audio categories with multi-label annotations
 - **Samples**: ~50,000 audio files
 - **Binary Strategies**: One-vs-all or semantic grouping
 - **Examples**: musical instruments, human sounds, vehicle sounds
+
+### UrbanSound8K (Extended)
+- **Classes**: 10 urban sound categories
+- **Samples**: ~8,700 audio files
+- **Binary Tasks**: Any class vs. all others
+- **Examples**: siren detection, dog bark detection, gunshot detection
 
 ## Architecture Overview
 
@@ -144,8 +144,8 @@ AudioLoop uses consistent versioning across all artifacts:
 python -m audioloop.active_learning --list-classes
 
 # Run detection for specific class
-python -m audioloop.active_learning --class-name siren --model outputs/model_v1.pt
-python -m audioloop.active_learning --class-id 3 --model outputs/model_v1.pt  # dog_bark
+python -m audioloop.active_learning --class-name Drill --model outputs/model_v1.pt
+python -m audioloop.active_learning --class-name Speech --model outputs/model_v1.pt
 ```
 
 ## File Formats

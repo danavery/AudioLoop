@@ -101,14 +101,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Run siren detection cycle 1 (automatically uses outputs/model_v1.pt)
-  python -m audioloop.active_learning --class-name siren --run-number 1
+  # Run drill detection cycle 1 (automatically uses outputs/model_v1.pt)
+  python -m audioloop.active_learning --class-name Drill --run-number 1
 
-  # Run dog bark detection cycle 2 (automatically uses outputs/model_v2.pt)
-  python -m audioloop.active_learning --class-name dog_bark --run-number 2
+  # Run speech detection cycle 2 (automatically uses outputs/model_v2.pt)
+  python -m audioloop.active_learning --class-name Speech --run-number 2
 
-  # Run with FSD50K dataset
-  python -m audioloop.active_learning --dataset fsd50k --class-name Drill --run-number 1
+  # Run with UrbanSound8K dataset
+  python -m audioloop.active_learning --dataset urbansound8k --class-name siren --run-number 1
 
   # Run with class ID instead of name (UrbanSound8K only)
   python -m audioloop.active_learning --class-id 3 --run-number 1
