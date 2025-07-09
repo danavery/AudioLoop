@@ -41,6 +41,7 @@ def main():
     )
     parser.add_argument(
         "--stopping-criterion",
+        type=str,
         choices=["accuracy", "plateau"],
         default="plateau",
         help="Stopping criterion to use (default: plateau)",
@@ -56,6 +57,13 @@ def main():
         type=float,
         default=0.01,
         help="Minimum delta for plateau stopping criterion (default: 0.01)",
+    )
+
+    parser.add_argument(
+        "--accuracy-floor",
+        type=float,
+        default=None,
+        help="Only count plateau patience when accuracy >= this threshold (default: None)",
     )
 
     args = parser.parse_args()
@@ -76,10 +84,12 @@ def main():
         stopping_criterion = AccuracyCriterion(max_epochs=args.epochs)
     elif args.stopping_criterion == "plateau":
         stopping_criterion = PlateauCriterion(
-            patience=args.patience, min_delta=args.min_delta, max_epochs=args.epochs
+            patience=args.patience, min_delta=args.min_delta, max_epochs=args.epochs, accuracy_floor=args.accuracy_floor
         )
     else:
-        stopping_criterion = PlateauCriterion(max_epochs=args.epochs)
+        stopping_criterion = PlateauCriterion(
+            patience=args.patience, min_delta=args.min_delta, max_epochs=args.epochs, accuracy_floor=args.accuracy_floor
+        )
 
     # Run training with CLI arguments
     accuracy = run_training(

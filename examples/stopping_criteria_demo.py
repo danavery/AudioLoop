@@ -100,13 +100,15 @@ def run_training_simulation(
         Tuple of (stop_epoch, metrics_history)
     """
     if verbose:
-        print(f"\n{'=' * 60}")
+        print(f"\n{'='*60}")
         print(f"Training Simulation: {criterion.__class__.__name__}")
         print(f"Pattern: {pattern}")
-        print(f"{'=' * 60}")
+        print(f"{'='*60}")
 
     # Reset criterion state
     criterion.reset()
+
+    # No dataset size needed for stopping criteria
 
     # Generate training metrics
     all_metrics = simulate_training_metrics(max_epochs, pattern)
@@ -128,17 +130,10 @@ def run_training_simulation(
                 print(f"    Final accuracy: {accuracy:.3f}")
                 print(f"    Final loss: {loss:.3f}")
 
-                # Print criterion-specific info
-                if hasattr(criterion, "best_train_loss"):
-                    best_loss = getattr(criterion, "best_train_loss", None)
-                    if best_loss is not None:
-                        print(f"    Best loss: {best_loss:.3f}")
-                if hasattr(criterion, "epochs_without_improvement"):
-                    epochs_without_improvement = getattr(
-                        criterion, "epochs_without_improvement", None
-                    )
-                    if epochs_without_improvement is not None:
-                        print(f"    Epochs without improvement: {epochs_without_improvement}")
+                # Print criterion-specific info using polymorphic approach
+                if isinstance(criterion, PlateauCriterion):
+                    print(f"    Best loss: {criterion.best_train_loss:.3f}")
+                    print(f"    Epochs without improvement: {criterion.epochs_without_improvement}")
 
             return epoch, history
 
@@ -198,10 +193,59 @@ def demo_plateau_criterion():
     print(f"Stopped at epoch: {stop_epoch}")
 
 
+def demo_plateau_with_accuracy_floor():
+    """Demonstrate PlateauCriterion with accuracy_floor parameter."""
+    print("\n" + "=" * 80)
+    print("DEMO 3: PlateauCriterion with Accuracy Floor")
+    print("=" * 80)
+
+    # Default plateau criterion
+    criterion = PlateauCriterion()
+    print(f"Default PlateauCriterion: patience={criterion.patience}, accuracy_floor={criterion.accuracy_floor}")
+
+    # Test with accuracy floor
+    print("\n" + "-" * 40)
+    print("Enhanced PlateauCriterion with accuracy floor (0.9)")
+    enhanced_criterion = PlateauCriterion(patience=10, accuracy_floor=0.9)
+    print(f"Parameters: patience={enhanced_criterion.patience}, accuracy_floor={enhanced_criterion.accuracy_floor}")
+    stop_epoch, _ = run_training_simulation(enhanced_criterion, "plateau", max_epochs=100)
+    print(f"Stopped at epoch {stop_epoch}")
+
+    # Test without accuracy floor
+    print("\n" + "-" * 40)
+    print("Standard PlateauCriterion (no accuracy floor)")
+    standard_criterion = PlateauCriterion(patience=10)
+    stop_epoch, _ = run_training_simulation(standard_criterion, "plateau", max_epochs=100)
+    print(f"Stopped at epoch {stop_epoch}")
+
+    # Demonstrate accuracy floor behavior with step-by-step simulation
+    print("\n" + "-" * 40)
+    print("Step-by-step accuracy floor demonstration")
+    demo_criterion = PlateauCriterion(patience=3, accuracy_floor=0.85)
+    print(f"Criterion: patience={demo_criterion.patience}, accuracy_floor={demo_criterion.accuracy_floor}")
+
+    # Simulate training sequence
+    training_steps = [
+        (0, 0.7, 1.0),   # Below floor
+        (1, 0.8, 1.1),   # Below floor, loss worse
+        (2, 0.9, 0.9),   # Above floor, loss better
+        (3, 0.91, 1.0),  # Above floor, loss worse (patience=1)
+        (4, 0.92, 1.1),  # Above floor, loss worse (patience=2)
+        (5, 0.93, 1.2),  # Above floor, loss worse (patience=3, should stop)
+    ]
+
+    for epoch, accuracy, loss in training_steps:
+        should_stop = demo_criterion.should_stop(epoch, accuracy, loss)
+        print(f"  Epoch {epoch}: accuracy={accuracy:.2f}, loss={loss:.2f}, "
+              f"patience={demo_criterion.epochs_without_improvement}, stop={should_stop}")
+        if should_stop:
+            break
+
+
 def demo_custom_criterion():
     """Demonstrate custom stopping criterion."""
     print("\n" + "=" * 80)
-    print("DEMO 3: Custom Stopping Criterion")
+    print("DEMO 4: Custom Stopping Criterion")
     print("=" * 80)
 
     class TargetAccuracyCriterion(TrainingStoppingCriterion):
@@ -210,9 +254,19 @@ def demo_custom_criterion():
         def __init__(self, target_accuracy: float = 0.9, max_epochs: int = 1000):
             self.target_accuracy = target_accuracy
             self.max_epochs = max_epochs
+            self.best_model_state = None
 
         def should_stop(self, epoch, train_accuracy, train_loss, val_accuracy=None, val_loss=None):
             return train_accuracy >= self.target_accuracy or epoch >= self.max_epochs - 1
+
+        def should_update_best_model(self) -> bool:
+            return False  # Simple criterion doesn't track best model
+
+        def update_best_model(self, model_state) -> None:
+            self.best_model_state = model_state
+
+        def get_best_model_state(self):
+            return self.best_model_state
 
     criterion = TargetAccuracyCriterion(target_accuracy=0.8, max_epochs=200)
     print(
@@ -227,7 +281,7 @@ def demo_custom_criterion():
 def demo_combined_criteria():
     """Demonstrate combining multiple criteria."""
     print("\n" + "=" * 80)
-    print("DEMO 4: Combined Stopping Criteria")
+    print("DEMO 5: Combined Stopping Criteria")
     print("=" * 80)
 
     class CombinedCriterion(TrainingStoppingCriterion):
@@ -242,6 +296,26 @@ def demo_combined_criteria():
                 if criterion.should_stop(epoch, train_accuracy, train_loss, val_accuracy, val_loss):
                     return True
             return False
+
+        def should_update_best_model(self) -> bool:
+            # Update if any criterion says to update
+            for criterion in self.criteria:
+                if criterion.should_update_best_model():
+                    return True
+            return False
+
+        def update_best_model(self, model_state) -> None:
+            # Update all criteria
+            for criterion in self.criteria:
+                criterion.update_best_model(model_state)
+
+        def get_best_model_state(self):
+            # Return the first available best model state
+            for criterion in self.criteria:
+                state = criterion.get_best_model_state()
+                if state is not None:
+                    return state
+            return None
 
         def reset(self):
             for criterion in self.criteria:
@@ -263,7 +337,7 @@ def demo_combined_criteria():
 def demo_performance_comparison():
     """Compare performance of different criteria."""
     print("\n" + "=" * 80)
-    print("DEMO 5: Performance Comparison")
+    print("DEMO 6: Performance Comparison")
     print("=" * 80)
 
     criteria = [
@@ -273,6 +347,7 @@ def demo_performance_comparison():
             "PlateauCriterion (sensitive)",
             PlateauCriterion(patience=5, min_delta=0.001, max_epochs=100),
         ),
+        ("PlateauCriterion (accuracy floor)", PlateauCriterion(patience=15, accuracy_floor=0.9, max_epochs=100)),
     ]
 
     patterns = ["improving", "plateau", "oscillating"]
@@ -302,6 +377,7 @@ def main():
     try:
         demo_accuracy_criterion()
         demo_plateau_criterion()
+        demo_plateau_with_accuracy_floor()
         demo_custom_criterion()
         demo_combined_criteria()
         demo_performance_comparison()
@@ -312,6 +388,7 @@ def main():
         print("Key Takeaways:")
         print("- AccuracyCriterion: Simple, stops at perfect accuracy or max epochs")
         print("- PlateauCriterion: Sophisticated, stops when loss plateaus")
+        print("- PlateauCriterion with accuracy_floor: Only patient when accuracy is high enough")
         print("- Custom criteria: Easy to implement for specific needs")
         print("- Combined criteria: Mix multiple strategies for robust stopping")
         print("- Performance: All criteria are lightweight and fast")

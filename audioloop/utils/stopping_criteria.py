@@ -70,6 +70,10 @@ class TrainingStoppingCriterion(ABC):
         """Reset any internal state for a new training run."""
         return
 
+    def get_current_mode(self) -> str:
+        """Get the current stopping mode for display purposes."""
+        return self.__class__.__name__.replace("Criterion", "")
+
 
 class AccuracyCriterion(TrainingStoppingCriterion):
     """Stop when training accuracy reaches 100% or max epochs is reached."""
@@ -125,16 +129,18 @@ class AccuracyCriterion(TrainingStoppingCriterion):
 class PlateauCriterion(TrainingStoppingCriterion):
     """Stop when training loss plateaus (stops improving)."""
 
-    def __init__(self, patience: int = 50, min_delta: float = 0.01, max_epochs: int = 1000):
+    def __init__(self, patience: int = 50, min_delta: float = 0.01, max_epochs: int = 1000, accuracy_floor: float | None = None):
         """
         Args:
             patience: Number of epochs to wait for improvement before stopping
             min_delta: Minimum change to qualify as improvement
             max_epochs: Maximum epochs (fallback safety)
+            accuracy_floor: Only count patience when accuracy >= this threshold (optional)
         """
         self.patience = patience
         self.min_delta = min_delta
         self.max_epochs = max_epochs
+        self.accuracy_floor = accuracy_floor
         self.best_train_loss = float("inf")
         self.epochs_without_improvement = 0
         self.best_model_state = None
@@ -160,8 +166,14 @@ class PlateauCriterion(TrainingStoppingCriterion):
             # Mark that we have a new best model (caller should update model state)
             self._should_update_best_model = True
         else:
-            self.epochs_without_improvement += 1
-            self._should_update_best_model = False
+            # Only increment patience if accuracy is above floor (if specified)
+            if self.accuracy_floor is None or train_accuracy >= self.accuracy_floor:
+                self.epochs_without_improvement += 1
+                self._should_update_best_model = False
+            else:
+                # Reset patience if accuracy falls below floor
+                self.epochs_without_improvement = 0
+                self._should_update_best_model = False
 
         # Stop if patience exceeded or max epochs reached
         return self.epochs_without_improvement >= self.patience or epoch >= self.max_epochs - 1

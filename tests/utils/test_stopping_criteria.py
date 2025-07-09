@@ -926,3 +926,177 @@ class TestTrainingLoopIntegration:
         # Training stopped at epoch 4, but we save model from epoch 2
         assert final_epoch == 3  # 0-indexed epoch 4
         assert best_model_state["epoch"] != final_epoch + 1  # Not the final epoch
+
+
+class TestPlateauCriterionAccuracyFloor:
+    """Test PlateauCriterion with accuracy_floor parameter."""
+
+    def test_accuracy_floor_defaults_to_none(self):
+        """Test that accuracy_floor defaults to None."""
+        criterion = PlateauCriterion()
+        assert criterion.accuracy_floor is None
+
+    def test_accuracy_floor_accepts_custom_value(self):
+        """Test that accuracy_floor accepts custom values."""
+        criterion = PlateauCriterion(accuracy_floor=0.95)
+        assert criterion.accuracy_floor == 0.95
+
+    def test_without_accuracy_floor_behaves_normally(self):
+        """Test that without accuracy_floor, plateau detection works normally."""
+        criterion = PlateauCriterion(patience=2, accuracy_floor=None)
+
+        # Should count patience regardless of accuracy
+        assert not criterion.should_stop(0, 0.5, 1.0)  # Initial, save best
+        assert not criterion.should_stop(1, 0.6, 1.1)  # Loss worse, patience=1
+        assert criterion.should_stop(2, 0.7, 1.2)      # Loss worse, patience=2, stop
+
+    def test_with_accuracy_floor_only_counts_patience_above_threshold(self):
+        """Test that with accuracy_floor, patience only counts when accuracy >= threshold."""
+        criterion = PlateauCriterion(patience=2, accuracy_floor=0.9)
+
+        # Below threshold: patience should not count
+        assert not criterion.should_stop(0, 0.5, 1.0)  # Initial, save best
+        assert not criterion.should_stop(1, 0.6, 1.1)  # Loss worse, but accuracy < 0.9, no patience
+        assert not criterion.should_stop(2, 0.7, 1.2)  # Loss worse, but accuracy < 0.9, no patience
+        assert criterion.epochs_without_improvement == 0  # Should be reset each time
+
+        # Above threshold: patience should count
+        assert not criterion.should_stop(3, 0.95, 1.0)  # Above threshold, save best
+        assert criterion.should_stop(4, 0.96, 1.1)      # Loss worse, patience=1
+        assert criterion.should_stop(5, 0.97, 1.2)      # Loss worse, patience=2, stop
+
+    def test_accuracy_floor_resets_patience_when_falling_below_threshold(self):
+        """Test that patience resets when accuracy falls below threshold."""
+        criterion = PlateauCriterion(patience=3, accuracy_floor=0.9)
+
+        # Build up patience above threshold
+        assert not criterion.should_stop(0, 0.95, 1.0)  # Above threshold, save best
+        assert not criterion.should_stop(1, 0.96, 1.1)  # Loss worse, patience=1
+        assert not criterion.should_stop(2, 0.97, 1.2)  # Loss worse, patience=2
+        assert criterion.epochs_without_improvement == 2
+
+        # Drop below threshold: patience should reset
+        assert not criterion.should_stop(3, 0.85, 1.3)  # Below threshold, patience reset
+        assert criterion.epochs_without_improvement == 0
+
+        # Back above threshold: patience should start counting again
+        assert not criterion.should_stop(4, 0.92, 0.9)  # Above threshold, save best
+        assert not criterion.should_stop(5, 0.93, 1.0)  # Loss worse, patience=1
+        assert not criterion.should_stop(6, 0.94, 1.1)  # Loss worse, patience=2
+        assert criterion.should_stop(7, 0.95, 1.2)      # Loss worse, patience=3, stop
+
+    def test_perfect_accuracy_stops_immediately_regardless_of_floor(self):
+        """Test that 100% accuracy stops immediately regardless of accuracy_floor."""
+        criterion = PlateauCriterion(accuracy_floor=0.9)
+
+        # Should stop immediately at 100% accuracy
+        assert criterion.should_stop(0, 1.0, 0.5)
+
+    def test_accuracy_floor_with_loss_improvement(self):
+        """Test that loss improvement resets patience even with accuracy_floor."""
+        criterion = PlateauCriterion(patience=2, accuracy_floor=0.9)
+
+        # Above threshold with loss improvement
+        assert not criterion.should_stop(0, 0.95, 1.0)  # Above threshold, save best
+        assert not criterion.should_stop(1, 0.96, 1.1)  # Loss worse, patience=1
+        assert not criterion.should_stop(2, 0.97, 0.9)  # Loss improved, patience reset
+        assert criterion.epochs_without_improvement == 0
+
+        # Patience should start counting again
+        assert not criterion.should_stop(3, 0.98, 1.0)  # Loss worse, patience=1
+        assert criterion.should_stop(4, 0.99, 1.1)      # Loss worse, patience=2, stop
+
+    def test_accuracy_floor_edge_cases(self):
+        """Test edge cases for accuracy_floor."""
+        criterion = PlateauCriterion(patience=1, accuracy_floor=0.9)
+
+        # Exactly at threshold
+        assert not criterion.should_stop(0, 0.9, 1.0)   # Exactly at threshold, save best
+        assert criterion.should_stop(1, 0.9, 1.1)       # Loss worse, patience=1, stop
+
+        # Just below threshold
+        criterion.reset()
+        assert not criterion.should_stop(0, 0.899, 1.0) # Just below threshold
+        assert not criterion.should_stop(1, 0.899, 1.1) # Loss worse, but below threshold, no patience
+        assert criterion.epochs_without_improvement == 0
+
+    def test_accuracy_floor_with_zero_threshold(self):
+        """Test accuracy_floor with 0.0 threshold (should always count patience)."""
+        criterion = PlateauCriterion(patience=1, accuracy_floor=0.0)
+
+        # Even very low accuracy should count patience
+        assert not criterion.should_stop(0, 0.1, 1.0)   # Save best
+        assert criterion.should_stop(1, 0.1, 1.1)       # Loss worse, patience=1, stop
+
+    def test_accuracy_floor_with_high_threshold(self):
+        """Test accuracy_floor with very high threshold (0.99)."""
+        criterion = PlateauCriterion(patience=1, accuracy_floor=0.99)
+
+        # High accuracy but below threshold
+        assert not criterion.should_stop(0, 0.98, 1.0)  # Below threshold
+        assert not criterion.should_stop(1, 0.98, 1.1)  # Loss worse, but below threshold, no patience
+        assert criterion.epochs_without_improvement == 0
+
+        # Above threshold (but loss improved significantly, so saved as best)
+        assert not criterion.should_stop(2, 0.995, 0.9) # Above threshold, save best (loss improved)
+        assert criterion.should_stop(3, 0.995, 1.0)     # Loss worse, patience=1, stop
+
+    def test_accuracy_floor_complex_training_scenario(self):
+        """Test accuracy_floor with complex training scenario."""
+        criterion = PlateauCriterion(patience=3, accuracy_floor=0.85)
+
+        # Training sequence: low accuracy -> high accuracy -> stuck
+        training_sequence = [
+            (0, 0.6, 2.0),   # Below threshold
+            (1, 0.7, 1.8),   # Below threshold, loss improved
+            (2, 0.8, 1.9),   # Below threshold, loss worse but no patience
+            (3, 0.9, 1.0),   # Above threshold, save best
+            (4, 0.91, 1.1),  # Above threshold, loss worse, patience=1
+            (5, 0.92, 1.2),  # Above threshold, loss worse, patience=2
+            (6, 0.93, 1.3),  # Above threshold, loss worse, patience=3, should stop
+        ]
+
+        for epoch, accuracy, loss in training_sequence[:-1]:
+            assert not criterion.should_stop(epoch, accuracy, loss)
+
+        # Final epoch should trigger stop
+        epoch, accuracy, loss = training_sequence[-1]
+        assert criterion.should_stop(epoch, accuracy, loss)
+
+    def test_accuracy_floor_reset_behavior(self):
+        """Test that reset() clears accuracy_floor state correctly."""
+        criterion = PlateauCriterion(patience=2, accuracy_floor=0.9)
+
+        # Build up some state
+        criterion.should_stop(0, 0.95, 1.0)
+        criterion.should_stop(1, 0.96, 1.1)
+        assert criterion.epochs_without_improvement == 1
+
+        # Reset should clear state
+        criterion.reset()
+        assert criterion.epochs_without_improvement == 0
+        assert criterion.best_train_loss == float("inf")
+        assert criterion.accuracy_floor == 0.9  # Should preserve accuracy_floor value
+
+    def test_accuracy_floor_best_model_tracking(self):
+        """Test that best model tracking works correctly with accuracy_floor."""
+        criterion = PlateauCriterion(patience=2, accuracy_floor=0.9)
+
+        # Below threshold: should still track best model
+        assert not criterion.should_stop(0, 0.8, 1.0)
+        assert criterion.should_update_best_model()
+        criterion.update_best_model({"epoch": 1, "loss": 1.0})
+
+        assert not criterion.should_stop(1, 0.85, 0.9)  # Better loss, below threshold
+        assert criterion.should_update_best_model()
+        criterion.update_best_model({"epoch": 2, "loss": 0.9})
+
+        # Above threshold: should continue tracking best model
+        assert not criterion.should_stop(2, 0.92, 0.8)  # Better loss, above threshold
+        assert criterion.should_update_best_model()
+        criterion.update_best_model({"epoch": 3, "loss": 0.8})
+
+        # Best model should be the one with best loss
+        best_model = criterion.get_best_model_state()
+        assert best_model["epoch"] == 3
+        assert best_model["loss"] == 0.8

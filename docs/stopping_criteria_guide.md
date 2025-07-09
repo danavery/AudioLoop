@@ -44,15 +44,17 @@ A more sophisticated criterion that stops when:
 ```python
 from audioloop.utils.stopping_criteria import PlateauCriterion
 
-# Default: patience=50, min_delta=0.01, max_epochs=1000
+# Default: patience=50, min_delta=0.01, max_epochs=1000, accuracy_floor=None
 criterion = PlateauCriterion()
 
 # Custom parameters
 criterion = PlateauCriterion(
     patience=20,        # Wait 20 epochs without improvement
     min_delta=0.005,    # Minimum improvement threshold
-    max_epochs=800      # Maximum epochs
+    max_epochs=800,     # Maximum epochs
+    accuracy_floor=0.95 # Only count patience when accuracy >= 95%
 )
+```
 
 # Usage
 for epoch in range(1000):
@@ -69,10 +71,17 @@ for epoch in range(1000):
 - `patience`: Number of epochs to wait without improvement before stopping
 - `min_delta`: Minimum change in loss to qualify as improvement
 - `max_epochs`: Maximum number of epochs (safety net)
+- `accuracy_floor`: Only count patience when accuracy >= this threshold (optional)
 
 **State Management:**
 - `best_train_loss`: Tracks the best (lowest) training loss seen
-- `epochs_without_improvement`: Counter for epochs without significant improvement
+- `epochs_without_improvement`: Counter for epochs without significant improvement (resets when accuracy falls below floor)
+
+**Accuracy Floor Behavior:**
+- When `accuracy_floor=None` (default): Standard plateau detection at all accuracy levels
+- When `accuracy_floor=0.95`: Only starts counting patience when accuracy >= 95%
+- If accuracy drops below floor: Patience counter resets to 0
+- Purpose: Prevents premature stopping when model hasn't reached high accuracy yet
 
 ## Integration with AudioLoop
 
@@ -83,7 +92,7 @@ from audioloop.utils.stopping_criteria import PlateauCriterion
 from audioloop.training_core import run_training
 
 # Use custom stopping criterion
-stopping_criterion = PlateauCriterion(patience=30, min_delta=0.01)
+stopping_criterion = PlateauCriterion(patience=30, min_delta=0.01, accuracy_floor=0.9)
 
 # Pass to training function
 run_training(
@@ -92,6 +101,18 @@ run_training(
     stopping_criterion=stopping_criterion,
     # ... other parameters
 )
+```
+
+**CLI Usage:**
+```bash
+# Default plateau behavior
+python -m audioloop.train training_sets/training_set_v1.csv --stopping-criterion plateau
+
+# Enhanced plateau with accuracy floor
+python -m audioloop.train training_sets/training_set_v1.csv --stopping-criterion plateau --accuracy-floor 0.95 --patience 20
+
+# High accuracy threshold (only patient when >= 98%)
+python -m audioloop.train training_sets/training_set_v1.csv --accuracy-floor 0.98 --patience 10
 ```
 
 ## Creating Custom Stopping Criteria
@@ -236,6 +257,13 @@ def load_criterion_from_config(config_path):
 - `patience`: Start with 10-20 for small datasets, 50-100 for large ones
 - `min_delta`: Start with 0.01, reduce to 0.001 for fine-tuning
 - `max_epochs`: Set based on your computational budget
+- `accuracy_floor`: Use 0.9-0.95 for audio classification to prevent early stopping before reaching good performance
+
+**Recommended Accuracy Floor Values:**
+- `accuracy_floor=0.85`: Good for stable audio datasets
+- `accuracy_floor=0.90`: Standard for most audio classification tasks
+- `accuracy_floor=0.95`: Conservative, only be patient when model is performing well
+- `accuracy_floor=None`: Default plateau behavior (always count patience)
 
 ### 3. State Management
 
@@ -310,6 +338,12 @@ def test_custom_criterion():
 ### Issue: Training never stops
 **Solution**: Check that `max_epochs` is set appropriately, or that your criterion logic is correct
 
+### Issue: Training stops too early with accuracy_floor
+**Solution**: Lower the `accuracy_floor` threshold or increase `patience`
+
+### Issue: Training doesn't stop when expected with accuracy_floor
+**Solution**: Check that accuracy is actually reaching the floor threshold, or remove `accuracy_floor` for standard behavior
+
 ### Issue: State persists between training runs
 **Solution**: Always call `reset()` before starting a new training run
 
@@ -354,13 +388,77 @@ class AccuracyCriterion(TrainingStoppingCriterion):
 
 ```python
 class PlateauCriterion(TrainingStoppingCriterion):
-    def __init__(self, patience: int = 50, min_delta: float = 0.01, max_epochs: int = 1000):
+    def __init__(self, patience: int = 50, min_delta: float = 0.01, max_epochs: int = 1000, accuracy_floor: float | None = None):
         """
         Args:
             patience: Number of epochs to wait for improvement before stopping
             min_delta: Minimum change to qualify as improvement
             max_epochs: Maximum epochs (fallback safety)
+            accuracy_floor: Only count patience when accuracy >= this threshold (optional)
         """
+```
+
+## Practical Examples
+
+### Example 1: Audio Classification with Accuracy Floor
+```python
+# Scenario: Audio classification where we want to be patient early in training
+# but stop when stuck at high accuracy
+
+from audioloop.utils.stopping_criteria import PlateauCriterion
+
+# Only count patience when accuracy >= 90%
+criterion = PlateauCriterion(
+    patience=20,
+    accuracy_floor=0.90,
+    min_delta=0.01,
+    max_epochs=1000
+)
+
+# Simulate training
+training_sequence = [
+    (0, 0.6, 1.5),   # Low accuracy - no patience counted
+    (10, 0.8, 1.2),  # Still low - no patience counted  
+    (20, 0.92, 1.0), # Above floor - start counting patience
+    (25, 0.93, 1.1), # Above floor - patience = 1
+    (30, 0.94, 1.2), # Above floor - patience = 2
+    # ... continues until patience exceeded or improvement
+]
+
+for epoch, accuracy, loss in training_sequence:
+    if criterion.should_stop(epoch, accuracy, loss):
+        print(f"Stopped at epoch {epoch} with {accuracy:.1%} accuracy")
+        break
+```
+
+### Example 2: Comparing Standard vs Accuracy Floor
+```python
+# Standard plateau criterion
+standard = PlateauCriterion(patience=10)
+
+# Enhanced with accuracy floor
+enhanced = PlateauCriterion(patience=10, accuracy_floor=0.85)
+
+# Same training data
+training_data = [
+    (0, 0.7, 1.0),   # Standard: counts patience, Enhanced: no patience
+    (1, 0.8, 1.1),   # Standard: patience=1, Enhanced: patience=0
+    (2, 0.9, 1.0),   # Standard: patience=0 (improved), Enhanced: patience=0
+    (3, 0.91, 1.1),  # Standard: patience=1, Enhanced: patience=1
+    # Enhanced only starts counting when accuracy >= 0.85
+]
+```
+
+### Example 3: CLI Usage Patterns
+```bash
+# For early training cycles (small datasets)
+python -m audioloop.train training_sets/training_set_v1.csv --accuracy-floor 0.85
+
+# For established models (larger datasets)  
+python -m audioloop.train training_sets/training_set_v3.csv --accuracy-floor 0.95 --patience 30
+
+# For fine-tuning (be very patient at high accuracy)
+python -m audioloop.train training_sets/training_set_v5.csv --accuracy-floor 0.98 --patience 50
 ```
 
 ## Further Reading

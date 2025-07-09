@@ -19,3 +19,4 @@ CLAUDE.md
 *png
 .ropeproject
 .coverage
+.pytest_cache
