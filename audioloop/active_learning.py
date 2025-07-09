@@ -27,6 +27,7 @@ def run_active_learning_for_class(
     basic_transition_variance_threshold=0.12,
     auto_thresholds=False,
     estimated_positive_pct=None,
+    experiment_name=None,
     **dataset_kwargs,
 ):
     """
@@ -49,6 +50,7 @@ def run_active_learning_for_class(
         basic_transition_variance_threshold: Std confidence threshold for basic transition (default: 0.12)
         auto_thresholds: Automatically calculate thresholds based on dataset characteristics (default: False)
         estimated_positive_pct: Estimated percentage of positive samples (0.0-1.0). Used with auto_thresholds.
+        experiment_name: Optional experiment name to customize output directory
         **dataset_kwargs: Additional dataset-specific configuration
 
     Returns:
@@ -87,6 +89,7 @@ def run_active_learning_for_class(
         basic_transition_variance_threshold=basic_transition_variance_threshold,
         auto_thresholds=auto_thresholds,
         estimated_positive_pct=estimated_positive_pct,
+        experiment_name=experiment_name,
         **dataset_kwargs,
     )
 
@@ -118,6 +121,9 @@ Examples:
 
   # List all available classes
   python -m audioloop.active_learning --list-classes
+
+  # Use custom experiment name (outputs go to outputs_myexp/)
+  python -m audioloop.active_learning --class-name siren --run-number 1 --experiment myexp
         """,
     )
 
@@ -148,7 +154,7 @@ Examples:
     parser.add_argument(
         "--model",
         type=str,
-        help="Path to trained model file (default: outputs/model_v{run_number}.pt)",
+        help="Path to trained model file (default: outputs/model_v{run_number}.pt or outputs_experiment/model_v{run_number}.pt)",
     )
 
     # Optional parameters
@@ -224,6 +230,11 @@ Examples:
         type=float,
         help="Estimated percentage of positive samples in dataset (0.0-1.0). Used with --auto-thresholds. If not specified, uses dataset defaults.",
     )
+    parser.add_argument(
+        "--experiment",
+        type=str,
+        help="Experiment name to customize output directory (default: outputs, with experiment: outputs_experiment)",
+    )
 
     args = parser.parse_args()
 
@@ -243,7 +254,8 @@ Examples:
 
     # Default model path based on run_number if not specified
     if not args.model:
-        args.model = f"outputs/model_v{args.run_number}.pt"
+        output_dir = f"outputs_{args.experiment}" if args.experiment else "outputs"
+        args.model = f"{output_dir}/model_v{args.run_number}.pt"
         print(f"Using default model path: {args.model}")
     else:
         # If model path provided, try to extract version number from it
@@ -306,6 +318,7 @@ Examples:
         basic_transition_variance_threshold=args.basic_transition_variance_threshold,
         auto_thresholds=args.auto_thresholds,
         estimated_positive_pct=args.estimated_positive_pct,
+        experiment_name=args.experiment,
     )
 
     print("\n✅ Active learning cycle completed!")

@@ -281,6 +281,11 @@ Example Usage:
         default="outputs",
         help="Directory containing the 'predictions_v*.csv' files (default: 'outputs').",
     )
+    parser.add_argument(
+        "--experiment",
+        type=str,
+        help="Experiment name to customize output directory (default: outputs, with experiment: outputs_experiment)",
+    )
     parser.add_argument("--plot", action="store_true", help="Display plots of the metrics.")
     parser.add_argument(
         "--save-plot",
@@ -290,6 +295,10 @@ Example Usage:
     )
 
     args = parser.parse_args()
+
+    # Use experiment-aware output directory if specified
+    if args.experiment:
+        args.output_dir = f"outputs_{args.experiment}" if args.experiment else "outputs"
 
     try:
         metrics_results = track_metrics_across_versions(args.output_dir)

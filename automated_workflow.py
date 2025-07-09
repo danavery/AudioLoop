@@ -33,6 +33,7 @@ from audioloop.merge_labels import merge_training_sets
 from audioloop.training_core import run_training
 
 
+
 def auto_label_candidates(candidates_file, dataset_name="urbansound8k", audio_dir=None):
     """
     Automatically label candidates using the auto-label functionality.
@@ -114,7 +115,7 @@ def run_automated_workflow(
     # Training parameters
     epochs=1000,
     batch_size=32,
-    learning_rate=1e-3,
+    learning_rate=0.001,
     stopping_criterion="plateau",
     patience=20,
     min_delta=0.01,
@@ -130,6 +131,7 @@ def run_automated_workflow(
     basic_transition_variance_threshold=0.12,
     auto_thresholds=False,
     estimated_positive_pct=None,
+    experiment_name=None,
 ):
     """
     Run the complete automated active learning workflow.
@@ -188,7 +190,8 @@ def run_automated_workflow(
         print("█" * 80)
 
         current_training_set = f"training_sets/training_set_v{cycle}.csv"
-        current_model = f"outputs/model_v{cycle}.pt"
+        output_dir = f"outputs_{experiment_name}" if experiment_name else "outputs"
+        current_model = f"{output_dir}/model_v{cycle}.pt"
 
         # Use the training set from the previous cycle if current doesn't exist
         if not os.path.exists(current_training_set) and len(training_sets) > 0:
@@ -223,6 +226,7 @@ def run_automated_workflow(
                 model_path=current_model,
                 version=cycle,
                 stopping_criterion=criterion,
+                experiment_name=experiment_name,
             )
             print(f"   ✅ Model trained (final accuracy: {final_accuracy:.3f})")
         except Exception as e:
@@ -248,6 +252,7 @@ def run_automated_workflow(
                 basic_transition_variance_threshold=basic_transition_variance_threshold,
                 auto_thresholds=auto_thresholds,
                 estimated_positive_pct=estimated_positive_pct,
+                experiment_name=experiment_name,
             )
             print(f"   ✅ Generated candidates: {candidates_file}")
         except Exception as e:
@@ -458,6 +463,11 @@ Prerequisites:
         type=float,
         help="Estimated percentage of positive samples in dataset (0.0-1.0). Used with --auto-thresholds. If not specified, uses dataset defaults.",
     )
+    parser.add_argument(
+        "--experiment",
+        type=str,
+        help="Experiment name to customize output directory (default: outputs, with experiment: outputs_experiment)",
+    )
 
     args = parser.parse_args()
 
@@ -500,6 +510,7 @@ Prerequisites:
             basic_transition_variance_threshold=args.basic_transition_variance_threshold,
             auto_thresholds=args.auto_thresholds,
             estimated_positive_pct=args.estimated_positive_pct,
+            experiment_name=args.experiment,
         )
 
         if training_sets:

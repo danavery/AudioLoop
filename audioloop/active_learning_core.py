@@ -1,5 +1,6 @@
 import csv
 import os
+from pathlib import Path
 
 import torch
 import torch.nn.functional as F
@@ -64,6 +65,7 @@ def run_binary_inference(
     dataset_file=None,
     positive_class_id=8,
     training_set_csv=None,
+    experiment_name=None,
     **dataset_kwargs,
 ):
     """
@@ -227,7 +229,8 @@ def run_binary_inference(
                 results.append(result)
 
     # Ensure outputs directory exists
-    os.makedirs("outputs", exist_ok=True)
+    output_dir = f"outputs_{experiment_name}" if experiment_name else "outputs"
+    Path(output_dir).mkdir(exist_ok=True)
 
     # Save results to CSV
     fieldnames = [
@@ -244,7 +247,6 @@ def run_binary_inference(
         "fold",
         "filepath",
     ]
-
     with open(predictions_csv, "w", newline="") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
@@ -262,16 +264,16 @@ def run_binary_inference(
 
 
 def run_active_learning_cycle(
-    positive_class_id=8,
-    positive_class_name="siren",
-    negative_class_name="not_siren",
+    positive_class_id,
+    positive_class_name,
+    negative_class_name,
     model_path=None,
     dataset_name="urbansound8k",
     dataset_file=None,
     run_number=1,
     training_set_csv=None,
-    total_candidates=50,
-    positive_percentage=0.75,
+    total_candidates=20,
+    positive_percentage=0.6,
     min_confidence=0.8,
     selection_mode="confidence",
     basic_transition_f1_threshold=0.2,
@@ -279,6 +281,7 @@ def run_active_learning_cycle(
     basic_transition_variance_threshold=0.12,
     auto_thresholds=False,
     estimated_positive_pct=None,
+    experiment_name=None,
     **dataset_kwargs,
 ):
     """
@@ -301,15 +304,20 @@ def run_active_learning_cycle(
         basic_transition_variance_threshold: Std confidence threshold for basic transition (default: 0.12)
         auto_thresholds: Automatically calculate thresholds based on dataset characteristics (default: False)
         estimated_positive_pct: Estimated percentage of positive samples (0.0-1.0). Used with auto_thresholds.
+        experiment_name: Optional experiment name to customize output directory
         **dataset_kwargs: Additional dataset-specific configuration
 
     Returns:
         tuple: (predictions_file, candidates_file)
     """
 
+    # Determine output directory and ensure it exists
+    output_dir = f"outputs_{experiment_name}" if experiment_name else "outputs"
+    Path(output_dir).mkdir(exist_ok=True)
+
     # Use versioned model path if not specified
     if model_path is None:
-        model_path = f"outputs/model_v{run_number}.pt"
+        model_path = f"{output_dir}/model_v{run_number}.pt"
 
     # Auto-detect training set if not provided
     if training_set_csv is None:
@@ -323,7 +331,7 @@ def run_active_learning_cycle(
 
     # Step 1: Run inference on all files
     print("\nStep 1: Running binary classification inference...")
-    predictions_file = f"outputs/predictions_v{run_number}.csv"
+    predictions_file = f"{output_dir}/predictions_v{run_number}.csv"
 
     _ = run_binary_inference(
         model_path=model_path,
@@ -334,12 +342,13 @@ def run_active_learning_cycle(
         dataset_file=dataset_file,
         positive_class_id=positive_class_id,
         training_set_csv=training_set_csv,
+        experiment_name=experiment_name,
         **dataset_kwargs,
     )
 
     # Step 2: Select candidates for active learning
     print("\nStep 2: Selecting candidates for human labeling...")
-    candidates_file = f"outputs/labeling_candidates_v{run_number}.csv"
+    candidates_file = f"{output_dir}/labeling_candidates_v{run_number}.csv"
 
     # Create strategy with basic transition parameters
     strategy_kwargs = {}

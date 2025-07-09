@@ -1,6 +1,7 @@
 import os
 import random
 import time
+from pathlib import Path
 
 import torch
 import torch.optim as optim
@@ -9,6 +10,7 @@ from torch.utils.data import DataLoader
 
 from .models.cnn_5layer import SoundCNN
 from .utils.data_utils import get_device, simple_collate_fn
+
 from .utils.spectrogram_dataset import SpectrogramDataset
 from .utils.stopping_criteria import PlateauCriterion
 
@@ -69,6 +71,7 @@ def run_training(
     version=None,
     use_batchnorm=None,
     stopping_criterion=None,
+    experiment_name=None,
 ):
     """
     Run training for a binary audio classification model.
@@ -84,6 +87,7 @@ def run_training(
         version: Model version number (for auto-generated paths)
         use_batchnorm: Whether to use BatchNorm (auto-decided if None)
         stopping_criterion: Training stopping criterion (PlateauCriterion if None)
+        experiment_name: Optional experiment name to customize output directory
 
     Returns:
         Final training accuracy
@@ -194,9 +198,10 @@ def run_training(
     # Save the best model state if available, otherwise save final model
     # This ensures that when early stopping triggers (e.g., patience exhausted),
     # we save the model from the epoch with the best performance, not the final epoch
-    os.makedirs("outputs", exist_ok=True)
+    output_dir = f"outputs_{experiment_name}" if experiment_name else "outputs"
+    Path(output_dir).mkdir(exist_ok=True)
     if model_path is None:
-        model_path = f"outputs/model_v{version}.pt"
+        model_path = f"{output_dir}/model_v{version or 1}.pt"
 
     best_model_state = stopping_criterion.get_best_model_state()
     if best_model_state is not None:

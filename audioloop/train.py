@@ -4,6 +4,7 @@ import re
 from .training_core import run_training, set_seed, train_epoch
 from .utils.stopping_criteria import AccuracyCriterion, PlateauCriterion
 
+
 # Re-export for backward compatibility
 __all__ = ["main", "run_training", "set_seed", "train_epoch"]
 
@@ -13,7 +14,7 @@ def main():
     parser = argparse.ArgumentParser(description="Train a binary audio classification model")
     parser.add_argument("labels_file", help="Path to CSV file with training labels")
     parser.add_argument(
-        "-o", "--output", help="Path to save trained model (default: auto-generated in outputs/)"
+        "-o", "--output", help="Path to save trained model (default: auto-generated in outputs/ or outputs_experiment/)"
     )
     parser.add_argument(
         "-v",
@@ -65,6 +66,11 @@ def main():
         default=None,
         help="Only count plateau patience when accuracy >= this threshold (default: None)",
     )
+    parser.add_argument(
+        "--experiment",
+        type=str,
+        help="Experiment name to customize output directory (default: outputs, with experiment: outputs_experiment)",
+    )
 
     args = parser.parse_args()
 
@@ -90,6 +96,11 @@ def main():
         stopping_criterion = PlateauCriterion(
             patience=args.patience, min_delta=args.min_delta, max_epochs=args.epochs, accuracy_floor=args.accuracy_floor
         )
+
+    # Use experiment-aware model path if output not specified
+    if args.output is None:
+        output_dir = f"outputs_{args.experiment}" if args.experiment else "outputs"
+        args.output = f"{output_dir}/model_v{args.version}.pt"
 
     # Run training with CLI arguments
     accuracy = run_training(
