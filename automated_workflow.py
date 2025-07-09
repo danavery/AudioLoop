@@ -22,7 +22,9 @@ Usage:
 
 import argparse
 import csv
+import json
 import os
+import sys
 import time
 
 from audioloop.active_learning import run_active_learning_for_class
@@ -472,6 +474,32 @@ Prerequisites:
     )
 
     args = parser.parse_args()
+
+    # Determine output directory
+    output_dir = f"outputs_{args.experiment}" if args.experiment else "outputs"
+
+    # Create output directory if it doesn't exist
+    os.makedirs(output_dir, exist_ok=True)
+
+    # Save command line arguments to the output directory
+    command_info = {
+        "command": " ".join(sys.argv),
+        "arguments": vars(args),
+        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+    # Save JSON file with full information
+    command_file = os.path.join(output_dir, "command_line.json")
+    with open(command_file, "w") as f:
+        json.dump(command_info, f, indent=2)
+
+    # Save plain text file with just the command
+    command_txt_file = os.path.join(output_dir, "command_line.txt")
+    with open(command_txt_file, "w") as f:
+        f.write(" ".join(sys.argv) + "\n")
+
+    print(f"📝 Command line saved to: {command_file}")
+    print(f"📝 Command line text saved to: {command_txt_file}")
 
     # Validate arguments
     if args.positive_pct < 0 or args.positive_pct > 1:
