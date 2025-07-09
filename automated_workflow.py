@@ -115,6 +115,10 @@ def run_automated_workflow(
     epochs=1000,
     batch_size=32,
     learning_rate=1e-3,
+    stopping_criterion="plateau",
+    patience=20,
+    min_delta=0.01,
+    accuracy_floor=None,
     # Active learning parameters
     total_candidates=50,
     positive_percentage=0.75,
@@ -139,6 +143,10 @@ def run_automated_workflow(
         epochs: Max training epochs per cycle
         batch_size: Training batch size
         learning_rate: Training learning rate
+        stopping_criterion: Stopping criterion to use ('accuracy' or 'plateau')
+        patience: Patience for plateau stopping criterion
+        min_delta: Minimum delta for plateau stopping criterion
+        accuracy_floor: Only count patience when accuracy >= this threshold
         total_candidates: Number of candidates to select per cycle
         positive_percentage: Target percentage of positive samples in candidates
         min_confidence: Minimum confidence threshold for candidate selection
@@ -194,6 +202,19 @@ def run_automated_workflow(
         print(f"   Model output: {current_model}")
 
         try:
+            # Create stopping criterion
+            if stopping_criterion == "accuracy":
+                from audioloop.utils.stopping_criteria import AccuracyCriterion
+                criterion = AccuracyCriterion(max_epochs=epochs)
+            else:  # plateau
+                from audioloop.utils.stopping_criteria import PlateauCriterion
+                criterion = PlateauCriterion(
+                    patience=patience,
+                    min_delta=min_delta,
+                    max_epochs=epochs,
+                    accuracy_floor=accuracy_floor
+                )
+
             final_accuracy = run_training(
                 labels_file=current_training_set,
                 max_epochs=epochs,
@@ -201,6 +222,7 @@ def run_automated_workflow(
                 learning_rate=learning_rate,
                 model_path=current_model,
                 version=cycle,
+                stopping_criterion=criterion,
             )
             print(f"   ✅ Model trained (final accuracy: {final_accuracy:.3f})")
         except Exception as e:
@@ -297,6 +319,9 @@ Examples:
   # Custom training parameters
   python automated_workflow.py --class-name gun_shot --cycles 3 --epochs 500 --batch-size 64
 
+  # Custom stopping criteria
+  python automated_workflow.py --class-name siren --cycles 2 --accuracy-floor 0.95 --patience 30
+
   # Custom active learning parameters
   python automated_workflow.py --class-name jackhammer --cycles 2 --candidates 100 --positive-pct 0.8
 
@@ -350,6 +375,32 @@ Prerequisites:
     )
     parser.add_argument(
         "--learning-rate", type=float, default=1e-3, help="Learning rate (default: 0.001)"
+    )
+
+    # Stopping criteria parameters
+    parser.add_argument(
+        "--stopping-criterion",
+        choices=["accuracy", "plateau"],
+        default="plateau",
+        help="Stopping criterion to use (default: plateau)",
+    )
+    parser.add_argument(
+        "--patience",
+        type=int,
+        default=20,
+        help="Patience for plateau stopping criterion (default: 20)",
+    )
+    parser.add_argument(
+        "--min-delta",
+        type=float,
+        default=0.01,
+        help="Minimum delta for plateau stopping criterion (default: 0.01)",
+    )
+    parser.add_argument(
+        "--accuracy-floor",
+        type=float,
+        default=None,
+        help="Only count plateau patience when accuracy >= this threshold (default: None)",
     )
 
     # Active learning parameters
@@ -436,6 +487,10 @@ Prerequisites:
             epochs=args.epochs,
             batch_size=args.batch_size,
             learning_rate=args.learning_rate,
+            stopping_criterion=args.stopping_criterion,
+            patience=args.patience,
+            min_delta=args.min_delta,
+            accuracy_floor=args.accuracy_floor,
             total_candidates=args.candidates,
             positive_percentage=args.positive_pct,
             min_confidence=args.min_confidence,

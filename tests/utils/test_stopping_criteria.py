@@ -1098,5 +1098,6 @@ class TestPlateauCriterionAccuracyFloor:
 
         # Best model should be the one with best loss
         best_model = criterion.get_best_model_state()
+        assert best_model is not None
         assert best_model["epoch"] == 3
         assert best_model["loss"] == 0.8
