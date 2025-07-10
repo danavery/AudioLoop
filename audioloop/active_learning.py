@@ -192,7 +192,7 @@ Examples:
     parser.add_argument(
         "--training-set",
         type=str,
-        help="Path to training set CSV (default: training_sets/training_set_v{run_number}.csv)",
+        help="Path to training set CSV (default: training_sets/training_set_v{run_number}.csv or training_sets_experiment/training_set_v{run_number}.csv)",
     )
     parser.add_argument(
         "--selection-mode",
@@ -326,8 +326,9 @@ Examples:
     print(f"🏷️  Candidates: {candidates_file}")
     print("\nNext steps:")
     print(f"1. Label candidates: python -m audioloop.label_audio {candidates_file}")
+    training_sets_dir = f"training_sets_{args.experiment}" if args.experiment else "training_sets"
     print(
-        f"2. Merge labels: python -m audioloop.merge_labels training_sets/training_set_v{args.run_number}.csv {candidates_file}"
+        f"2. Merge labels: python -m audioloop.merge_labels {training_sets_dir}/training_set_v{args.run_number}.csv {candidates_file}"
     )
 
 

@@ -107,6 +107,7 @@ def create_training_set(
     dataset_name: str = "urbansound8k",
     output_path: str = "training_sets/training_set_v1.csv",
     positive_percentage: float = 0.5,
+    experiment_name: str | None = None,
     **kwargs,
 ) -> tuple[list[str], list[str]]:
     """Create training set CSV file for any dataset and class.
@@ -117,8 +118,13 @@ def create_training_set(
         dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
         output_path: Path to save training set CSV
         positive_percentage: Percentage of samples that should be positive (0.0-1.0)
+        experiment_name: Optional experiment name to adjust output path
         **kwargs: Additional dataset-specific parameters
     """
+    # Adjust output path for experiment if provided
+    if experiment_name and output_path == "training_sets/training_set_v1.csv":
+        output_path = f"training_sets_{experiment_name}/training_set_v1.csv"
+
     n_positive = int(n * positive_percentage)
     n_negative = n - n_positive
 
@@ -211,6 +217,11 @@ Examples:
         help="Percentage positive (0.0-1.0, default 0.75)",
     )
     parser.add_argument("--output", default="training_sets/training_set_v1.csv", help="Output path")
+    parser.add_argument(
+        "--experiment",
+        type=str,
+        help="Experiment name to customize training set directory (default: training_sets, with experiment: training_sets_experiment)",
+    )
 
     # Dataset-specific parameters
     parser.add_argument("--metadata-csv", help="Path to metadata CSV (UrbanSound8K)")
@@ -257,12 +268,13 @@ Examples:
         list_available_classes(dataset_name, **dataset_kwargs)
     else:
         try:
-            create_training_set(
+            positive_files, negative_files = create_training_set(
                 n=args.n,
                 class_name=args.class_name,
                 dataset_name=dataset_name,
                 output_path=args.output,
                 positive_percentage=args.positive_pct,
+                experiment_name=args.experiment,
                 **dataset_kwargs,
             )
         except ValueError as e:

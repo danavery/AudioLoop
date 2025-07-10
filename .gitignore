@@ -12,7 +12,7 @@ wheels/
 .ruff_cache
 data/
 outputs*/
-training_sets/
+training_sets*/
 
 .claude/
 CLAUDE.md

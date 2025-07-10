@@ -19,7 +19,13 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None):
     if output_csv is None:
         base = os.path.splitext(os.path.basename(original_csv))[0]
         version = int(base.split("_v")[1]) + 1 if "v" in base else 2
-        output_csv = f"training_sets/training_set_v{version}.csv"
+        # Extract experiment name from input path if it exists
+        parent_dir = os.path.dirname(original_csv)
+        if parent_dir.startswith("training_sets_"):
+            experiment_name = parent_dir.replace("training_sets_", "")
+            output_csv = f"training_sets_{experiment_name}/training_set_v{version}.csv"
+        else:
+            output_csv = f"training_sets/training_set_v{version}.csv"
 
     all_data = []
 
@@ -142,6 +148,11 @@ if __name__ == "__main__":
     print("4. Train model and run next cycle:")
     print("   python -m audioloop.train training_sets/training_set_v2.csv -v 2")
     print("   python -m audioloop.active_learning --class-name siren --run-number 2")
+    print()
+    print("For experiments, use matching directories:")
+    print(
+        "   python -m audioloop.merge_labels training_sets_exp/training_set_v1.csv outputs_exp/labeling_candidates_v1.csv"
+    )
     print()
 
     main()

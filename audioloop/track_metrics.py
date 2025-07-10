@@ -13,6 +13,7 @@ import glob
 import os
 import re
 from collections import defaultdict
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
@@ -92,12 +93,17 @@ def track_metrics_across_versions(output_dir: str) -> dict[int, dict]:
     if not prediction_files:
         raise FileNotFoundError(f"No 'predictions_v*.csv' files found in '{output_dir}'")
 
-    print("Tracking Key Metrics Across Versions:")
-    print("-" * 120)
-    print(
-        f"{'Version':<10} {'F1-Score':<12} {'Precision':<12} {'Recall':<10} {'Neg Acc':<10} {'Mean Conf':<12} {'Std Conf':<11} {'p05-p95 Conf':<15} {'Pred/Actual+':<15}"
-    )
-    print("-" * 120)
+    # Prepare output lines for both console and file
+    output_lines = []
+    output_lines.append("Tracking Key Metrics Across Versions:")
+    output_lines.append("-" * 120)
+    header = f"{'Version':<10} {'F1-Score':<12} {'Precision':<12} {'Recall':<10} {'Neg Acc':<10} {'Mean Conf':<12} {'Std Conf':<11} {'p05-p95 Conf':<15} {'Pred/Actual+':<15}"
+    output_lines.append(header)
+    output_lines.append("-" * 120)
+
+    # Print to console
+    for line in output_lines:
+        print(line)
 
     all_metrics = {}
     for f in prediction_files:
@@ -106,7 +112,7 @@ def track_metrics_across_versions(output_dir: str) -> dict[int, dict]:
             metrics = calculate_core_metrics(f)
             all_metrics[version] = metrics
             p05_p95_str = f"{metrics['p05_confidence']:.2f}-{metrics['p95_confidence']:.2f}"
-            print(
+            metrics_line = (
                 f"v{version:<8} {metrics['f1_score']:<12.3f} "
                 f"{metrics['precision']:<12.3f} {metrics['recall']:<10.3f} "
                 f"{metrics['negative_class_accuracy']:<10.3f} "
@@ -114,15 +120,29 @@ def track_metrics_across_versions(output_dir: str) -> dict[int, dict]:
                 f"{p05_p95_str:<15} "
                 f"{metrics['predicted_positive_ratio']:.1%}/{metrics['actual_positive_ratio']:.1%}"
             )
+            print(metrics_line)
+            output_lines.append(metrics_line)
         except Exception as e:
-            print(f"Could not process file {os.path.basename(f)}: {e}")
+            error_line = f"Could not process file {os.path.basename(f)}: {e}"
+            print(error_line)
+            output_lines.append(error_line)
 
-    print("-" * 120)
+    separator = "-" * 120
+    print(separator)
+    output_lines.append(separator)
+
+    # Save to file
+    Path(output_dir).mkdir(exist_ok=True)
+    metrics_file = os.path.join(output_dir, "metrics_summary.txt")
+    with open(metrics_file, "w") as f:
+        f.write("\n".join(output_lines))
+    print(f"\nMetrics summary saved to: {metrics_file}")
+
     return all_metrics
 
 
-def analyze_trends(results: dict[int, dict]):
-    """Prints a summary of the overall trends for key metrics."""
+def analyze_trends(results: dict[int, dict], output_dir: str):
+    """Prints a summary of the overall trends for key metrics and saves to file."""
     if len(results) < 2:
         return
 
@@ -130,27 +150,29 @@ def analyze_trends(results: dict[int, dict]):
     start_v, end_v = versions[0], versions[-1]
     start_m, end_m = results[start_v], results[end_v]
 
-    print("\nOverall Performance Summary:")
-    print("=" * 35)
+    # Prepare output lines for both console and file
+    trend_lines = []
+    trend_lines.append("\nOverall Performance Summary:")
+    trend_lines.append("=" * 35)
 
-    def print_trend(metric_name: str, start_val: float, end_val: float, higher_is_better: bool):
+    def format_trend(metric_name: str, start_val: float, end_val: float, higher_is_better: bool):
         change = end_val - start_val
         arrow = "↑" if (change > 0) == higher_is_better else "↓"
-        print(f"{arrow} {metric_name:<20}: {start_val:.3f} -> {end_val:.3f} ({change:+.3f})")
+        return f"{arrow} {metric_name:<20}: {start_val:.3f} -> {end_val:.3f} ({change:+.3f})"
 
-    print_trend("F1-Score", start_m["f1_score"], end_m["f1_score"], higher_is_better=True)
-    print_trend(
+    trend_lines.append(format_trend("F1-Score", start_m["f1_score"], end_m["f1_score"], higher_is_better=True))
+    trend_lines.append(format_trend(
         "Negative Class Acc",
         start_m["negative_class_accuracy"],
         end_m["negative_class_accuracy"],
         True,
-    )
-    print_trend("Mean Confidence", start_m["mean_confidence"], end_m["mean_confidence"], True)
-    print_trend("Std Confidence", start_m["std_confidence"], end_m["std_confidence"], True)
-    print_trend(
+    ))
+    trend_lines.append(format_trend("Mean Confidence", start_m["mean_confidence"], end_m["mean_confidence"], True))
+    trend_lines.append(format_trend("Std Confidence", start_m["std_confidence"], end_m["std_confidence"], True))
+    trend_lines.append(format_trend(
         "Confidence p05", start_m["p05_confidence"], end_m["p05_confidence"], True
-    )  # Rising floor is good
-    print_trend("Mean Entropy", start_m["mean_entropy"], end_m["mean_entropy"], False)
+    ))  # Rising floor is good
+    trend_lines.append(format_trend("Mean Entropy", start_m["mean_entropy"], end_m["mean_entropy"], False))
 
     pred_ratio_change = end_m["predicted_positive_ratio"] - start_m["predicted_positive_ratio"]
     actual_ratio = end_m["actual_positive_ratio"]
@@ -161,10 +183,19 @@ def analyze_trends(results: dict[int, dict]):
             < abs(start_m["predicted_positive_ratio"] - actual_ratio)
             else "❌"
         )
-        print(
+        trend_lines.append(
             f"{arrow} Predicted+ Ratio     : {start_m['predicted_positive_ratio']:.1%} -> {end_m['predicted_positive_ratio']:.1%} (target: {actual_ratio:.1%})"
         )
-    print("=" * 35)
+    trend_lines.append("=" * 35)
+
+    # Print to console
+    for line in trend_lines:
+        print(line)
+
+    # Append to metrics file
+    metrics_file = os.path.join(output_dir, "metrics_summary.txt")
+    with open(metrics_file, "a") as f:
+        f.write("\n".join(trend_lines))
 
 
 def plot_core_trends(results: dict[int, dict], save_path: str | None = None):
@@ -274,12 +305,10 @@ Example Usage:
 
   # Analyze metrics and save the plot to a file
   python -m audioloop.track_metrics --save-plot learning_curves.png
+
+  # Track metrics from experiment directory
+  python -m audioloop.track_metrics --experiment myexp --plot
         """,
-    )
-    parser.add_argument(
-        "--output-dir",
-        default="outputs",
-        help="Directory containing the 'predictions_v*.csv' files (default: 'outputs').",
     )
     parser.add_argument(
         "--experiment",
@@ -296,13 +325,12 @@ Example Usage:
 
     args = parser.parse_args()
 
-    # Use experiment-aware output directory if specified
-    if args.experiment:
-        args.output_dir = f"outputs_{args.experiment}" if args.experiment else "outputs"
+    # Determine output directory based on experiment name
+    output_dir = f"outputs_{args.experiment}" if args.experiment else "outputs"
 
     try:
-        metrics_results = track_metrics_across_versions(args.output_dir)
-        analyze_trends(metrics_results)
+        metrics_results = track_metrics_across_versions(output_dir)
+        analyze_trends(metrics_results, output_dir)
         if args.plot or args.save_plot:
             plot_core_trends(metrics_results, args.save_plot)
     except FileNotFoundError as e:

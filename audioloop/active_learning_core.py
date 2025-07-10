@@ -321,7 +321,10 @@ def run_active_learning_cycle(
 
     # Auto-detect training set if not provided
     if training_set_csv is None:
-        training_set_csv = f"training_sets/training_set_v{run_number}.csv"
+        training_sets_dir = (
+            f"training_sets_{experiment_name}" if experiment_name else "training_sets"
+        )
+        training_set_csv = f"{training_sets_dir}/training_set_v{run_number}.csv"
 
     print(f"Using model: {model_path}")
     if os.path.exists(training_set_csv):

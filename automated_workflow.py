@@ -176,11 +176,17 @@ def run_automated_workflow(
     print("=" * 80)
 
     # Check that initial training set exists
-    initial_training_set = "training_sets/training_set_v1.csv"
+    training_sets_dir = f"training_sets_{experiment_name}" if experiment_name else "training_sets"
+    initial_training_set = f"{training_sets_dir}/training_set_v1.csv"
     if not os.path.exists(initial_training_set):
         print(f"❌ Initial training set not found: {initial_training_set}")
         print("💡 Create it first with:")
-        print(f"   python -m audioloop.utils.start_labeling --class-name {class_name} --n 40")
+        if experiment_name:
+            print(
+                f"   python -m audioloop.utils.start_labeling --class-name {class_name} --n 40 --output {initial_training_set}"
+            )
+        else:
+            print(f"   python -m audioloop.utils.start_labeling --class-name {class_name} --n 40")
         return []
 
     training_sets = [initial_training_set]
@@ -190,7 +196,7 @@ def run_automated_workflow(
         print(f"🔄 CYCLE {cycle} of {num_cycles}")
         print("█" * 80)
 
-        current_training_set = f"training_sets/training_set_v{cycle}.csv"
+        current_training_set = f"{training_sets_dir}/training_set_v{cycle}.csv"
         output_dir = f"outputs_{experiment_name}" if experiment_name else "outputs"
         current_model = f"{output_dir}/model_v{cycle}.pt"
 
