@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from .models.cnn_5layer import SoundCNN
+from .models import SoundCNN
 from .utils.candidate_selection import (
     load_predictions,
     print_selection_statistics,
@@ -35,23 +35,7 @@ def load_training_set_filenames(training_set_csv):
 
 def load_model(model_path, num_classes, device):
     """Load a trained model from disk."""
-    # Load the state dict first to detect architecture
-    state_dict = torch.load(model_path, map_location=device)
-
-    # Handle both direct state dict and checkpoint format
-    if "model_state_dict" in state_dict:
-        actual_state_dict = state_dict["model_state_dict"]
-    else:
-        actual_state_dict = state_dict
-
-    # Detect if the model was trained with BatchNorm by checking for bn keys
-    has_batchnorm = any("bn" in key for key in actual_state_dict)
-
-    # Create model with appropriate BatchNorm setting
-    model = SoundCNN(num_classes=num_classes, kernel_size=(3, 3), use_batchnorm=has_batchnorm)
-
-    model.load_state_dict(actual_state_dict)
-    model.to(device)
+    model = SoundCNN.load_model(model_path, device)
     model.eval()
     return model
 

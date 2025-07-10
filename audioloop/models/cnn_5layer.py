@@ -1,9 +1,29 @@
+import torch
 import torch.nn as nn
 
+from .base import AudioLoopModel
 
-class SoundCNN(nn.Module):
-    def __init__(self, num_classes, kernel_size, use_batchnorm=True):
+
+class SoundCNN(nn.Module, AudioLoopModel):
+    def __init__(
+        self,
+        num_classes,
+        kernel_size=(3, 3),
+        dataset_size=None,
+        batchnorm_threshold=100.0,
+        _use_batchnorm=None,
+        **kwargs,
+    ):
         super().__init__()
+        self.num_classes = num_classes
+        self.kernel_size = kernel_size
+        self.batchnorm_threshold = batchnorm_threshold
+
+        # Auto-decide BatchNorm based on dataset size, unless explicitly overridden
+        if _use_batchnorm is not None:
+            use_batchnorm = _use_batchnorm
+        else:
+            use_batchnorm = dataset_size is None or dataset_size >= batchnorm_threshold
         self.use_batchnorm = use_batchnorm
         padding = (kernel_size[0] // 2, kernel_size[1] // 2)
 
@@ -93,3 +113,42 @@ class SoundCNN(nn.Module):
             x = self.dropout(x)
         x = self.fc2(x)
         return x
+
+    def save_model(self, path: str) -> None:
+        """Save model with metadata."""
+        save_dict = {
+            "model_state_dict": self.state_dict(),
+            "num_classes": self.num_classes,
+            "kernel_size": self.kernel_size,
+            "use_batchnorm": self.use_batchnorm,
+            "batchnorm_threshold": self.batchnorm_threshold,
+            "model_type": "SoundCNN",
+        }
+        torch.save(save_dict, path)
+
+    @classmethod
+    def load_model(cls, path: str, device: torch.device) -> "SoundCNN":
+        """Load model from disk."""
+        checkpoint = torch.load(path, map_location=device)
+
+        # Create model with the saved BatchNorm setting (bypassing auto-decision)
+        model = cls(
+            num_classes=checkpoint["num_classes"],
+            kernel_size=checkpoint["kernel_size"],
+            batchnorm_threshold=checkpoint.get("batchnorm_threshold", 100),
+            _use_batchnorm=checkpoint["use_batchnorm"],  # Use the saved BatchNorm setting
+        )
+        model.load_state_dict(checkpoint["model_state_dict"])
+        model.to(device)
+        return model
+
+    def get_model_info(self) -> dict:
+        """Get model metadata."""
+        return {
+            "model_type": "SoundCNN",
+            "num_classes": self.num_classes,
+            "kernel_size": self.kernel_size,
+            "use_batchnorm": self.use_batchnorm,
+            "batchnorm_threshold": self.batchnorm_threshold,
+            "num_parameters": sum(p.numel() for p in self.parameters()),
+        }

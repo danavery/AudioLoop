@@ -119,22 +119,18 @@ def run_training(
         collate_fn=simple_collate_fn,
     )
 
-    # Decide whether to use BatchNorm based on dataset size
-    if use_batchnorm is None:
-        # Auto-decide: BatchNorm works well with larger datasets but can be problematic
-        # with very small datasets due to poor running statistics estimation
-        use_batchnorm = len(train_dataset) >= 100
-        if len(train_dataset) < 100:
-            print(f"⚠️  Small dataset ({len(train_dataset)} samples) detected - disabling BatchNorm")
-
     # Create 5-layer CNN model with appropriate architecture
-    model = SoundCNN(num_classes=num_classes, kernel_size=(3, 3), use_batchnorm=use_batchnorm).to(
-        device
-    )
-    if use_batchnorm:
+    model = SoundCNN(
+        num_classes=num_classes, kernel_size=(3, 3), dataset_size=len(train_dataset)
+    ).to(device)
+
+    # Print BatchNorm decision made by the model
+    if model.use_batchnorm:
         print("Using model WITH BatchNorm")
     else:
-        print("Using model WITHOUT BatchNorm")
+        print(
+            f"⚠️  Small dataset ({len(train_dataset)} samples) detected - using model WITHOUT BatchNorm"
+        )
 
     # Print basic model info
     sample = train_dataset[0]
@@ -203,10 +199,12 @@ def run_training(
 
     best_model_state = stopping_criterion.get_best_model_state()
     if best_model_state is not None:
-        torch.save(best_model_state, model_path)
+        # For best model state, we need to load it into the model and save using the new method
+        model.load_state_dict(best_model_state)
+        model.save_model(model_path)
         print(f"✅ Best model saved to: {model_path}")
     else:
-        torch.save(model.state_dict(), model_path)
+        model.save_model(model_path)
         print(f"📁 Final model saved to: {model_path}")
 
     # Clean up and return
