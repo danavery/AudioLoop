@@ -266,6 +266,7 @@ def run_active_learning_cycle(
     auto_thresholds=False,
     estimated_positive_pct=None,
     experiment_name=None,
+    seed=None,
     **dataset_kwargs,
 ):
     """
@@ -289,6 +290,7 @@ def run_active_learning_cycle(
         auto_thresholds: Automatically calculate thresholds based on dataset characteristics (default: False)
         estimated_positive_pct: Estimated percentage of positive samples (0.0-1.0). Used with auto_thresholds.
         experiment_name: Optional experiment name to customize output directory
+        seed: Random seed for reproducibility (default: None)
         **dataset_kwargs: Additional dataset-specific configuration
 
     Returns:
@@ -363,6 +365,7 @@ def run_active_learning_cycle(
         negative_class_name=negative_class_name,
         positive_percentage=positive_percentage,
         candidate_pool_multiplier=5,
+        random_seed=seed,
     )
     save_candidates(candidates, candidates_file)
     print_selection_statistics(

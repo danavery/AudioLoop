@@ -28,6 +28,7 @@ def run_active_learning_for_class(
     auto_thresholds=False,
     estimated_positive_pct=None,
     experiment_name=None,
+    seed=None,
     **dataset_kwargs,
 ):
     """
@@ -51,6 +52,7 @@ def run_active_learning_for_class(
         auto_thresholds: Automatically calculate thresholds based on dataset characteristics (default: False)
         estimated_positive_pct: Estimated percentage of positive samples (0.0-1.0). Used with auto_thresholds.
         experiment_name: Optional experiment name to customize output directory
+        seed: Random seed for reproducibility (default: None)
         **dataset_kwargs: Additional dataset-specific configuration
 
     Returns:
@@ -90,6 +92,7 @@ def run_active_learning_for_class(
         auto_thresholds=auto_thresholds,
         estimated_positive_pct=estimated_positive_pct,
         experiment_name=experiment_name,
+        seed=seed,
         **dataset_kwargs,
     )
 
@@ -235,6 +238,11 @@ Examples:
         type=str,
         help="Experiment name to customize output directory (default: outputs, with experiment: outputs_experiment)",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        help="Random seed for reproducibility (default: None)",
+    )
 
     args = parser.parse_args()
 
@@ -319,6 +327,7 @@ Examples:
         auto_thresholds=args.auto_thresholds,
         estimated_positive_pct=args.estimated_positive_pct,
         experiment_name=args.experiment,
+        seed=args.seed,
     )
 
     print("\n✅ Active learning cycle completed!")

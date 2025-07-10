@@ -2,6 +2,7 @@ import random
 import time
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.optim as optim
 from torch import nn
@@ -16,6 +17,7 @@ from .utils.stopping_criteria import PlateauCriterion
 def set_seed(seed):
     """Set random seed for reproducible training."""
     random.seed(seed)
+    np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
@@ -61,7 +63,7 @@ def train_epoch(model, train_loader, optimizer, criterion, device):
 def run_training(
     labels_file="labels.csv",
     max_epochs=1000,
-    seed=43,
+    seed=42,
     batch_size=32,
     learning_rate=1e-3,
     specs_dir="data/all_specs",

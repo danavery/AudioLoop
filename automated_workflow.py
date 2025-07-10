@@ -133,6 +133,7 @@ def run_automated_workflow(
     auto_thresholds=False,
     estimated_positive_pct=None,
     experiment_name=None,
+    seed=None,
 ):
     """
     Run the complete automated active learning workflow.
@@ -159,6 +160,7 @@ def run_automated_workflow(
         basic_transition_variance_threshold: Std confidence threshold for basic transition (default: 0.12)
         auto_thresholds: Automatically calculate thresholds based on dataset characteristics (default: False)
         estimated_positive_pct: Estimated percentage of positive samples (0.0-1.0). Used with auto_thresholds.
+        seed: Random seed for reproducibility (default: None)
 
     Returns:
         list: Paths to training sets created during the workflow
@@ -236,6 +238,7 @@ def run_automated_workflow(
                 version=cycle,
                 stopping_criterion=criterion,
                 experiment_name=experiment_name,
+                seed=seed if seed is not None else 42,
             )
             print(f"   ✅ Model trained (final accuracy: {final_accuracy:.3f})")
         except Exception as e:
@@ -262,6 +265,7 @@ def run_automated_workflow(
                 auto_thresholds=auto_thresholds,
                 estimated_positive_pct=estimated_positive_pct,
                 experiment_name=experiment_name,
+                seed=seed,
             )
             print(f"   ✅ Generated candidates: {candidates_file}")
         except Exception as e:
@@ -478,6 +482,11 @@ Prerequisites:
         type=str,
         help="Experiment name to customize output directory (default: outputs, with experiment: outputs_experiment)",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        help="Random seed for reproducibility (default: None)",
+    )
 
     args = parser.parse_args()
 
@@ -547,6 +556,7 @@ Prerequisites:
             auto_thresholds=args.auto_thresholds,
             estimated_positive_pct=args.estimated_positive_pct,
             experiment_name=args.experiment,
+            seed=args.seed,
         )
 
         if training_sets:

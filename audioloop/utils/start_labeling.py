@@ -249,9 +249,11 @@ Examples:
         print(f"Error: {e}")
         exit(1)
 
-    # Set random seed if provided
+    # Set random seed if provided, otherwise use default
     if args.seed is not None:
         random.seed(args.seed)
+    else:
+        random.seed(42)  # Default seed for reproducibility
 
     # Build kwargs for dataset processor
     dataset_kwargs = {}

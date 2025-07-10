@@ -8,7 +8,6 @@ following the same pattern as stopping_criteria.py.
 import csv
 import os
 import random
-import time
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -65,7 +64,7 @@ class ConfidenceStrategy(CandidateSelectionStrategy):
         """Select high-confidence candidates using existing algorithm."""
         positive_percentage = kwargs.get("positive_percentage", 0.8)
         candidate_pool_multiplier = kwargs.get("candidate_pool_multiplier", 5)
-        random_seed = kwargs.get("random_seed", int(time.time()))
+        random_seed = kwargs.get("random_seed", 42)
 
         # Calculate numbers based on percentage
         num_positive = int(num_candidates * positive_percentage)
@@ -116,7 +115,7 @@ class EntropyStrategy(CandidateSelectionStrategy):
         """Select high-entropy candidates using existing algorithm."""
         positive_percentage = kwargs.get("positive_percentage", 0.8)
         candidate_pool_multiplier = kwargs.get("candidate_pool_multiplier", 5)
-        random_seed = kwargs.get("random_seed", int(time.time()))
+        random_seed = kwargs.get("random_seed", 42)
 
         # Calculate numbers based on percentage
         num_positive = int(num_candidates * positive_percentage)
