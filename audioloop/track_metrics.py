@@ -160,19 +160,29 @@ def analyze_trends(results: dict[int, dict], output_dir: str):
         arrow = "↑" if (change > 0) == higher_is_better else "↓"
         return f"{arrow} {metric_name:<20}: {start_val:.3f} -> {end_val:.3f} ({change:+.3f})"
 
-    trend_lines.append(format_trend("F1-Score", start_m["f1_score"], end_m["f1_score"], higher_is_better=True))
-    trend_lines.append(format_trend(
-        "Negative Class Acc",
-        start_m["negative_class_accuracy"],
-        end_m["negative_class_accuracy"],
-        True,
-    ))
-    trend_lines.append(format_trend("Mean Confidence", start_m["mean_confidence"], end_m["mean_confidence"], True))
-    trend_lines.append(format_trend("Std Confidence", start_m["std_confidence"], end_m["std_confidence"], True))
-    trend_lines.append(format_trend(
-        "Confidence p05", start_m["p05_confidence"], end_m["p05_confidence"], True
-    ))  # Rising floor is good
-    trend_lines.append(format_trend("Mean Entropy", start_m["mean_entropy"], end_m["mean_entropy"], False))
+    trend_lines.append(
+        format_trend("F1-Score", start_m["f1_score"], end_m["f1_score"], higher_is_better=True)
+    )
+    trend_lines.append(
+        format_trend(
+            "Negative Class Acc",
+            start_m["negative_class_accuracy"],
+            end_m["negative_class_accuracy"],
+            True,
+        )
+    )
+    trend_lines.append(
+        format_trend("Mean Confidence", start_m["mean_confidence"], end_m["mean_confidence"], True)
+    )
+    trend_lines.append(
+        format_trend("Std Confidence", start_m["std_confidence"], end_m["std_confidence"], True)
+    )
+    trend_lines.append(
+        format_trend("Confidence p05", start_m["p05_confidence"], end_m["p05_confidence"], True)
+    )  # Rising floor is good
+    trend_lines.append(
+        format_trend("Mean Entropy", start_m["mean_entropy"], end_m["mean_entropy"], False)
+    )
 
     pred_ratio_change = end_m["predicted_positive_ratio"] - start_m["predicted_positive_ratio"]
     actual_ratio = end_m["actual_positive_ratio"]

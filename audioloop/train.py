@@ -1,6 +1,7 @@
 import argparse
 import re
 
+from .models import MODEL_TYPES
 from .training_core import run_training, set_seed, train_epoch
 from .utils.stopping_criteria import AccuracyCriterion, PlateauCriterion
 
@@ -8,10 +9,28 @@ from .utils.stopping_criteria import AccuracyCriterion, PlateauCriterion
 __all__ = ["main", "run_training", "set_seed", "train_epoch"]
 
 
+def get_available_models():
+    """Get a list of available model types."""
+    model_descriptions = {
+        "soundcnn": "5-layer CNN with adaptive pooling (default)",
+        "simplecnn": "Lightweight 2-layer CNN",
+        # Add more descriptions here as models are added
+    }
+    # Return descriptions for all models in registry
+    return {k: model_descriptions.get(k, f"{k} model") for k in MODEL_TYPES}
+
+
+def list_models():
+    """Print available models and exit."""
+    print("Available model types:")
+    for model_type, description in get_available_models().items():
+        print(f"  {model_type}: {description}")
+
+
 def main():
     """Main CLI entry point for training."""
     parser = argparse.ArgumentParser(description="Train a binary audio classification model")
-    parser.add_argument("labels_file", help="Path to CSV file with training labels")
+    parser.add_argument("labels_file", nargs="?", help="Path to CSV file with training labels")
     parser.add_argument(
         "-o",
         "--output",
@@ -28,6 +47,15 @@ def main():
     )
     parser.add_argument("-s", "--seed", type=int, default=42, help="Random seed (default: 42)")
     parser.add_argument("-b", "--batch-size", type=int, default=32, help="Batch size (default: 32)")
+    parser.add_argument(
+        "--model-type",
+        choices=list(MODEL_TYPES.keys()),
+        default="soundcnn",
+        help="Model type to use (default: soundcnn). Use --list-models to see all options",
+    )
+    parser.add_argument(
+        "--list-models", action="store_true", help="List available model types and exit"
+    )
     parser.add_argument(
         "-lr", "--learning-rate", type=float, default=0.001, help="Learning rate (default: 0.001)"
     )
@@ -75,6 +103,15 @@ def main():
 
     args = parser.parse_args()
 
+    # Handle list-models command
+    if args.list_models:
+        list_models()
+        return
+
+    # Check if labels_file is provided when not listing models
+    if args.labels_file is None:
+        parser.error("labels_file is required unless using --list-models")
+
     # Auto-detect version from training set filename if not specified
     if args.version is None:
         # Try to extract version from filename like training_set_v2.csv
@@ -121,6 +158,7 @@ def main():
         version=args.version,
         use_batchnorm=False if args.no_batchnorm else None,
         stopping_criterion=stopping_criterion,
+        model_type=args.model_type,
     )
     print(f"\nFinal training accuracy: {accuracy:.4f}")
 

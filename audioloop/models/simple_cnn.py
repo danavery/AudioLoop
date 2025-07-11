@@ -1,6 +1,8 @@
+from typing import Any
+
 import torch
 import torch.nn as nn
-from typing import Dict, Any
+
 from .base import AudioLoopModel
 
 
@@ -22,7 +24,7 @@ class SimpleCNN(nn.Module, AudioLoopModel):
         self.fc = nn.Linear(32, num_classes)
         self.relu = nn.ReLU()
 
-    def forward(self, batch: Dict[str, Any]) -> torch.Tensor:
+    def forward(self, batch: dict[str, Any]) -> torch.Tensor:
         """Forward pass expecting spectrogram data."""
         features = batch["data"]
 
@@ -39,7 +41,7 @@ class SimpleCNN(nn.Module, AudioLoopModel):
         x = self.fc(x)
         return x
 
-    def prepare_input(self, batch: Dict[str, Any]) -> Dict[str, Any]:
+    def prepare_input(self, batch: dict[str, Any]) -> dict[str, Any]:
         """Prepare input for custom CNN model."""
         features = batch["data"].to(self.get_device())
         return {"data": features}
@@ -53,7 +55,7 @@ class SimpleCNN(nn.Module, AudioLoopModel):
         save_dict = {
             "model_state_dict": self.state_dict(),
             "num_classes": self.num_classes,
-            "model_type": "SimpleCNN"
+            "model_type": "SimpleCNN",
         }
         torch.save(save_dict, path)
 
@@ -72,5 +74,5 @@ class SimpleCNN(nn.Module, AudioLoopModel):
         return {
             "model_type": "SimpleCNN",
             "num_classes": self.num_classes,
-            "num_parameters": sum(p.numel() for p in self.parameters())
+            "num_parameters": sum(p.numel() for p in self.parameters()),
         }

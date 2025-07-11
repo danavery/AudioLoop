@@ -7,7 +7,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from .models import SoundCNN
+from .models import MODEL_REGISTRY
 from .utils.candidate_selection import (
     load_predictions,
     print_selection_statistics,
@@ -34,8 +34,21 @@ def load_training_set_filenames(training_set_csv):
 
 
 def load_model(model_path, num_classes, device):
-    """Load a trained model from disk."""
-    model = SoundCNN.load_model(model_path, device)
+    """Load a trained model from disk, detecting model type automatically."""
+    # Load checkpoint to detect model type
+    checkpoint = torch.load(model_path, map_location=device)
+    model_type = checkpoint.get(
+        "model_type", "SoundCNN"
+    )  # Default to SoundCNN for backward compatibility
+
+    # Use centralized model registry
+    if model_type not in MODEL_REGISTRY:
+        raise ValueError(
+            f"Unknown model type: {model_type}. Available: {list(MODEL_REGISTRY.keys())}"
+        )
+
+    model_class = MODEL_REGISTRY[model_type]
+    model = model_class.load_model(model_path, device)
     model.eval()
     return model
 

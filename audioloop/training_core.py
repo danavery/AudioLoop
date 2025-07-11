@@ -8,7 +8,7 @@ import torch.optim as optim
 from torch import nn
 from torch.utils.data import DataLoader
 
-from .models.cnn_5layer import SoundCNN
+from .models import MODEL_TYPES
 from .utils.data_utils import get_device, simple_collate_fn
 from .utils.spectrogram_dataset import SpectrogramDataset
 from .utils.stopping_criteria import PlateauCriterion
@@ -58,6 +58,19 @@ def train_epoch(model, train_loader, optimizer, criterion, device):
     return avg_loss, accuracy
 
 
+def create_model(model_type: str, num_classes: int, dataset_size: int, **kwargs):
+    """Create a model based on the specified type."""
+    if model_type not in MODEL_TYPES:
+        raise ValueError(f"Unknown model type: {model_type}. Available: {list(MODEL_TYPES.keys())}")
+
+    model_class = MODEL_TYPES[model_type]
+
+    # Create model with appropriate parameters based on type
+    if model_type == "soundcnn":
+        return model_class(num_classes=num_classes, kernel_size=(3, 3), dataset_size=dataset_size)
+    return model_class(num_classes=num_classes)
+
+
 def run_training(
     labels_file="labels.csv",
     max_epochs=1000,
@@ -69,6 +82,7 @@ def run_training(
     version=None,
     use_batchnorm=None,
     stopping_criterion=None,
+    model_type="soundcnn",
     experiment_name=None,
 ):
     """
@@ -119,15 +133,19 @@ def run_training(
         collate_fn=simple_collate_fn,
     )
 
-    # Create 5-layer CNN model with appropriate architecture
-    model = SoundCNN(
-        num_classes=num_classes, kernel_size=(3, 3), dataset_size=len(train_dataset)
+    # Create model based on specified type
+    model = create_model(
+        model_type=model_type, num_classes=num_classes, dataset_size=len(train_dataset)
     ).to(device)
 
-    # Print BatchNorm decision made by the model
-    if model.use_batchnorm:
-        print("Using model WITH BatchNorm")
-    else:
+    # Print model info
+    model_info = model.get_model_info()
+    print(f"Using model: {model_info['model_type']}")
+    if "use_batchnorm" in model_info:
+        if model_info["use_batchnorm"]:
+            print("Using model WITH BatchNorm")
+        else:
+            print("Using model WITHOUT BatchNorm")
         print(
             f"⚠️  Small dataset ({len(train_dataset)} samples) detected - using model WITHOUT BatchNorm"
         )

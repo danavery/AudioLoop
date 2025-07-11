@@ -1,15 +1,16 @@
 """Base model interface for AudioLoop active learning framework."""
 
 from abc import ABC, abstractmethod
+from typing import Any
+
 import torch
-from typing import Dict, Any
 
 
 class AudioLoopModel(ABC):
     """Abstract base class for all AudioLoop models."""
 
     @abstractmethod
-    def forward(self, batch: Dict[str, Any]) -> torch.Tensor:
+    def forward(self, batch: dict[str, Any]) -> torch.Tensor:
         """
         Forward pass through the model.
 
@@ -22,7 +23,7 @@ class AudioLoopModel(ABC):
         pass
 
     @abstractmethod
-    def prepare_input(self, batch: Dict[str, Any]) -> Dict[str, Any]:
+    def prepare_input(self, batch: dict[str, Any]) -> dict[str, Any]:
         """
         Prepare input batch for the model's expected format.
 
