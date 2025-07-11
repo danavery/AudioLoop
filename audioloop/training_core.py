@@ -33,15 +33,13 @@ def train_epoch(model, train_loader, optimizer, criterion, device):
     total = 0
 
     for batch in train_loader:
-        features = batch["data"].to(device)
         labels = batch["label"].to(device)
 
-        # If features are spectrograms with shape (batch, n_mels, time), add channel dim:
-        if features.ndim == 3:
-            features = features.unsqueeze(1)  # shape: (batch, 1, n_mels, time)
+        # Prepare inputs using model's method
+        model_inputs = model.prepare_input(batch)
 
-        # Forward pass
-        outputs = model(features)
+        # Forward pass through model's forward method
+        outputs = model.forward(model_inputs)
         loss = criterion(outputs, labels)
 
         optimizer.zero_grad(set_to_none=True)

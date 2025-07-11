@@ -252,6 +252,7 @@ filename,predicted_is_positive,confidence,needs_human_label,prediction,entropy,p
 - **[WORKFLOW_GUIDE.md](WORKFLOW_GUIDE.md)**: Versioned workflow patterns
 - **[LABELING_GUIDE.md](LABELING_GUIDE.md)**: Audio labeling tool usage
 - **[FSD50K_INTEGRATION.md](FSD50K_INTEGRATION.md)**: FSD50K dataset integration
+- **[Adding New Models Guide](docs/adding_new_models.md)**: How to integrate custom or HuggingFace models
 - **[CLAUDE.md](CLAUDE.md)**: AI assistant guidance
 
 ## Getting Started

@@ -153,15 +153,13 @@ def run_binary_inference(
 
     with torch.no_grad():
         for batch in tqdm(data_loader):
-            features = batch["data"].to(device)
             true_labels = batch["label"]
 
-            # Add channel dimension if needed
-            if features.ndim == 3:
-                features = features.unsqueeze(1)
+            # Prepare inputs using model's method
+            model_inputs = model.prepare_input(batch)
 
-            # Forward pass
-            logits = model(features)
+            # Forward pass through model's forward method
+            logits = model.forward(model_inputs)
             probabilities = F.softmax(logits, dim=-1)
             predicted_classes = torch.argmax(probabilities, dim=-1)
 

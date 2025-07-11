@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from typing import Dict, Any
 
 from .base import AudioLoopModel
 
@@ -71,8 +72,16 @@ class SoundCNN(nn.Module, AudioLoopModel):
             )  # Add dropout for regularization when not using BatchNorm
         self.fc2 = nn.Linear(in_features=128, out_features=num_classes)
 
-    def forward(self, x):
+    def forward(self, batch: Dict[str, Any]) -> torch.Tensor:
+        """Forward pass expecting spectrogram data."""
+        features = batch["data"]
+
+        # Add channel dimension if needed
+        if features.ndim == 3:
+            features = features.unsqueeze(1)
+
         # x shape: (batch, 1, n_mels, time_frames)
+        x = features
 
         x = self.conv1(x)
         if self.use_batchnorm:
@@ -113,6 +122,15 @@ class SoundCNN(nn.Module, AudioLoopModel):
             x = self.dropout(x)
         x = self.fc2(x)
         return x
+
+    def prepare_input(self, batch: Dict[str, Any]) -> Dict[str, Any]:
+        """Prepare input for custom CNN model."""
+        features = batch["data"].to(self.get_device())
+        return {"data": features}
+
+    def get_device(self) -> torch.device:
+        """Get the device this model is on."""
+        return next(self.parameters()).device
 
     def save_model(self, path: str) -> None:
         """Save model with metadata."""

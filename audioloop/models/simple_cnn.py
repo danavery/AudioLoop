@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+from typing import Dict, Any
 from .base import AudioLoopModel
 
 
@@ -21,22 +22,31 @@ class SimpleCNN(nn.Module, AudioLoopModel):
         self.fc = nn.Linear(32, num_classes)
         self.relu = nn.ReLU()
 
-    def forward(self, x):
-        """Forward pass through the network.
+    def forward(self, batch: Dict[str, Any]) -> torch.Tensor:
+        """Forward pass expecting spectrogram data."""
+        features = batch["data"]
 
-        Args:
-            x: Input tensor of shape (batch_size, channels, height, width)
-               For spectrograms: (batch_size, 1, n_mels, time_frames)
+        # Add channel dimension if needed
+        if features.ndim == 3:
+            features = features.unsqueeze(1)
 
-        Returns:
-            logits: Output tensor of shape (batch_size, num_classes)
-        """
+        # Forward pass through the network
+        x = features
         x = self.pool(self.relu(self.conv1(x)))
         x = self.pool(self.relu(self.conv2(x)))
         x = self.global_pool(x)
         x = x.view(x.size(0), -1)
         x = self.fc(x)
         return x
+
+    def prepare_input(self, batch: Dict[str, Any]) -> Dict[str, Any]:
+        """Prepare input for custom CNN model."""
+        features = batch["data"].to(self.get_device())
+        return {"data": features}
+
+    def get_device(self) -> torch.device:
+        """Get the device this model is on."""
+        return next(self.parameters()).device
 
     def save_model(self, path: str) -> None:
         """Save model with metadata."""
