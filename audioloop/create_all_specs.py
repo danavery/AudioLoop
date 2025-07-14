@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 from .datasets import UrbanSound8KConfig, UrbanSound8KProcessor
 from .datasets.fsd50k import FSD50KConfig, FSD50KProcessor
-from .utils.dataset_utils import get_dataset_help_text, resolve_dataset_choice
+from .config import AudioLoopConfig
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -278,7 +278,7 @@ Examples:
         "--dataset",
         choices=["urbansound8k", "fsd50k"],
         default=None,
-        help=get_dataset_help_text() + " to process",
+        help="Dataset to process ('fsd50k' or 'urbansound8k'). Can also be set via AUDIOLOOP_DATASET environment variable.",
     )
 
     parser.add_argument(
@@ -289,9 +289,10 @@ Examples:
 
     args = parser.parse_args()
 
-    # Resolve dataset choice from CLI and environment variable
+    # Get unified config
     try:
-        dataset_name = resolve_dataset_choice(args.dataset)
+        config = AudioLoopConfig(dataset=args.dataset)
+        dataset_name = config.dataset
     except ValueError as e:
         logger.error(f"Dataset error: {e}")
         exit(1)

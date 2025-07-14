@@ -1,6 +1,7 @@
 """Tests for the AudioLoop model system."""
 
 import tempfile
+from typing import Any
 import torch
 import pytest
 from pathlib import Path
@@ -32,6 +33,13 @@ class TestAudioLoopModel:
             def __init__(self):
                 super().__init__()
                 self.linear = torch.nn.Linear(10, 1)
+                self.device_type = torch.device("cpu")
+
+            def forward(self, batch: dict[str, Any]) -> torch.Tensor:
+                return self.linear(batch["input"])
+
+            def prepare_input(self, batch: dict[str, Any]) -> dict[str, Any]:
+                return batch
 
             def save_model(self, path: str) -> None:
                 torch.save({"test": "data"}, path)
@@ -42,6 +50,9 @@ class TestAudioLoopModel:
 
             def get_model_info(self) -> dict:
                 return {"type": "test"}
+
+            def get_device(self) -> torch.device:
+                return self.device_type
 
         # Should not raise an exception
         model = CompleteModel()
@@ -132,7 +143,8 @@ class TestSoundCNN:
 
         # Create a sample input (batch=1, channels=1, height=128, width=128)
         x = torch.randn(1, 1, 128, 128)
-        output = model(x)
+        batch = {"data": x}
+        output = model(batch)
 
         assert output.shape == (1, 2)
         assert not torch.isnan(output).any()
@@ -143,7 +155,8 @@ class TestSoundCNN:
 
         # Create a sample input
         x = torch.randn(1, 1, 128, 128)
-        output = model(x)
+        batch = {"data": x}
+        output = model(batch)
 
         assert output.shape == (1, 2)
         assert not torch.isnan(output).any()
@@ -302,7 +315,8 @@ class TestSoundCNN:
 
         # Test forward pass still works
         x = torch.randn(1, 1, 128, 128)
-        output = model(x)
+        batch = {"data": x}
+        output = model(batch)
         assert output.shape == (1, 2)
 
     def test_private_use_batchnorm_parameter(self):
@@ -330,12 +344,13 @@ class TestSoundCNN:
 
         # Test that they produce different outputs
         x = torch.randn(1, 1, 128, 128)
-        out1 = model1(x)
-        out2 = model2(x)
+        batch = {"data": x}
+        output1 = model1(batch)
+        output2 = model2(batch)
 
-        assert out1.shape == (1, 2)
-        assert out2.shape == (1, 3)
-        assert not torch.equal(out1[:, :2], out2[:, :2])  # Should be different
+        assert output1.shape == (1, 2)
+        assert output2.shape == (1, 3)
+        assert not torch.equal(output1[:, :2], output2[:, :2])  # Should be different
 
 
 class TestSimpleCNN:
@@ -361,7 +376,8 @@ class TestSimpleCNN:
 
         # Create a sample input (batch=2, channels=1, height=64, width=64)
         x = torch.randn(2, 1, 64, 64)
-        output = model(x)
+        batch = {"data": x}
+        output = model(batch)
 
         assert output.shape == (2, 3)
         assert not torch.isnan(output).any()

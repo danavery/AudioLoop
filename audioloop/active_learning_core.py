@@ -14,7 +14,6 @@ from .utils.candidate_selection import (
     save_candidates,
 )
 from .utils.data_utils import entropy, get_device, simple_collate_fn
-from .utils.dataset_utils import get_dataset_processor
 from .utils.spectrogram_dataset import SpectrogramDataset
 
 
@@ -54,30 +53,27 @@ def load_model(model_path, num_classes, device):
 
 
 def run_binary_inference(
+    config,
     model_path,
     predictions_csv="outputs/predictions.csv",
     positive_class_name="positive",
     negative_class_name="negative",
-    dataset_name="urbansound8k",
     dataset_file=None,
     positive_class_id=8,
     training_set_csv=None,
-    experiment_name=None,
-    **dataset_kwargs,
 ):
     """
     Run binary classification inference on all dataset files.
 
     Args:
+        config: AudioLoopConfig with dataset and experiment configuration
         model_path: Path to trained binary model
         predictions_csv: Path for output predictions CSV
         positive_class_name: Name for positive class (for logging and output)
         negative_class_name: Name for negative class (for logging and output)
-        dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
         dataset_file: Path to dataset metadata CSV (auto-detected if None)
         positive_class_id: Audio class ID to treat as positive
         training_set_csv: Path to training set CSV (files to exclude from inference)
-        **dataset_kwargs: Additional dataset-specific configuration
 
     Returns:
         list: Inference results with predictions and confidences
@@ -85,12 +81,13 @@ def run_binary_inference(
     device = get_device()
     print(f"Using device: {device}")
 
-    # Get dataset processor and config
-    processor, config = get_dataset_processor(dataset_name, **dataset_kwargs)
+    # Get dataset processor and dataset config from unified config
+    processor = config.get_dataset_processor()
+    dataset_config = config.get_dataset_config()
 
     # Auto-detect dataset file if not provided
     if dataset_file is None:
-        dataset_file = str(config.dataset_csv)
+        dataset_file = str(dataset_config.dataset_csv)
 
     # Load all available metadata and create binary labels inline
     metadata = processor.load_metadata(split="dev")
@@ -116,7 +113,7 @@ def run_binary_inference(
         # Use processor's binary classification method
         is_positive = processor.get_binary_label(item, positive_class_id, positive_class_name)
 
-        spec_path = f"data/all_specs/{spec_filename}"
+        spec_path = str(config.specs_dir / spec_filename)
 
         # Get original class info
         original_class = getattr(item, "classID", getattr(item, "class_id", -1))
@@ -224,7 +221,7 @@ def run_binary_inference(
                 results.append(result)
 
     # Ensure outputs directory exists
-    output_dir = f"outputs_{experiment_name}" if experiment_name else "outputs"
+    output_dir = f"outputs_{config.experiment_name}" if config.experiment_name else "outputs"
     Path(output_dir).mkdir(exist_ok=True)
 
     # Save results to CSV
@@ -333,17 +330,19 @@ def run_active_learning_cycle(
     print("\nStep 1: Running binary classification inference...")
     predictions_file = f"{output_dir}/predictions_v{run_number}.csv"
 
+    # Create config for inference
+    from .config import AudioLoopConfig
+    inference_config = AudioLoopConfig(experiment_name=experiment_name, dataset=dataset_name)
+
     _ = run_binary_inference(
+        config=inference_config,
         model_path=model_path,
         predictions_csv=predictions_file,
         positive_class_name=positive_class_name,
         negative_class_name=negative_class_name,
-        dataset_name=dataset_name,
         dataset_file=dataset_file,
         positive_class_id=positive_class_id,
         training_set_csv=training_set_csv,
-        experiment_name=experiment_name,
-        **dataset_kwargs,
     )
 
     # Step 2: Select candidates for active learning

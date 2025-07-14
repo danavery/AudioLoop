@@ -2,11 +2,7 @@ import argparse
 import os
 import random
 
-from audioloop.utils.dataset_utils import (
-    get_dataset_help_text,
-    get_dataset_processor,
-    resolve_dataset_choice,
-)
+from audioloop.config import AudioLoopConfig
 
 
 def get_matching_samples(
@@ -23,7 +19,8 @@ def get_matching_samples(
     Returns:
         List of spectrogram filenames (not full paths)
     """
-    processor, config = get_dataset_processor(dataset_name, **kwargs)
+    config = AudioLoopConfig(dataset=dataset_name)
+    processor = config.get_dataset_processor()
 
     # Get split parameter (FSD50K uses it, UrbanSound8K ignores it)
     split = kwargs.get("split", "dev")
@@ -164,7 +161,8 @@ def list_available_classes(dataset_name: str, **kwargs) -> None:
         dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
         **kwargs: Additional dataset-specific parameters
     """
-    processor, config = get_dataset_processor(dataset_name, **kwargs)
+    config = AudioLoopConfig(dataset=dataset_name)
+    processor = config.get_dataset_processor()
 
     if dataset_name == "urbansound8k":
         processor.list_classes()
@@ -204,7 +202,7 @@ Examples:
 
     # Dataset selection
     parser.add_argument(
-        "--dataset", choices=["urbansound8k", "fsd50k"], default=None, help=get_dataset_help_text()
+        "--dataset", choices=["urbansound8k", "fsd50k"], default=None, help="Dataset to use ('fsd50k' or 'urbansound8k'). Can also be set via AUDIOLOOP_DATASET environment variable."
     )
 
     # Core parameters
@@ -244,7 +242,8 @@ Examples:
 
     # Resolve dataset choice from CLI and environment variable
     try:
-        dataset_name = resolve_dataset_choice(args.dataset)
+        config = AudioLoopConfig(dataset=args.dataset)
+        dataset_name = config.dataset
     except ValueError as e:
         print(f"Error: {e}")
         exit(1)

@@ -48,14 +48,20 @@ python automated_workflow.py --class-name Drill --cycles 2 --dataset fsd50k --au
 
 ## Manual Command Reference
 
-### Environment Variable Setup
-```bash
-# Set default dataset for all commands (optional)
-export AUDIOLOOP_DATASET=fsd50k     # Use FSD50K as default (default behavior)
-export AUDIOLOOP_DATASET=urbansound8k  # Use UrbanSound8K as default
+### Configuration System
 
-# Unset to return to default behavior
-unset AUDIOLOOP_DATASET
+AudioLoop uses a unified configuration system with proper precedence:
+
+```bash
+# Environment variables (used as fallbacks when no explicit parameters)
+export AUDIOLOOP_DATASET=urbansound8k      # Default dataset
+export AUDIOLOOP_DATA_ROOT=/custom/data    # Custom data directory
+export AUDIOLOOP_OUTPUT_ROOT=/custom/out   # Custom output directory
+
+# Configuration precedence:
+# 1. Explicit CLI parameters (highest priority)
+# 2. Environment variables (fallback)
+# 3. Default values (lowest priority)
 ```
 
 ### Data Preparation
@@ -66,9 +72,13 @@ python -m audioloop.create_all_specs
 # Generate spectrograms for UrbanSound8K dataset
 python -m audioloop.create_all_specs --dataset urbansound8k
 
-# With environment variable set, no need to specify --dataset
+# With environment variable set (fallback when no explicit --dataset)
 export AUDIOLOOP_DATASET=urbansound8k
-python -m audioloop.create_all_specs  # Automatically uses UrbanSound8K
+python -m audioloop.create_all_specs  # Uses environment variable
+
+# Explicit parameter overrides environment variable
+export AUDIOLOOP_DATASET=urbansound8k
+python -m audioloop.create_all_specs --dataset fsd50k  # Uses fsd50k despite env var
 ```
 
 ### Creating Initial Training Sets
@@ -79,10 +89,14 @@ python -m audioloop.utils.start_labeling --class-name Drill --n 50
 # Create UrbanSound8K training set
 python -m audioloop.utils.start_labeling --dataset urbansound8k --class-name siren --n 40
 
-# Using environment variable (simpler workflow)
+# Environment variable provides fallback when no explicit --dataset
 export AUDIOLOOP_DATASET=urbansound8k
-python -m audioloop.utils.start_labeling --class-name siren --n 40  # Automatically uses UrbanSound8K
-python -m audioloop.utils.start_labeling --list-classes              # Lists UrbanSound8K classes
+python -m audioloop.utils.start_labeling --class-name siren --n 40  # Uses urbansound8k
+python -m audioloop.utils.start_labeling --list-classes              # Lists urbansound8k classes
+
+# Explicit parameter takes precedence over environment variable
+export AUDIOLOOP_DATASET=urbansound8k
+python -m audioloop.utils.start_labeling --dataset fsd50k --class-name Drill  # Uses fsd50k
 
 # Create with custom parameters
 python -m audioloop.utils.start_labeling --class-name Speech --n 60 --positive-pct 0.8 --output training_sets/training_set_v2.csv
@@ -93,11 +107,43 @@ python -m audioloop.utils.start_labeling --list-classes
 # List available classes for UrbanSound8K  
 python -m audioloop.utils.start_labeling --dataset urbansound8k --list-classes
 
-# CLI override still works
-export AUDIOLOOP_DATASET=urbansound8k
-python -m audioloop.utils.start_labeling --dataset fsd50k --class-name Drill  # Uses FSD50K despite env var
+### Experiment Organization
 
-# Use custom dataset paths
+AudioLoop automatically organizes files by experiment:
+
+```bash
+# Default behavior (no experiment name)
+python -m audioloop.train training_sets/training_set_v1.csv
+# Output: outputs/model_v1.pt
+
+# With experiment name
+python -m audioloop.train training_sets_myexp/training_set_v1.csv --experiment myexp
+# Output: outputs_myexp/model_v1.pt
+
+# All commands support --experiment parameter
+python -m audioloop.active_learning --class-name siren --run-number 1 --experiment myexp
+# Uses: training_sets_myexp/ and outputs_myexp/
+```
+
+### Configuration in Python Code
+
+For programmatic usage, use the unified configuration system:
+
+```python
+from audioloop.config import AudioLoopConfig
+
+# Create configuration
+config = AudioLoopConfig(experiment_name="test", dataset="urbansound8k")
+
+# Access organized paths
+print(config.output_dir)         # outputs_test/
+print(config.training_sets_dir)  # training_sets_test/
+print(config.specs_dir)         # data/all_specs/
+
+# Generate versioned paths
+model_path = config.get_model_path(1)        # outputs_test/model_v1.pt
+pred_path = config.get_predictions_path(1)   # outputs_test/predictions_v1.csv
+```
 python -m audioloop.utils.start_labeling --class-name siren --metadata-csv /path/to/UrbanSound8K.csv --audio-root /path/to/audio
 ```
 

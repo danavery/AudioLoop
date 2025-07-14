@@ -2,12 +2,14 @@ import csv
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import List, Dict, Any
 
 import torch
 import torchaudio
 from torch import nn
 
 from audioloop.utils.log_normalize import LogNormalize
+from .dataset_config import DatasetConfig
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +99,7 @@ def list_classes(vocab_path: Path | None = None) -> None:
 
 
 @dataclass
-class UrbanSound8KConfig:
+class UrbanSound8KConfig(DatasetConfig):
     """Configuration for UrbanSound8K dataset."""
 
     # Audio processing parameters
@@ -114,10 +116,53 @@ class UrbanSound8KConfig:
 
     # Default paths
     metadata_csv: Path = Path("data/urbansound8k/UrbanSound8K.csv")
-    dataset_csv: Path = Path("data/urbansound8k/UrbanSound8K.csv")  # Common interface
-    audio_root: Path = Path("data/urbansound8k")
+    _dataset_csv: Path = Path("data/urbansound8k/UrbanSound8K.csv")  # Common interface
+    _audio_root: Path = Path("data/urbansound8k")
     output_dir: Path = Path("data/all_specs")
     inference_csv: Path = Path("outputs/urbansound8k_files.csv")
+    
+    @property
+    def dataset_csv(self) -> Path:
+        """Path to the main dataset CSV file."""
+        return self._dataset_csv
+    
+    @property
+    def audio_root(self) -> Path:
+        """Root directory containing audio files."""
+        return self._audio_root
+
+    def get_metadata_entries(self) -> List[Dict[str, Any]]:
+        """Get list of metadata entries for active learning."""
+        entries = []
+        vocabulary = load_urbansound8k_vocabulary()
+        
+        with open(self.metadata_csv, 'r') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                filename = row['slice_file_name']
+                class_id = int(row['classID'])
+                fold = int(row['fold'])
+                
+                if class_id in vocabulary:
+                    entries.append({
+                        'filename': filename,
+                        'class_name': vocabulary[class_id],
+                        'fold': fold
+                    })
+        return entries
+    
+    def get_audio_path(self, filename: str, fold: int | None = None) -> Path:
+        """Get full path to audio file."""
+        if fold is not None:
+            return self.audio_root / f"fold{fold}" / filename
+        else:
+            # Try to find the file in any fold (less efficient but works)
+            for fold_num in range(1, 11):
+                path = self.audio_root / f"fold{fold_num}" / filename
+                if path.exists():
+                    return path
+            # Return most likely path if not found
+            return self.audio_root / "fold1" / filename
 
 
 class UrbanSound8KProcessor:

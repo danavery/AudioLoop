@@ -1,6 +1,5 @@
 import random
 import time
-from pathlib import Path
 
 import numpy as np
 import torch
@@ -8,6 +7,7 @@ import torch.optim as optim
 from torch import nn
 from torch.utils.data import DataLoader
 
+from .config import AudioLoopConfig
 from .models import MODEL_TYPES
 from .utils.data_utils import get_device, simple_collate_fn
 from .utils.spectrogram_dataset import SpectrogramDataset
@@ -72,34 +72,33 @@ def create_model(model_type: str, num_classes: int, dataset_size: int, **kwargs)
 
 
 def run_training(
-    labels_file="labels.csv",
-    max_epochs=1000,
-    seed=42,
-    batch_size=32,
-    learning_rate=1e-3,
-    specs_dir="data/all_specs",
-    model_path=None,
-    version=None,
-    use_batchnorm=None,
+    config: AudioLoopConfig,
+    labels_file: str = "labels.csv",
+    max_epochs: int = 1000,
+    seed: int = 42,
+    batch_size: int = 32,
+    learning_rate: float = 1e-3,
+    model_path: str | None = None,
+    version: int | None = None,
+    use_batchnorm: bool | None = None,
     stopping_criterion=None,
-    model_type="soundcnn",
-    experiment_name=None,
+    model_type: str = "soundcnn",
 ):
     """
     Run training for a binary audio classification model.
 
     Args:
+        config: AudioLoopConfig with paths and experiment settings
         labels_file: Path to CSV file with training labels
         max_epochs: Maximum number of training epochs
         seed: Random seed for reproducibility
         batch_size: Training batch size
         learning_rate: Learning rate for optimizer
-        specs_dir: Directory containing spectrogram files
         model_path: Path to save trained model (auto-generated if None)
         version: Model version number (for auto-generated paths)
         use_batchnorm: Whether to use BatchNorm (auto-decided if None)
         stopping_criterion: Training stopping criterion (PlateauCriterion if None)
-        experiment_name: Optional experiment name to customize output directory
+        model_type: Type of model to use ("soundcnn" or "simplecnn")
 
     Returns:
         Final training accuracy
@@ -110,8 +109,7 @@ def run_training(
     set_seed(seed)
 
     # Create dataset from precomputed spectrograms
-    # Note: This assumes you've run create_all_specs.py first to generate .pt files
-    train_dataset = SpectrogramDataset(csv_file=labels_file, specs_dir=specs_dir)
+    train_dataset = SpectrogramDataset(csv_file=labels_file, specs_dir=str(config.specs_dir))
     print(f"Dataset size: {len(train_dataset)}")
 
     # Determine number of classes from the dataset
@@ -210,10 +208,9 @@ def run_training(
     # Save the best model state if available, otherwise save final model
     # This ensures that when early stopping triggers (e.g., patience exhausted),
     # we save the model from the epoch with the best performance, not the final epoch
-    output_dir = f"outputs_{experiment_name}" if experiment_name else "outputs"
-    Path(output_dir).mkdir(exist_ok=True)
+    config.create_directories()
     if model_path is None:
-        model_path = f"{output_dir}/model_v{version or 1}.pt"
+        model_path = str(config.get_model_path(version or 1))
 
     best_model_state = stopping_criterion.get_best_model_state()
     if best_model_state is not None:

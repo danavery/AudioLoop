@@ -1,6 +1,7 @@
 import argparse
 import re
 
+from .config import AudioLoopConfig
 from .models import MODEL_TYPES
 from .training_core import run_training, set_seed, train_epoch
 from .utils.stopping_criteria import AccuracyCriterion, PlateauCriterion
@@ -141,19 +142,21 @@ def main():
             accuracy_floor=args.accuracy_floor,
         )
 
+    # Create config from arguments
+    config = AudioLoopConfig(experiment_name=args.experiment)
+
     # Use experiment-aware model path if output not specified
     if args.output is None:
-        output_dir = f"outputs_{args.experiment}" if args.experiment else "outputs"
-        args.output = f"{output_dir}/model_v{args.version}.pt"
+        args.output = str(config.get_model_path(args.version))
 
     # Run training with CLI arguments
     accuracy = run_training(
+        config=config,
         labels_file=args.labels_file,
         max_epochs=args.epochs,
         seed=args.seed,
         batch_size=args.batch_size,
         learning_rate=args.learning_rate,
-        specs_dir=args.specs_dir,
         model_path=args.output,
         version=args.version,
         use_batchnorm=False if args.no_batchnorm else None,

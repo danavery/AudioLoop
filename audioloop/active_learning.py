@@ -3,11 +3,7 @@ import os
 import re
 
 from .active_learning_core import run_active_learning_cycle
-from .utils.dataset_utils import (
-    get_dataset_help_text,
-    get_dataset_processor,
-    resolve_dataset_choice,
-)
+from .config import AudioLoopConfig
 
 
 def run_active_learning_for_class(
@@ -58,12 +54,14 @@ def run_active_learning_for_class(
     Returns:
         tuple: (predictions_file, candidates_file)
     """
-    # Get processor and config once
-    processor, config = get_dataset_processor(dataset_name, **dataset_kwargs)
+    # Get unified config
+    config = AudioLoopConfig(experiment_name=experiment_name, dataset=dataset_name)
+    processor = config.get_dataset_processor()
 
     # Auto-detect dataset file if not provided
     if dataset_file is None:
-        dataset_file = str(config.dataset_csv)
+        dataset_config = config.get_dataset_config()
+        dataset_file = str(dataset_config.dataset_csv)
 
     # Validate class name and get class ID
     positive_class_id = processor.get_class_id(positive_class_name)
@@ -134,7 +132,7 @@ Examples:
     parser.add_argument(
         "--dataset",
         type=str,
-        help=get_dataset_help_text(),
+        help="Dataset to use ('fsd50k' or 'urbansound8k'). Can also be set via AUDIOLOOP_DATASET environment variable.",
     )
 
     # Mode selection
@@ -246,14 +244,13 @@ Examples:
 
     args = parser.parse_args()
 
-    # Resolve dataset choice
+    # Get unified config
     try:
-        dataset_name = resolve_dataset_choice(args.dataset)
+        config = AudioLoopConfig(experiment_name=args.experiment, dataset=args.dataset)
+        processor = config.get_dataset_processor()
+        dataset_name = config.dataset
     except ValueError as e:
         parser.error(str(e))
-
-    # Get processor and config once for the entire operation
-    processor, config = get_dataset_processor(dataset_name)
 
     # Handle list classes
     if args.list_classes:

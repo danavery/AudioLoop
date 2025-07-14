@@ -40,11 +40,7 @@ import os
 import subprocess
 import sys
 
-from .utils.dataset_utils import (
-    get_dataset_help_text,
-    get_dataset_processor,
-    resolve_dataset_choice,
-)
+from .config import AudioLoopConfig
 
 
 class SimpleAudioLabeler:
@@ -75,7 +71,9 @@ class SimpleAudioLabeler:
         if audio_dir:
             dataset_kwargs["audio_root"] = audio_dir
 
-        self.processor, self.config = get_dataset_processor(self.dataset_name, **dataset_kwargs)
+        config = AudioLoopConfig(dataset=self.dataset_name)
+        self.processor = config.get_dataset_processor()
+        self.config = config.get_dataset_config()
 
         # Set default audio directory if not provided
         if audio_dir is None:
@@ -548,7 +546,7 @@ Audio playback:
   - Linux: install sox ('sudo apt-get install sox') for play command
   - Windows: uses default audio player
 
-{get_dataset_help_text()}
+Dataset to use ('fsd50k' or 'urbansound8k'). Can also be set via AUDIOLOOP_DATASET environment variable.
         """,
     )
 
@@ -580,7 +578,8 @@ Audio playback:
     args = parser.parse_args()
 
     # Handle dataset resolution
-    dataset_name = resolve_dataset_choice(args.dataset)
+    config = AudioLoopConfig(dataset=args.dataset)
+    dataset_name = config.dataset
 
     # Handle test mode
     if args.test_audio:

@@ -2,12 +2,14 @@ import csv
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import List, Dict, Any
 
 import torch
 import torchaudio
 from torch import nn
 
 from audioloop.utils.log_normalize import LogNormalize
+from .dataset_config import DatasetConfig
 
 logger = logging.getLogger(__name__)
 
@@ -142,7 +144,7 @@ def list_semantic_groups() -> None:
 
 
 @dataclass
-class FSD50KConfig:
+class FSD50KConfig(DatasetConfig):
     """Configuration for FSD50K dataset."""
 
     # Audio processing parameters (matching UrbanSound8K for consistency)
@@ -160,15 +162,49 @@ class FSD50KConfig:
     # Default paths
     metadata_dir: Path = Path("data/FSD50K/FSD50K.metadata")
     ground_truth_dir: Path = Path("data/FSD50K/FSD50K.ground_truth")
-    audio_root: Path = Path("data/FSD50K/FSD50K.dev_audio")
+    _audio_root: Path = Path("data/FSD50K/FSD50K.dev_audio")
     output_dir: Path = Path("data/all_specs")
 
     # Specific files
     vocabulary_csv: Path = Path("data/FSD50K/FSD50K.ground_truth/vocabulary.csv")
     dev_csv: Path = Path("data/FSD50K/FSD50K.ground_truth/dev.csv")
-    dataset_csv: Path = Path("data/FSD50K/FSD50K.ground_truth/dev.csv")  # Common interface
+    _dataset_csv: Path = Path("data/FSD50K/FSD50K.ground_truth/dev.csv")  # Common interface
     eval_csv: Path = Path("data/FSD50K/FSD50K.ground_truth/eval.csv")
     inference_csv: Path = Path("outputs/fsd50k_files.csv")
+    
+    @property
+    def audio_root(self) -> Path:
+        """Root directory containing audio files."""
+        return self._audio_root
+    
+    @property 
+    def dataset_csv(self) -> Path:
+        """Path to the main dataset CSV file."""
+        return self._dataset_csv
+
+    def get_metadata_entries(self) -> List[Dict[str, Any]]:
+        """Get list of metadata entries for active learning."""
+        entries = []
+        vocabulary = load_fsd50k_vocabulary(self.vocabulary_csv)
+        
+        with open(self.dev_csv, 'r') as f:
+            reader = csv.DictReader(f, delimiter='\t')
+            for row in reader:
+                filename = row['fname']
+                # Handle multiple labels (comma-separated)
+                label_ids = [int(x) for x in row['labels'].split(',')]
+                for label_id in label_ids:
+                    if label_id in vocabulary:
+                        entries.append({
+                            'filename': filename,
+                            'class_name': vocabulary[label_id],
+                            'fold': None  # FSD50K doesn't use folds
+                        })
+        return entries
+    
+    def get_audio_path(self, filename: str, fold: int | None = None) -> Path:
+        """Get full path to audio file."""
+        return self.audio_root / filename
 
 
 class FSD50KProcessor:

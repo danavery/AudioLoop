@@ -28,6 +28,7 @@ import sys
 import time
 
 from audioloop.active_learning import run_active_learning_for_class
+from audioloop.config import AudioLoopConfig
 from audioloop.label_audio import SimpleAudioLabeler
 from audioloop.merge_labels import merge_training_sets
 
@@ -229,7 +230,11 @@ def run_automated_workflow(
                     accuracy_floor=accuracy_floor,
                 )
 
+            # Create config for this workflow
+            config = AudioLoopConfig(experiment_name=experiment_name, dataset=dataset_name)
+
             final_accuracy = run_training(
+                config=config,
                 labels_file=current_training_set,
                 max_epochs=epochs,
                 batch_size=batch_size,
@@ -237,7 +242,6 @@ def run_automated_workflow(
                 model_path=current_model,
                 version=cycle,
                 stopping_criterion=criterion,
-                experiment_name=experiment_name,
                 seed=seed if seed is not None else 42,
             )
             print(f"   ✅ Model trained (final accuracy: {final_accuracy:.3f})")

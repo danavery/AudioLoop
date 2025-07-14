@@ -2,7 +2,7 @@
 dependencies = [
     "matplotlib>=3.7.0",
     "numpy>=2.3.0",
-    "pyright>=1.1.402",
+    "pyright>=1.1.403",
     "ruff",
     "soundfile>=0.13.1",
     "torch>=2.7.1",
@@ -37,3 +37,6 @@ ignore = ["RET504", "E501"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore:.*At least one mel filterbank has all zero values.*:UserWarning:torchaudio.functional.functional"
+]

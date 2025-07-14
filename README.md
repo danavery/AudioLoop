@@ -43,6 +43,39 @@ python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --audio-dir d
 python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv
 ```
 
+## Configuration System
+
+AudioLoop uses a unified configuration system that eliminates hardcoded paths and provides consistent experiment organization:
+
+```python
+from audioloop.config import AudioLoopConfig
+
+# Create configuration for an experiment
+config = AudioLoopConfig(experiment_name="my_experiment", dataset="urbansound8k")
+
+# All paths are automatically organized
+config.output_dir          # outputs_my_experiment/
+config.training_sets_dir   # training_sets_my_experiment/
+config.specs_dir          # data/all_specs/
+
+# Generate versioned file paths
+config.get_model_path(1)        # outputs_my_experiment/model_v1.pt
+config.get_predictions_path(1)  # outputs_my_experiment/predictions_v1.csv
+```
+
+### Environment Variables
+Customize behavior without code changes:
+```bash
+# Set default dataset
+export AUDIOLOOP_DATASET=urbansound8k
+
+# Customize data locations
+export AUDIOLOOP_DATA_ROOT=/custom/data
+export AUDIOLOOP_OUTPUT_ROOT=/custom/outputs
+
+# Configuration precedence: explicit parameters > env vars > defaults
+```
+
 ## Core Concept
 
 Traditional supervised learning requires large labeled datasets. AudioLoop reduces this burden through active learning:
@@ -59,6 +92,7 @@ Traditional supervised learning requires large labeled datasets. AudioLoop reduc
 ```
 audioloop/
 ├── audioloop/                    # Main package
+│   ├── config.py                # Unified configuration system
 │   ├── active_learning.py        # CLI interface for active learning
 │   ├── active_learning_core.py   # Core active learning pipeline
 │   ├── train.py                 # CLI interface for model training
@@ -70,10 +104,12 @@ audioloop/
 │   │   ├── cnn_5layer.py        # Primary CNN with adaptive pooling
 │   │   └── simple_cnn.py        # Lightweight alternative
 │   ├── utils/                   # Supporting utilities
+│   │   ├── paths.py             # Path utilities and environment config
 │   │   ├── spectrogram_dataset.py # Unified dataset loader
 │   │   ├── data_utils.py        # Core utilities
 │   │   └── log_normalize.py     # Spectrogram normalization
 │   └── datasets/                # Dataset handlers
+│       ├── dataset_config.py    # Abstract dataset interface
 │       ├── urbansound8k.py      # UrbanSound8K integration
 │       └── fsd50k.py           # FSD50K integration
 ├── data/
