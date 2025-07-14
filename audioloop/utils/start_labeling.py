@@ -29,7 +29,10 @@ def get_matching_samples(
     # Get positive class ID if we have a class name
     positive_class_id = None
     if class_name is not None:
-        positive_class_id = processor.get_class_id(class_name)
+        try:
+            positive_class_id = processor.config.name_to_id[class_name]
+        except KeyError:
+            raise ValueError(f"Invalid class name: '{class_name}'. Valid names: {list(processor.config.name_to_id.keys())}") from None
 
     matching_filenames = []
 

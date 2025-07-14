@@ -2,13 +2,14 @@ import csv
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any
 
 import torch
 import torchaudio
 from torch import nn
 
 from audioloop.utils.log_normalize import LogNormalize
+
 from .dataset_config import DatasetConfig
 
 logger = logging.getLogger(__name__)
@@ -120,49 +121,66 @@ class UrbanSound8KConfig(DatasetConfig):
     _audio_root: Path = Path("data/urbansound8k")
     output_dir: Path = Path("data/all_specs")
     inference_csv: Path = Path("outputs/urbansound8k_files.csv")
-    
+
     @property
     def dataset_csv(self) -> Path:
         """Path to the main dataset CSV file."""
         return self._dataset_csv
-    
+
     @property
     def audio_root(self) -> Path:
         """Root directory containing audio files."""
         return self._audio_root
 
-    def get_metadata_entries(self) -> List[Dict[str, Any]]:
+    @property
+    def vocabulary(self) -> dict[int, str]:
+        """Get UrbanSound8K vocabulary mapping."""
+        return load_urbansound8k_vocabulary()
+
+    @property
+    def name_to_id(self) -> dict[str, int]:
+        """Get class name to ID mapping."""
+        return {name: class_id for class_id, name in self.vocabulary.items()}
+
+    def get_metadata_entries(self) -> list[dict[str, Any]]:
         """Get list of metadata entries for active learning."""
         entries = []
         vocabulary = load_urbansound8k_vocabulary()
-        
-        with open(self.metadata_csv, 'r') as f:
+
+        with open(self.metadata_csv) as f:
             reader = csv.DictReader(f)
             for row in reader:
-                filename = row['slice_file_name']
-                class_id = int(row['classID'])
-                fold = int(row['fold'])
-                
+                filename = row["slice_file_name"]
+                class_id = int(row["classID"])
+                fold = int(row["fold"])
+
                 if class_id in vocabulary:
-                    entries.append({
-                        'filename': filename,
-                        'class_name': vocabulary[class_id],
-                        'fold': fold
-                    })
+                    entries.append(
+                        {"filename": filename, "class_name": vocabulary[class_id], "fold": fold}
+                    )
         return entries
-    
+
     def get_audio_path(self, filename: str, fold: int | None = None) -> Path:
         """Get full path to audio file."""
         if fold is not None:
             return self.audio_root / f"fold{fold}" / filename
-        else:
-            # Try to find the file in any fold (less efficient but works)
-            for fold_num in range(1, 11):
-                path = self.audio_root / f"fold{fold_num}" / filename
-                if path.exists():
-                    return path
-            # Return most likely path if not found
-            return self.audio_root / "fold1" / filename
+        # Try to find the file in any fold (less efficient but works)
+        for fold_num in range(1, 11):
+            path = self.audio_root / f"fold{fold_num}" / filename
+            if path.exists():
+                return path
+        # Return most likely path if not found
+        return self.audio_root / "fold1" / filename
+
+
+
+    def list_classes(self) -> None:
+        """Print all available UrbanSound8K classes."""
+        print("UrbanSound8K Classes:")
+        print("=" * 30)
+        for class_id in sorted(self.vocabulary.keys()):
+            name = self.vocabulary[class_id]
+            print(f"{class_id}: {name}")
 
 
 class UrbanSound8KProcessor:
@@ -171,10 +189,6 @@ class UrbanSound8KProcessor:
     def __init__(self, config: UrbanSound8KConfig):
         self.config = config
         self.spec_transform = self._create_transform()
-
-        # Load vocabulary for class name/ID conversion (consistent with FSD50K interface)
-        self.vocabulary = load_urbansound8k_vocabulary()
-        self.name_to_id = {name: class_id for class_id, name in self.vocabulary.items()}
 
     def _create_transform(self) -> nn.Sequential:
         """Create the spectrogram transform pipeline."""
@@ -190,7 +204,7 @@ class UrbanSound8KProcessor:
 
     def get_audio_path(self, filename: str, fold: int) -> Path:
         """Get full path to audio file given filename and fold."""
-        return self.config.audio_root / f"fold{fold}" / filename
+        return self.config.get_audio_path(filename, fold)
 
     def parse_metadata_row(self, row: dict[str, str]) -> dict:
         """Parse a metadata CSV row into standardized format."""
@@ -238,27 +252,11 @@ class UrbanSound8KProcessor:
 
         return spec
 
-    def get_class_id(self, class_name: str) -> int:
-        """Get UrbanSound8K class ID from human-readable class name."""
-        if class_name not in self.name_to_id:
-            raise ValueError(
-                f"Invalid class name: '{class_name}'. Use list_classes() to see valid names."
-            )
-        return self.name_to_id[class_name]
 
-    def get_class_name(self, class_id: int) -> str:
-        """Get human-readable class name from UrbanSound8K class ID."""
-        if class_id not in self.vocabulary:
-            raise ValueError(f"Invalid class ID: {class_id}. Must be 0-9.")
-        return self.vocabulary[class_id]
 
     def list_classes(self) -> None:
         """Print all available UrbanSound8K classes."""
-        print("UrbanSound8K Classes:")
-        print("=" * 30)
-        for class_id in sorted(self.vocabulary.keys()):
-            name = self.vocabulary[class_id]
-            print(f"{class_id}: {name}")
+        self.config.list_classes()
 
     def get_binary_label(self, item: dict, positive_class_id: int, positive_class_name: str) -> int:
         """Get binary label for an item based on positive class criteria.

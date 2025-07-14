@@ -2,13 +2,14 @@ import csv
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any
 
 import torch
 import torchaudio
 from torch import nn
 
 from audioloop.utils.log_normalize import LogNormalize
+
 from .dataset_config import DatasetConfig
 
 logger = logging.getLogger(__name__)
@@ -171,40 +172,72 @@ class FSD50KConfig(DatasetConfig):
     _dataset_csv: Path = Path("data/FSD50K/FSD50K.ground_truth/dev.csv")  # Common interface
     eval_csv: Path = Path("data/FSD50K/FSD50K.ground_truth/eval.csv")
     inference_csv: Path = Path("outputs/fsd50k_files.csv")
-    
+
+    # Cached vocabulary to avoid repeated loading
+    _vocabulary: dict[int, str] | None = None
+    _name_to_id: dict[str, int] | None = None
+
     @property
     def audio_root(self) -> Path:
         """Root directory containing audio files."""
         return self._audio_root
-    
-    @property 
+
+    @property
     def dataset_csv(self) -> Path:
         """Path to the main dataset CSV file."""
         return self._dataset_csv
 
-    def get_metadata_entries(self) -> List[Dict[str, Any]]:
+    @property
+    def vocabulary(self) -> dict[int, str]:
+        """Load and cache FSD50K vocabulary mapping."""
+        if self._vocabulary is None:
+            self._vocabulary = load_fsd50k_vocabulary(self.vocabulary_csv)
+        return self._vocabulary
+
+    @property
+    def name_to_id(self) -> dict[str, int]:
+        """Load and cache class name to ID mapping."""
+        if self._name_to_id is None:
+            self._name_to_id = {name: class_id for class_id, name in self.vocabulary.items()}
+        return self._name_to_id
+
+    def get_metadata_entries(self) -> list[dict[str, Any]]:
         """Get list of metadata entries for active learning."""
         entries = []
         vocabulary = load_fsd50k_vocabulary(self.vocabulary_csv)
-        
-        with open(self.dev_csv, 'r') as f:
-            reader = csv.DictReader(f, delimiter='\t')
+
+        with open(self.dev_csv) as f:
+            reader = csv.DictReader(f, delimiter="\t")
             for row in reader:
-                filename = row['fname']
+                filename = row["fname"]
                 # Handle multiple labels (comma-separated)
-                label_ids = [int(x) for x in row['labels'].split(',')]
+                label_ids = [int(x) for x in row["labels"].split(",")]
                 for label_id in label_ids:
                     if label_id in vocabulary:
-                        entries.append({
-                            'filename': filename,
-                            'class_name': vocabulary[label_id],
-                            'fold': None  # FSD50K doesn't use folds
-                        })
+                        entries.append(
+                            {
+                                "filename": filename,
+                                "class_name": vocabulary[label_id],
+                                "fold": None,  # FSD50K doesn't use folds
+                            }
+                        )
         return entries
-    
+
     def get_audio_path(self, filename: str, fold: int | None = None) -> Path:
         """Get full path to audio file."""
-        return self.audio_root / filename
+        if filename.endswith(".wav"):
+            return self.audio_root / filename
+        return self.audio_root / f"{filename}.wav"
+
+
+
+    def list_classes(self) -> None:
+        """Print all available FSD50K classes."""
+        print("FSD50K Classes (200 total):")
+        print("=" * 40)
+        for class_id in sorted(self.vocabulary.keys()):
+            name = self.vocabulary[class_id]
+            print(f"{class_id:3d}: {name}")
 
 
 class FSD50KProcessor:
@@ -213,10 +246,6 @@ class FSD50KProcessor:
     def __init__(self, config: FSD50KConfig):
         self.config = config
         self.spec_transform = self._create_transform()
-
-        # Load vocabulary for class name/ID conversion
-        self.vocabulary = load_fsd50k_vocabulary(self.config.vocabulary_csv)
-        self.name_to_id = {name: class_id for class_id, name in self.vocabulary.items()}
 
     def _create_transform(self) -> nn.Sequential:
         """Create the spectrogram transform pipeline."""
@@ -232,7 +261,7 @@ class FSD50KProcessor:
 
     def get_audio_path(self, filename: str) -> Path:
         """Get full path to audio file given filename."""
-        return self.config.audio_root / f"{filename}.wav"
+        return self.config.get_audio_path(filename)
 
     def parse_metadata_row(self, row: dict[str, str]) -> dict:
         """Parse a metadata CSV row into standardized format."""
@@ -311,9 +340,9 @@ class FSD50KProcessor:
             Path to created binary labels CSV
         """
         # Validate class name
-        if positive_class not in self.name_to_id:
+        if positive_class not in self.config.name_to_id:
             raise ValueError(
-                f"Invalid class name: '{positive_class}'. Use list_classes() to see valid names."
+                f"Invalid class name: '{positive_class}'. Valid names: {list(self.config.name_to_id.keys())}"
             )
 
         # Load metadata
@@ -393,7 +422,7 @@ class FSD50KProcessor:
 
         # Validate class names
         for class_name in positive_classes:
-            if class_name not in self.name_to_id:
+            if class_name not in self.config.name_to_id:
                 raise ValueError(f"Invalid class name in group: '{class_name}'")
 
         # Load metadata
@@ -461,27 +490,11 @@ class FSD50KProcessor:
 
         return spec
 
-    def get_class_id(self, class_name: str) -> int:
-        """Get FSD50K class ID from human-readable class name."""
-        if class_name not in self.name_to_id:
-            raise ValueError(
-                f"Invalid class name: '{class_name}'. Use list_classes() to see valid names."
-            )
-        return self.name_to_id[class_name]
 
-    def get_class_name(self, class_id: int) -> str:
-        """Get human-readable class name from FSD50K class ID."""
-        if class_id not in self.vocabulary:
-            raise ValueError(f"Invalid class ID: {class_id}. Must be 0-199.")
-        return self.vocabulary[class_id]
 
     def list_classes(self) -> None:
         """Print all available FSD50K classes."""
-        print("FSD50K Classes (200 total):")
-        print("=" * 40)
-        for class_id in sorted(self.vocabulary.keys()):
-            name = self.vocabulary[class_id]
-            print(f"{class_id:3d}: {name}")
+        self.config.list_classes()
 
     def process_single_file(self, file_info: dict, output_dir: Path) -> tuple[bool, int | None]:
         """Process a single audio file and save its spectrogram.

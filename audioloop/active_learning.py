@@ -64,7 +64,10 @@ def run_active_learning_for_class(
         dataset_file = str(dataset_config.dataset_csv)
 
     # Validate class name and get class ID
-    positive_class_id = processor.get_class_id(positive_class_name)
+    try:
+        positive_class_id = processor.config.name_to_id[positive_class_name]
+    except KeyError:
+        raise ValueError(f"Invalid class name: '{positive_class_name}'. Valid names: {list(processor.config.name_to_id.keys())}") from None
 
     # Auto-generate negative class name if not provided
     if negative_class_name is None:
@@ -277,15 +280,15 @@ Examples:
     if args.class_name:
         positive_class_name = args.class_name
         try:
-            positive_class_id = processor.get_class_id(args.class_name)
-        except ValueError as e:
-            parser.error(str(e))
+            positive_class_id = processor.config.name_to_id[args.class_name]
+        except KeyError:
+            parser.error(f"Invalid class name: '{args.class_name}'. Valid names: {list(processor.config.name_to_id.keys())}")
     else:  # args.class_id is not None
         positive_class_id = args.class_id
         try:
-            positive_class_name = processor.get_class_name(positive_class_id)
-        except ValueError as e:
-            parser.error(str(e))
+            positive_class_name = processor.config.vocabulary[positive_class_id]
+        except KeyError:
+            parser.error(f"Invalid class ID: {positive_class_id}. Valid IDs: {list(processor.config.vocabulary.keys())}")
 
     # Determine negative class name
     negative_class_name = args.negative_name or f"not_{positive_class_name}"

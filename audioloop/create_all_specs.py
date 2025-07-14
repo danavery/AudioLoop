@@ -10,9 +10,9 @@ from pathlib import Path
 import torchaudio
 from tqdm import tqdm
 
+from .config import AudioLoopConfig
 from .datasets import UrbanSound8KConfig, UrbanSound8KProcessor
 from .datasets.fsd50k import FSD50KConfig, FSD50KProcessor
-from .config import AudioLoopConfig
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

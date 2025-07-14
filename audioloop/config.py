@@ -42,26 +42,26 @@ Environment Variables:
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Type, Any, Dict, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from .datasets.dataset_config import DatasetConfig
 
+from .datasets.dataset_config import DatasetConfig
 from .utils.paths import (
     create_output_directories,
     get_output_dir,
     get_specs_dir,
     get_training_sets_dir,
 )
-from .datasets.dataset_config import DatasetConfig
 
 # Registry with better typing - avoid runtime import of DatasetConfig
-DATASET_CONFIGS: Dict[str, Optional[Type["DatasetConfig"]]] = {
+DATASET_CONFIGS: dict[str, type["DatasetConfig"] | None] = {
     "urbansound8k": None,  # Lazy loaded
     "fsd50k": None,        # Lazy loaded
 }
 
-DATASET_PROCESSORS: Dict[str, Optional[Type[Any]]] = {
+DATASET_PROCESSORS: dict[str, type[Any] | None] = {
     "urbansound8k": None,  # Lazy loaded
     "fsd50k": None,        # Lazy loaded
 }

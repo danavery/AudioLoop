@@ -500,7 +500,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Audio labeling tool for active learning with multi-dataset support",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=f"""
+        epilog="""
 Example workflows:
 
 FSD50K (default):
