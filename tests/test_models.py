@@ -1,12 +1,13 @@
 """Tests for the AudioLoop model system."""
 
 import tempfile
-from typing import Any
-import torch
-import pytest
 from pathlib import Path
+from typing import Any
 
-from audioloop.models import AudioLoopModel, SoundCNN, SimpleCNN
+import pytest
+import torch
+
+from audioloop.models import AudioLoopModel, SimpleCNN, SoundCNN
 
 
 class TestAudioLoopModel:
@@ -79,17 +80,17 @@ class TestSoundCNN:
         model = SoundCNN(num_classes=2, dataset_size=150)
 
         assert model.use_batchnorm is True
-        assert hasattr(model, 'bn1')
-        assert hasattr(model, 'bn2')
+        assert hasattr(model, "bn1")
+        assert hasattr(model, "bn2")
 
     def test_batchnorm_decision_small_dataset(self):
         """Test BatchNorm decision for small datasets."""
         model = SoundCNN(num_classes=2, dataset_size=50)
 
         assert model.use_batchnorm is False
-        assert not hasattr(model, 'bn1')
-        assert not hasattr(model, 'bn2')
-        assert hasattr(model, 'dropout')  # Should have dropout instead
+        assert not hasattr(model, "bn1")
+        assert not hasattr(model, "bn2")
+        assert hasattr(model, "dropout")  # Should have dropout instead
 
     def test_batchnorm_decision_at_threshold(self):
         """Test BatchNorm decision exactly at threshold."""
@@ -114,7 +115,7 @@ class TestSoundCNN:
         assert model_always.use_batchnorm is True
 
         # Never use BatchNorm
-        model_never = SoundCNN(num_classes=2, dataset_size=1000, batchnorm_threshold=float('inf'))
+        model_never = SoundCNN(num_classes=2, dataset_size=1000, batchnorm_threshold=float("inf"))
         assert model_never.use_batchnorm is False
 
     def test_no_dataset_size_defaults_to_batchnorm(self):
@@ -126,10 +127,7 @@ class TestSoundCNN:
     def test_custom_parameters(self):
         """Test custom kernel size and other parameters."""
         model = SoundCNN(
-            num_classes=5,
-            kernel_size=(5, 5),
-            dataset_size=200,
-            batchnorm_threshold=150
+            num_classes=5, kernel_size=(5, 5), dataset_size=200, batchnorm_threshold=150
         )
 
         assert model.num_classes == 5
@@ -189,7 +187,7 @@ class TestSoundCNN:
         """Test model saving functionality."""
         model = SoundCNN(num_classes=2, dataset_size=50, batchnorm_threshold=75)
 
-        with tempfile.NamedTemporaryFile(suffix='.pt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
             temp_path = f.name
 
         try:
@@ -199,7 +197,7 @@ class TestSoundCNN:
             assert Path(temp_path).exists()
 
             # Verify file contains expected data
-            checkpoint = torch.load(temp_path, map_location='cpu')
+            checkpoint = torch.load(temp_path, map_location="cpu")
             assert checkpoint["model_type"] == "SoundCNN"
             assert checkpoint["num_classes"] == 2
             assert checkpoint["kernel_size"] == (3, 3)
@@ -214,7 +212,7 @@ class TestSoundCNN:
         """Test model loading functionality."""
         original_model = SoundCNN(num_classes=3, dataset_size=25, batchnorm_threshold=50)
 
-        with tempfile.NamedTemporaryFile(suffix='.pt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
             temp_path = f.name
 
         try:
@@ -222,7 +220,7 @@ class TestSoundCNN:
             original_model.save_model(temp_path)
 
             # Load it back
-            device = torch.device('cpu')
+            device = torch.device("cpu")
             loaded_model = SoundCNN.load_model(temp_path, device)
 
             # Verify loaded model has same properties
@@ -246,14 +244,14 @@ class TestSoundCNN:
         model = SoundCNN(num_classes=2, dataset_size=50, batchnorm_threshold=75)
         assert model.use_batchnorm is False
 
-        with tempfile.NamedTemporaryFile(suffix='.pt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
             temp_path = f.name
 
         try:
             model.save_model(temp_path)
 
             # Load model - should preserve the original BatchNorm decision
-            device = torch.device('cpu')
+            device = torch.device("cpu")
             loaded_model = SoundCNN.load_model(temp_path, device)
 
             # Should preserve the original decision, not recalculate
@@ -274,18 +272,18 @@ class TestSoundCNN:
             "num_classes": 2,
             "kernel_size": (3, 3),
             "use_batchnorm": True,
-            "model_type": "SoundCNN"
+            "model_type": "SoundCNN",
             # Note: no batchnorm_threshold
         }
 
-        with tempfile.NamedTemporaryFile(suffix='.pt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
             temp_path = f.name
 
         try:
             torch.save(checkpoint, temp_path)
 
             # Should load successfully with default threshold
-            device = torch.device('cpu')
+            device = torch.device("cpu")
             loaded_model = SoundCNN.load_model(temp_path, device)
 
             assert loaded_model.batchnorm_threshold == 100  # Default value
@@ -311,7 +309,7 @@ class TestSoundCNN:
         model = SoundCNN(num_classes=2, dataset_size=150)
 
         # Move to CPU (should work regardless of CUDA availability)
-        model.to(torch.device('cpu'))
+        model.to(torch.device("cpu"))
 
         # Test forward pass still works
         x = torch.randn(1, 1, 128, 128)
@@ -397,7 +395,7 @@ class TestSimpleCNN:
         """Test SimpleCNN saving functionality."""
         model = SimpleCNN(num_classes=3)
 
-        with tempfile.NamedTemporaryFile(suffix='.pt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
             temp_path = f.name
 
         try:
@@ -407,7 +405,7 @@ class TestSimpleCNN:
             assert Path(temp_path).exists()
 
             # Verify file contains expected data
-            checkpoint = torch.load(temp_path, map_location='cpu')
+            checkpoint = torch.load(temp_path, map_location="cpu")
             assert checkpoint["model_type"] == "SimpleCNN"
             assert checkpoint["num_classes"] == 3
             assert "model_state_dict" in checkpoint
@@ -419,7 +417,7 @@ class TestSimpleCNN:
         """Test SimpleCNN loading functionality."""
         original_model = SimpleCNN(num_classes=5)
 
-        with tempfile.NamedTemporaryFile(suffix='.pt', delete=False) as f:
+        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
             temp_path = f.name
 
         try:
@@ -427,7 +425,7 @@ class TestSimpleCNN:
             original_model.save_model(temp_path)
 
             # Load it back
-            device = torch.device('cpu')
+            device = torch.device("cpu")
             loaded_model = SimpleCNN.load_model(temp_path, device)
 
             # Verify loaded model has same properties

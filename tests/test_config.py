@@ -5,7 +5,6 @@ Focused on behavior testing with minimal mocking and good use of parameterizatio
 """
 
 import os
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
@@ -39,10 +38,9 @@ class TestAudioLoopConfig:
         config = AudioLoopConfig(experiment_name="test_exp")
         assert config.experiment_name == "test_exp"
 
-    @pytest.mark.parametrize("env_dataset,expected", [
-        ("fsd50k", "fsd50k"),
-        ("urbansound8k", "urbansound8k")
-    ])
+    @pytest.mark.parametrize(
+        "env_dataset,expected", [("fsd50k", "fsd50k"), ("urbansound8k", "urbansound8k")]
+    )
     def test_environment_override(self, env_dataset, expected):
         """Test environment variable override."""
         with patch.dict(os.environ, {"AUDIOLOOP_DATASET": env_dataset}):
@@ -63,10 +61,10 @@ class TestAudioLoopConfig:
 class TestConfigPaths:
     """Path generation functionality."""
 
-    @pytest.mark.parametrize("experiment,expected_output,expected_training", [
-        (None, "outputs", "training_sets"),
-        ("test", "outputs_test", "training_sets_test")
-    ])
+    @pytest.mark.parametrize(
+        "experiment,expected_output,expected_training",
+        [(None, "outputs", "training_sets"), ("test", "outputs_test", "training_sets_test")],
+    )
     def test_directory_paths(self, experiment, expected_output, expected_training):
         """Test output and training directory generation."""
         config = AudioLoopConfig(experiment_name=experiment)
@@ -74,10 +72,13 @@ class TestConfigPaths:
         assert config.output_dir.name == expected_output
         assert config.training_sets_dir.name == expected_training
 
-    @pytest.mark.parametrize("version,expected_file", [
-        (1, "model_v1.pt"),
-        (42, "predictions_v42.csv"),
-    ])
+    @pytest.mark.parametrize(
+        "version,expected_file",
+        [
+            (1, "model_v1.pt"),
+            (42, "predictions_v42.csv"),
+        ],
+    )
     def test_versioned_paths(self, version, expected_file):
         """Test versioned file path generation."""
         config = AudioLoopConfig()
@@ -109,10 +110,7 @@ class TestConfigConstructor:
 
     def test_constructor_with_args(self):
         """Test constructor with arguments."""
-        config = AudioLoopConfig(
-            experiment_name="test",
-            dataset="urbansound8k"
-        )
+        config = AudioLoopConfig(experiment_name="test", dataset="urbansound8k")
         assert config.experiment_name == "test"
         assert config.dataset == "urbansound8k"
 
@@ -150,5 +148,5 @@ class TestDatasetIntegration:
         dataset_config = config.get_dataset_config()
 
         # Test required methods exist
-        assert callable(getattr(dataset_config, "get_audio_path"))
-        assert callable(getattr(dataset_config, "get_metadata_entries"))
+        assert callable(dataset_config.get_audio_path)
+        assert callable(dataset_config.get_metadata_entries)

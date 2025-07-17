@@ -28,16 +28,18 @@ class TestConfigPathIntegration:
 
     def test_directory_creation_integration(self):
         """Test that config can create directories that match its paths."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            with patch("audioloop.utils.paths.get_output_root", return_value=Path(temp_dir)):
-                config = AudioLoopConfig(experiment_name="integration_test")
+        with (
+            tempfile.TemporaryDirectory() as temp_dir,
+            patch("audioloop.utils.paths.get_output_root", return_value=Path(temp_dir)),
+        ):
+            config = AudioLoopConfig(experiment_name="integration_test")
 
-                # Create directories through config
-                config.create_directories()
+            # Create directories through config
+            config.create_directories()
 
-                # Verify config paths exist
-                assert config.output_dir.exists()
-                assert config.training_sets_dir.exists()
+            # Verify config paths exist
+            assert config.output_dir.exists()
+            assert config.training_sets_dir.exists()
 
 
 class TestEnvironmentIntegration:
@@ -64,10 +66,10 @@ class TestEnvironmentIntegration:
 
     def test_path_environment_integration(self):
         """Test that path environment variables work with config."""
-        with patch.dict(os.environ, {
-            "AUDIOLOOP_OUTPUT_ROOT": "/custom/output",
-            "AUDIOLOOP_DATA_ROOT": "/custom/data"
-        }):
+        with patch.dict(
+            os.environ,
+            {"AUDIOLOOP_OUTPUT_ROOT": "/custom/output", "AUDIOLOOP_DATA_ROOT": "/custom/data"},
+        ):
             config = AudioLoopConfig()
 
             # Paths should reflect environment variables
@@ -154,10 +156,7 @@ class TestRealUsagePatterns:
     def test_typical_cli_workflow(self):
         """Test typical CLI-like usage pattern."""
         # Simulate CLI argument processing
-        config = AudioLoopConfig(
-            experiment_name="cli_test",
-            dataset="urbansound8k"
-        )
+        config = AudioLoopConfig(experiment_name="cli_test", dataset="urbansound8k")
 
         # Should work without errors
         assert config.experiment_name == "cli_test"
@@ -195,4 +194,4 @@ class TestRealUsagePatterns:
         # Dataset config should be retrievable multiple times
         dataset_config1 = config.get_dataset_config()
         dataset_config2 = config.get_dataset_config()
-        assert type(dataset_config1) == type(dataset_config2)
+        assert isinstance(dataset_config1, type(dataset_config2))

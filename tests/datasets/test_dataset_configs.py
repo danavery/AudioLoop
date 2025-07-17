@@ -5,7 +5,7 @@ Focused on interface compliance and key behavioral differences.
 """
 
 from pathlib import Path
-from unittest.mock import patch, mock_open
+from unittest.mock import mock_open, patch
 
 import pytest
 
@@ -24,6 +24,7 @@ class TestDatasetConfigInterface:
 
     def test_subclass_must_implement_methods(self):
         """Test that incomplete subclasses cannot be instantiated."""
+
         class IncompleteConfig(DatasetConfig):
             pass
 
@@ -32,6 +33,7 @@ class TestDatasetConfigInterface:
 
     def test_complete_subclass_works(self):
         """Test that complete implementation can be instantiated."""
+
         class CompleteConfig(DatasetConfig):
             @property
             def dataset_csv(self) -> Path:
@@ -107,7 +109,9 @@ class TestDatasetConfigBehavior:
 class TestMetadataHandling:
     """Test metadata entry generation with minimal mocking."""
 
-    @patch("builtins.open", new_callable=mock_open, read_data="fname\tlabels\tmids\n100032\t1,5\tm1,m5")
+    @patch(
+        "builtins.open", new_callable=mock_open, read_data="fname\tlabels\tmids\n100032\t1,5\tm1,m5"
+    )
     @patch("audioloop.datasets.fsd50k.load_fsd50k_vocabulary")
     def test_fsd50k_metadata_parsing(self, mock_vocab, mock_file):
         """Test FSD50K metadata entry generation."""
@@ -122,7 +126,11 @@ class TestMetadataHandling:
         assert entries[0]["class_name"] in ["Drill", "Music"]
         assert entries[0]["fold"] is None
 
-    @patch("builtins.open", new_callable=mock_open, read_data="slice_file_name,fold,classID,class\n7061-6-0-0.wav,5,0,air_conditioner")
+    @patch(
+        "builtins.open",
+        new_callable=mock_open,
+        read_data="slice_file_name,fold,classID,class\n7061-6-0-0.wav,5,0,air_conditioner",
+    )
     @patch("audioloop.datasets.urbansound8k.load_urbansound8k_vocabulary")
     def test_urbansound8k_metadata_parsing(self, mock_vocab, mock_file):
         """Test UrbanSound8K metadata entry generation."""
@@ -148,7 +156,9 @@ class TestMetadataHandling:
                 with patch("audioloop.datasets.fsd50k.load_fsd50k_vocabulary", return_value={}):
                     entries = config.get_metadata_entries()
             else:
-                with patch("audioloop.datasets.urbansound8k.load_urbansound8k_vocabulary", return_value={}):
+                with patch(
+                    "audioloop.datasets.urbansound8k.load_urbansound8k_vocabulary", return_value={}
+                ):
                     entries = config.get_metadata_entries()
 
             assert isinstance(entries, list)
