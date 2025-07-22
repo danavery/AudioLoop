@@ -109,58 +109,22 @@ def prompt_for_manual_labeling(candidates_file):
 
 
 def run_automated_workflow(
+    config,
     class_name,
     num_cycles=3,
     auto_label=True,
-    dataset_name="urbansound8k",
     audio_dir=None,
-    # Training parameters
-    epochs=1000,
-    batch_size=32,
-    learning_rate=0.001,
-    stopping_criterion="plateau",
-    patience=20,
-    min_delta=0.01,
-    accuracy_floor=None,
-    # Active learning parameters
-    total_candidates=50,
-    positive_percentage=0.75,
-    min_confidence=0.8,
-    selection_mode="confidence",
-    # Basic transition parameters
-    basic_transition_f1_threshold=0.2,
-    basic_transition_confidence_threshold=0.9,
-    basic_transition_variance_threshold=0.12,
-    auto_thresholds=False,
-    estimated_positive_pct=None,
-    experiment_name=None,
     seed=None,
 ):
     """
     Run the complete automated active learning workflow.
 
     Args:
+        config: AudioLoopConfig instance with all configuration parameters
         class_name: Target class name (e.g., "siren", "dog_bark")
         num_cycles: Number of active learning cycles
         auto_label: Whether to auto-label (True) or prompt for manual labeling (False)
-        dataset_name: Dataset name ("urbansound8k" or "fsd50k")
         audio_dir: Custom audio directory (optional)
-        epochs: Max training epochs per cycle
-        batch_size: Training batch size
-        learning_rate: Training learning rate
-        stopping_criterion: Stopping criterion to use ('accuracy' or 'plateau')
-        patience: Patience for plateau stopping criterion
-        min_delta: Minimum delta for plateau stopping criterion
-        accuracy_floor: Only count patience when accuracy >= this threshold
-        total_candidates: Number of candidates to select per cycle
-        positive_percentage: Target percentage of positive samples in candidates
-        min_confidence: Minimum confidence threshold for candidate selection
-        selection_mode: Selection strategy ('confidence', 'entropy', 'basic_transition')
-        basic_transition_f1_threshold: F1 threshold for basic transition (default: 0.2)
-        basic_transition_confidence_threshold: Mean confidence threshold for basic transition (default: 0.9)
-        basic_transition_variance_threshold: Std confidence threshold for basic transition (default: 0.12)
-        auto_thresholds: Automatically calculate thresholds based on dataset characteristics (default: False)
-        estimated_positive_pct: Estimated percentage of positive samples (0.0-1.0). Used with auto_thresholds.
         seed: Random seed for reproducibility (default: None)
 
     Returns:
@@ -170,23 +134,22 @@ def run_automated_workflow(
     print("🚀 AUTOMATED ACTIVE LEARNING WORKFLOW")
     print("=" * 80)
     print(f"Target class: {class_name}")
-    print(f"Dataset: {dataset_name}")
+    print(f"Dataset: {config.dataset}")
     print(f"Cycles: {num_cycles}")
     print(f"Auto-label: {auto_label}")
-    print(f"Training epochs: {epochs}")
-    print(f"Candidates per cycle: {total_candidates}")
-    print(f"Selection strategy: {selection_mode}")
+    print(f"Training epochs: {config.max_epochs}")
+    print(f"Candidates per cycle: {config.total_candidates}")
+    print(f"Selection strategy: {config.selection_mode}")
     print("=" * 80)
 
     # Check that initial training set exists
-    training_sets_dir = f"training_sets_{experiment_name}" if experiment_name else "training_sets"
-    initial_training_set = f"{training_sets_dir}/training_set_v1.csv"
+    initial_training_set = config.get_training_set_path(1)
     if not os.path.exists(initial_training_set):
         print(f"❌ Initial training set not found: {initial_training_set}")
         print("💡 Create it first with:")
-        if experiment_name:
+        if config.experiment_name:
             print(
-                f"   python -m audioloop.utils.start_labeling --class-name {class_name} --n 40 --output {initial_training_set}"
+                f"   python -m audioloop.utils.start_labeling --class-name {class_name} --n 40 --experiment {config.experiment_name}"
             )
         else:
             print(f"   python -m audioloop.utils.start_labeling --class-name {class_name} --n 40")
@@ -199,9 +162,8 @@ def run_automated_workflow(
         print(f"🔄 CYCLE {cycle} of {num_cycles}")
         print("█" * 80)
 
-        current_training_set = f"{training_sets_dir}/training_set_v{cycle}.csv"
-        output_dir = f"outputs_{experiment_name}" if experiment_name else "outputs"
-        current_model = f"{output_dir}/model_v{cycle}.pt"
+        current_training_set = config.get_training_set_path(cycle)
+        current_model = config.get_model_path(cycle)
 
         # Use the training set from the previous cycle if current doesn't exist
         if not os.path.exists(current_training_set) and len(training_sets) > 0:
@@ -215,34 +177,11 @@ def run_automated_workflow(
         print(f"   Model output: {current_model}")
 
         try:
-            # Create stopping criterion
-            if stopping_criterion == "accuracy":
-                from audioloop.utils.stopping_criteria import AccuracyCriterion
-
-                criterion = AccuracyCriterion(max_epochs=epochs)
-            else:  # plateau
-                from audioloop.utils.stopping_criteria import PlateauCriterion
-
-                criterion = PlateauCriterion(
-                    patience=patience,
-                    min_delta=min_delta,
-                    max_epochs=epochs,
-                    accuracy_floor=accuracy_floor,
-                )
-
-            # Create config for this workflow
-            config = AudioLoopConfig(experiment_name=experiment_name, dataset=dataset_name)
-
             final_accuracy = run_training(
                 config=config,
                 labels_file=current_training_set,
-                max_epochs=epochs,
-                batch_size=batch_size,
-                learning_rate=learning_rate,
-                model_path=current_model,
                 version=cycle,
-                stopping_criterion=criterion,
-                seed=seed if seed is not None else 42,
+                model_path=current_model,
             )
             print(f"   ✅ Model trained (final accuracy: {final_accuracy:.3f})")
         except Exception as e:
@@ -257,18 +196,18 @@ def run_automated_workflow(
             predictions_file, candidates_file = run_active_learning_for_class(
                 positive_class_name=class_name,
                 model_path=current_model,
-                dataset_name=dataset_name,
+                dataset_name=config.dataset,
                 run_number=cycle,
-                total_candidates=total_candidates,
-                positive_percentage=positive_percentage,
-                min_confidence=min_confidence,
-                selection_mode=selection_mode,
-                basic_transition_f1_threshold=basic_transition_f1_threshold,
-                basic_transition_confidence_threshold=basic_transition_confidence_threshold,
-                basic_transition_variance_threshold=basic_transition_variance_threshold,
-                auto_thresholds=auto_thresholds,
-                estimated_positive_pct=estimated_positive_pct,
-                experiment_name=experiment_name,
+                total_candidates=config.total_candidates,
+                positive_percentage=config.positive_percentage,
+                min_confidence=config.min_confidence,
+                selection_mode=config.selection_mode,
+                basic_transition_f1_threshold=config.basic_transition_f1_threshold,
+                basic_transition_confidence_threshold=config.basic_transition_confidence_threshold,
+                basic_transition_variance_threshold=config.basic_transition_variance_threshold,
+                auto_thresholds=config.auto_thresholds,
+                estimated_positive_pct=config.estimated_positive_pct,
+                experiment_name=config.experiment_name,
                 seed=seed,
             )
             print(f"   ✅ Generated candidates: {candidates_file}")
@@ -281,7 +220,7 @@ def run_automated_workflow(
         print("▼" * 50)
         if auto_label:
             labeled_count = auto_label_candidates(
-                candidates_file=candidates_file, dataset_name=dataset_name, audio_dir=audio_dir
+                candidates_file=candidates_file, dataset_name=config.dataset, audio_dir=audio_dir
             )
         else:
             labeled_count = prompt_for_manual_labeling(candidates_file)
@@ -370,7 +309,7 @@ Prerequisites:
 
     # Workflow parameters
     parser.add_argument(
-        "--cycles", type=int, default=3, help="Number of active learning cycles (default: 3)"
+        "--cycles", type=int, help="Number of active learning cycles (default: 3)"
     )
     parser.add_argument(
         "--auto-label",
@@ -381,9 +320,8 @@ Prerequisites:
     # Dataset parameters
     parser.add_argument(
         "--dataset",
-        default="fsd50k",
         choices=["urbansound8k", "fsd50k"],
-        help="Dataset name (default: fsd50k)",
+        help="Dataset name (default from config: fsd50k)",
     )
     parser.add_argument(
         "--audio-dir", help="Custom audio directory (uses dataset default if not specified)"
@@ -391,85 +329,74 @@ Prerequisites:
 
     # Training parameters
     parser.add_argument(
-        "--epochs", type=int, default=1000, help="Max training epochs per cycle (default: 1000)"
+        "--epochs", type=int, help="Max training epochs per cycle (default from config: 1000)"
     )
     parser.add_argument(
-        "--batch-size", type=int, default=32, help="Training batch size (default: 32)"
+        "--batch-size", type=int, help="Training batch size (default from config: 32)"
     )
     parser.add_argument(
-        "--learning-rate", type=float, default=1e-3, help="Learning rate (default: 0.001)"
+        "--learning-rate", type=float, help="Learning rate (default from config: 0.001)"
     )
 
     # Stopping criteria parameters
     parser.add_argument(
         "--stopping-criterion",
-        choices=["accuracy", "plateau"],
-        default="plateau",
-        help="Stopping criterion to use (default: plateau)",
+        choices=["accuracy", "plateau", "hybrid"],
+        help="Stopping criterion to use (default from config: hybrid)",
     )
     parser.add_argument(
         "--patience",
         type=int,
-        default=20,
-        help="Patience for plateau stopping criterion (default: 20)",
+        help="Patience for plateau stopping criterion (default from config: 25)",
     )
     parser.add_argument(
         "--min-delta",
         type=float,
-        default=0.01,
-        help="Minimum delta for plateau stopping criterion (default: 0.01)",
+        help="Minimum delta for plateau stopping criterion (default from config: 0.01)",
     )
     parser.add_argument(
         "--accuracy-floor",
         type=float,
-        default=None,
-        help="Only count plateau patience when accuracy >= this threshold (default: None)",
+        help="Only count plateau patience when accuracy >= this threshold (default from config: None)",
     )
 
     # Active learning parameters
     parser.add_argument(
         "--candidates",
         type=int,
-        default=50,
-        help="Number of candidates to select per cycle (default: 50)",
+        help="Number of candidates to select per cycle (default from config: 50)",
     )
     parser.add_argument(
         "--positive-pct",
         type=float,
-        default=0.75,
-        help="Target percentage of positive samples (default: 0.75)",
+        help="Target percentage of positive samples (default from config: 0.75)",
     )
     parser.add_argument(
         "--min-confidence",
         type=float,
-        default=0.8,
-        help="Minimum confidence threshold (default: 0.8)",
+        help="Minimum confidence threshold (default from config: 0.8)",
     )
 
     # Selection strategy parameters
     parser.add_argument(
         "--selection-mode",
         choices=["confidence", "entropy", "basic_transition"],
-        default="confidence",
-        help="Selection strategy: 'confidence', 'entropy', or 'basic_transition' (default: confidence)",
+        help="Selection strategy: 'confidence', 'entropy', or 'basic_transition' (default from config: confidence)",
     )
     parser.add_argument(
         "--basic-transition-f1-threshold",
         type=float,
-        default=0.2,
-        help="F1 threshold for basic transition (default: 0.2)",
+        help="F1 threshold for basic transition (default from config: 0.2)",
     )
     parser.add_argument(
         "--basic-transition-confidence-threshold",
         type=float,
-        default=0.9,
-        help="Mean confidence threshold for basic transition (default: 0.9)",
+        help="Mean confidence threshold for basic transition (default from config: 0.9)",
     )
     parser.add_argument(
         "--basic-transition-variance-threshold",
         type=float,
-        default=0.12,
-        help="Std confidence threshold for basic transition (default: 0.12)",
+        help="Std confidence threshold for basic transition (default from config: 0.12)",
     )
     parser.add_argument(
         "--auto-thresholds",
@@ -489,16 +416,43 @@ Prerequisites:
     parser.add_argument(
         "--seed",
         type=int,
-        help="Random seed for reproducibility (default: None)",
+        help="Random seed for reproducibility (default from config: 42)",
     )
 
     args = parser.parse_args()
 
-    # Determine output directory
-    output_dir = f"outputs_{args.experiment}" if args.experiment else "outputs"
-
+    # Create config with CLI overrides (config-first approach)
+    config_overrides = {
+        key: value for key, value in {
+            'experiment_name': args.experiment,
+            'dataset': args.dataset,
+            'max_epochs': args.epochs,
+            'batch_size': args.batch_size,
+            'learning_rate': args.learning_rate,
+            'stopping_criterion_type': args.stopping_criterion,
+            'patience': args.patience,
+            'min_delta': args.min_delta,
+            'accuracy_floor': args.accuracy_floor,
+            'total_candidates': args.candidates,
+            'positive_percentage': args.positive_pct,
+            'min_confidence': args.min_confidence,
+            'selection_mode': args.selection_mode,
+            'basic_transition_f1_threshold': args.basic_transition_f1_threshold,
+            'basic_transition_confidence_threshold': args.basic_transition_confidence_threshold,
+            'basic_transition_variance_threshold': args.basic_transition_variance_threshold,
+            'estimated_positive_pct': args.estimated_positive_pct,
+            'seed': args.seed,
+        }.items() if value is not None
+    }
+    
+    # Handle boolean flags separately (they're always provided by argparse)
+    if args.auto_thresholds:
+        config_overrides['auto_thresholds'] = True
+        
+    config = AudioLoopConfig(**config_overrides)
+    
     # Create output directory if it doesn't exist
-    os.makedirs(output_dir, exist_ok=True)
+    os.makedirs(config.output_dir, exist_ok=True)
 
     # Save command line arguments to the output directory
     command_info = {
@@ -508,24 +462,24 @@ Prerequisites:
     }
 
     # Save JSON file with full information
-    command_file = os.path.join(output_dir, "command_line.json")
+    command_file = os.path.join(config.output_dir, "command_line.json")
     with open(command_file, "w") as f:
         json.dump(command_info, f, indent=2)
 
     # Save plain text file with just the command
-    command_txt_file = os.path.join(output_dir, "command_line.txt")
+    command_txt_file = os.path.join(config.output_dir, "command_line.txt")
     with open(command_txt_file, "w") as f:
         f.write(" ".join(sys.argv) + "\n")
 
     print(f"📝 Command line saved to: {command_file}")
     print(f"📝 Command line text saved to: {command_txt_file}")
 
-    # Validate arguments
-    if args.positive_pct < 0 or args.positive_pct > 1:
+    # Validate arguments (use config values for validation since CLI may be None)
+    if config.positive_percentage < 0 or config.positive_percentage > 1:
         print("❌ --positive-pct must be between 0 and 1")
         return 1
 
-    if args.min_confidence < 0 or args.min_confidence > 1:
+    if config.min_confidence < 0 or config.min_confidence > 1:
         print("❌ --min-confidence must be between 0 and 1")
         return 1
 
@@ -538,28 +492,11 @@ Prerequisites:
     # Run the workflow
     try:
         training_sets = run_automated_workflow(
+            config=config,
             class_name=args.class_name,
-            num_cycles=args.cycles,
+            num_cycles=args.cycles if args.cycles is not None else 3,
             auto_label=args.auto_label,
-            dataset_name=args.dataset,
             audio_dir=args.audio_dir,
-            epochs=args.epochs,
-            batch_size=args.batch_size,
-            learning_rate=args.learning_rate,
-            stopping_criterion=args.stopping_criterion,
-            patience=args.patience,
-            min_delta=args.min_delta,
-            accuracy_floor=args.accuracy_floor,
-            total_candidates=args.candidates,
-            positive_percentage=args.positive_pct,
-            min_confidence=args.min_confidence,
-            selection_mode=args.selection_mode,
-            basic_transition_f1_threshold=args.basic_transition_f1_threshold,
-            basic_transition_confidence_threshold=args.basic_transition_confidence_threshold,
-            basic_transition_variance_threshold=args.basic_transition_variance_threshold,
-            auto_thresholds=args.auto_thresholds,
-            estimated_positive_pct=args.estimated_positive_pct,
-            experiment_name=args.experiment,
             seed=args.seed,
         )
 

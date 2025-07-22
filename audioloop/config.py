@@ -44,8 +44,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-if TYPE_CHECKING:
-    from .datasets.dataset_config import DatasetConfig
+from .datasets.dataset_config import DatasetConfig
 
 from .utils.paths import (
     create_output_directories,
