@@ -61,11 +61,6 @@ def main():
         "-lr", "--learning-rate", type=float, default=0.001, help="Learning rate (default: 0.001)"
     )
     parser.add_argument(
-        "--specs-dir",
-        default="data/all_specs",
-        help="Directory containing spectrogram files (default: data/all_specs)",
-    )
-    parser.add_argument(
         "--no-batchnorm",
         action="store_true",
         help="Disable BatchNorm (auto-disabled for <100 samples)",

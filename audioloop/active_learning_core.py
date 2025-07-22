@@ -55,7 +55,7 @@ def load_model(model_path, num_classes, device):
 def run_binary_inference(
     config,
     model_path,
-    predictions_csv="outputs/predictions.csv",
+    predictions_csv=None,
     positive_class_name="positive",
     negative_class_name="negative",
     dataset_file=None,
@@ -80,6 +80,10 @@ def run_binary_inference(
     """
     device = get_device()
     print(f"Using device: {device}")
+
+    # Set default predictions_csv if not provided
+    if predictions_csv is None:
+        predictions_csv = str(config.output_dir / "predictions.csv")
 
     # Get dataset processor and dataset config from unified config
     processor = config.get_dataset_processor()
@@ -128,7 +132,7 @@ def run_binary_inference(
         )
 
     # Load dataset directly from entries
-    dataset = SpectrogramDataset(data=dataset_entries, specs_dir="data/all_specs")
+    dataset = SpectrogramDataset(data=dataset_entries, specs_dir=str(config.specs_dir))
     if filtered_count > 0:
         print(f"Filtered out {filtered_count} files already in training set")
     print(f"Running inference on {len(dataset)} files")

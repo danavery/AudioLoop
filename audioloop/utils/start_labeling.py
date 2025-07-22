@@ -105,7 +105,7 @@ def create_training_set(
     n: int = 10,
     class_name: str = "siren",
     dataset_name: str = "urbansound8k",
-    output_path: str = "training_sets/training_set_v1.csv",
+    output_path: str | None = None,
     positive_percentage: float = 0.5,
     experiment_name: str | None = None,
     **kwargs,
@@ -121,9 +121,11 @@ def create_training_set(
         experiment_name: Optional experiment name to adjust output path
         **kwargs: Additional dataset-specific parameters
     """
-    # Adjust output path for experiment if provided
-    if experiment_name and output_path == "training_sets/training_set_v1.csv":
-        output_path = f"training_sets_{experiment_name}/training_set_v1.csv"
+    # Generate output path using config if not provided
+    if output_path is None:
+        from ..config import AudioLoopConfig
+        config = AudioLoopConfig(experiment_name=experiment_name)
+        output_path = str(config.get_training_set_path(1))
 
     n_positive = int(n * positive_percentage)
     n_negative = n - n_positive
@@ -217,7 +219,7 @@ Examples:
         default=0.75,
         help="Percentage positive (0.0-1.0, default 0.75)",
     )
-    parser.add_argument("--output", default="training_sets/training_set_v1.csv", help="Output path")
+    parser.add_argument("--output", default=None, help="Output path (default: auto-generated from config)")
     parser.add_argument(
         "--experiment",
         type=str,

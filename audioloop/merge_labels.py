@@ -2,8 +2,11 @@ import argparse
 import csv
 import os
 
+from .config import AudioLoopConfig
+from .utils.paths import extract_version_from_filename
 
-def merge_training_sets(original_csv, new_labels_csv, output_csv=None):
+
+def merge_training_sets(original_csv, new_labels_csv, output_csv=None, config=None):
     """
     Merge original training set with newly labeled samples.
 
@@ -11,21 +14,27 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None):
         original_csv: Path to existing training set (e.g., training_set_v1.csv)
         new_labels_csv: Path to newly labeled samples (candidates CSV with human labels)
         output_csv: Path for merged training set (auto-generated if None)
+        config: AudioLoopConfig instance (auto-created if None)
 
     Returns:
         str: Path to the created output file
     """
     # Auto-generate output filename if not provided
     if output_csv is None:
-        base = os.path.splitext(os.path.basename(original_csv))[0]
-        version = int(base.split("_v")[1]) + 1 if "v" in base else 2
-        # Extract experiment name from input path if it exists
-        parent_dir = os.path.dirname(original_csv)
-        if parent_dir.startswith("training_sets_"):
-            experiment_name = parent_dir.replace("training_sets_", "")
-            output_csv = f"training_sets_{experiment_name}/training_set_v{version}.csv"
-        else:
-            output_csv = f"training_sets/training_set_v{version}.csv"
+        if config is None:
+            # Try to infer experiment from original CSV path
+            parent_dir = os.path.dirname(original_csv)
+            if parent_dir.startswith("training_sets_"):
+                experiment_name = parent_dir.replace("training_sets_", "")
+                config = AudioLoopConfig(experiment_name=experiment_name)
+            else:
+                config = AudioLoopConfig()
+        
+        # Get version from original CSV and increment
+        from pathlib import Path
+        current_version = extract_version_from_filename(Path(original_csv), "training_set")
+        version = (current_version or 1) + 1
+        output_csv = str(config.get_training_set_path(version))
 
     all_data = []
 
@@ -119,10 +128,13 @@ def main():
         "candidates_csv", help="Candidates CSV with filled needs_human_label column"
     )
     parser.add_argument("-o", "--output", help="Output merged training set CSV")
+    parser.add_argument("--experiment", help="Experiment name for output directory")
 
     args = parser.parse_args()
 
-    merge_training_sets(args.original_csv, args.candidates_csv, args.output)
+    # Create config to ensure consistent path handling
+    config = AudioLoopConfig(experiment_name=args.experiment)
+    merge_training_sets(args.original_csv, args.candidates_csv, args.output, config=config)
 
 
 if __name__ == "__main__":
