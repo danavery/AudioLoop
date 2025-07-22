@@ -234,8 +234,6 @@ class FSD50KConfig(DatasetConfig):
             return self.audio_root / filename
         return self.audio_root / f"{filename}.wav"
 
-
-
     def list_classes(self) -> None:
         """Print all available FSD50K classes."""
         print("FSD50K Classes (200 total):")
@@ -494,8 +492,6 @@ class FSD50KProcessor:
             spec = spec[..., start_idx : start_idx + target_length]
 
         return spec
-
-
 
     def list_classes(self) -> None:
         """Print all available FSD50K classes."""

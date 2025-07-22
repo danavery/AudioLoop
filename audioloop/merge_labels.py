@@ -29,9 +29,10 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None, config=No
                 config = AudioLoopConfig(experiment_name=experiment_name)
             else:
                 config = AudioLoopConfig()
-        
+
         # Get version from original CSV and increment
         from pathlib import Path
+
         current_version = extract_version_from_filename(Path(original_csv), "training_set")
         version = (current_version or 1) + 1
         output_csv = str(config.get_training_set_path(version))

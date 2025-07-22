@@ -172,8 +172,6 @@ class UrbanSound8KConfig(DatasetConfig):
         # Return most likely path if not found
         return self.audio_root / "fold1" / filename
 
-
-
     def list_classes(self) -> None:
         """Print all available UrbanSound8K classes."""
         print("UrbanSound8K Classes:")
@@ -251,8 +249,6 @@ class UrbanSound8KProcessor:
             spec = spec[..., start_idx : start_idx + target_length]
 
         return spec
-
-
 
     def list_classes(self) -> None:
         """Print all available UrbanSound8K classes."""

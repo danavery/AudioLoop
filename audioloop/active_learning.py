@@ -67,7 +67,9 @@ def run_active_learning_for_class(
     try:
         positive_class_id = processor.config.name_to_id[positive_class_name]
     except KeyError:
-        raise ValueError(f"Invalid class name: '{positive_class_name}'. Valid names: {list(processor.config.name_to_id.keys())}") from None
+        raise ValueError(
+            f"Invalid class name: '{positive_class_name}'. Valid names: {list(processor.config.name_to_id.keys())}"
+        ) from None
 
     # Auto-generate negative class name if not provided
     if negative_class_name is None:
@@ -247,27 +249,28 @@ Examples:
     # Create config with CLI overrides (only when explicitly provided by user)
     try:
         config_overrides = {
-            key: value for key, value in {
-                'experiment_name': args.experiment,
-                'dataset': args.dataset,
-                'total_candidates': args.total_candidates,
-                'positive_percentage': args.positive_pct,
-                'min_confidence': args.min_confidence,
-                'selection_mode': args.selection_mode,
-                'basic_transition_f1_threshold': args.basic_transition_f1_threshold,
-                'basic_transition_confidence_threshold': args.basic_transition_confidence_threshold,
-                'basic_transition_variance_threshold': args.basic_transition_variance_threshold,
-                'estimated_positive_pct': args.estimated_positive_pct,
-            }.items() if value is not None
+            key: value
+            for key, value in {
+                "experiment_name": args.experiment,
+                "dataset": args.dataset,
+                "total_candidates": args.total_candidates,
+                "positive_percentage": args.positive_pct,
+                "min_confidence": args.min_confidence,
+                "selection_mode": args.selection_mode,
+                "basic_transition_f1_threshold": args.basic_transition_f1_threshold,
+                "basic_transition_confidence_threshold": args.basic_transition_confidence_threshold,
+                "basic_transition_variance_threshold": args.basic_transition_variance_threshold,
+                "estimated_positive_pct": args.estimated_positive_pct,
+            }.items()
+            if value is not None
         }
-        
+
         # Handle boolean flags separately (they're always provided by argparse)
         if args.auto_thresholds:
-            config_overrides['auto_thresholds'] = True
-        
+            config_overrides["auto_thresholds"] = True
+
         config = AudioLoopConfig(**config_overrides)
         processor = config.get_dataset_processor()
-        dataset_name = config.dataset
     except ValueError as e:
         parser.error(str(e))
 
@@ -297,13 +300,17 @@ Examples:
         try:
             positive_class_id = processor.config.name_to_id[args.class_name]
         except KeyError:
-            parser.error(f"Invalid class name: '{args.class_name}'. Valid names: {list(processor.config.name_to_id.keys())}")
+            parser.error(
+                f"Invalid class name: '{args.class_name}'. Valid names: {list(processor.config.name_to_id.keys())}"
+            )
     else:  # args.class_id is not None
         positive_class_id = args.class_id
         try:
             positive_class_name = processor.config.vocabulary[positive_class_id]
         except KeyError:
-            parser.error(f"Invalid class ID: {positive_class_id}. Valid IDs: {list(processor.config.vocabulary.keys())}")
+            parser.error(
+                f"Invalid class ID: {positive_class_id}. Valid IDs: {list(processor.config.vocabulary.keys())}"
+            )
 
     # Determine negative class name
     negative_class_name = args.negative_name or f"not_{positive_class_name}"

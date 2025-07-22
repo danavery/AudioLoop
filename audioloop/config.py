@@ -42,10 +42,9 @@ Environment Variables:
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from .datasets.dataset_config import DatasetConfig
-
 from .utils.paths import (
     create_output_directories,
     get_output_dir,
@@ -56,12 +55,12 @@ from .utils.paths import (
 # Registry with better typing - avoid runtime import of DatasetConfig
 DATASET_CONFIGS: dict[str, type["DatasetConfig"] | None] = {
     "urbansound8k": None,  # Lazy loaded
-    "fsd50k": None,        # Lazy loaded
+    "fsd50k": None,  # Lazy loaded
 }
 
 DATASET_PROCESSORS: dict[str, type[Any] | None] = {
     "urbansound8k": None,  # Lazy loaded
-    "fsd50k": None,        # Lazy loaded
+    "fsd50k": None,  # Lazy loaded
 }
 
 # Track loading state to avoid repeated imports
@@ -133,7 +132,9 @@ class AudioLoopConfig:
     def _validate_dataset(self):
         """Validate that the dataset is supported."""
         if self.dataset not in DATASET_CONFIGS:
-            raise ValueError(f"Unknown dataset: {self.dataset}. Supported: {list(DATASET_CONFIGS.keys())}")
+            raise ValueError(
+                f"Unknown dataset: {self.dataset}. Supported: {list(DATASET_CONFIGS.keys())}"
+            )
 
     def _validate_training_params(self):
         """Validate core training parameters."""
@@ -167,7 +168,9 @@ class AudioLoopConfig:
             raise ValueError("basic_transition_confidence_threshold must be between 0.0 and 1.0")
         if not (0.0 <= self.basic_transition_variance_threshold <= 1.0):
             raise ValueError("basic_transition_variance_threshold must be between 0.0 and 1.0")
-        if self.estimated_positive_pct is not None and not (0.0 <= self.estimated_positive_pct <= 1.0):
+        if self.estimated_positive_pct is not None and not (
+            0.0 <= self.estimated_positive_pct <= 1.0
+        ):
             raise ValueError("estimated_positive_pct must be between 0.0 and 1.0")
 
     @property
@@ -184,7 +187,6 @@ class AudioLoopConfig:
     def specs_dir(self) -> Path:
         """Get the spectrograms directory."""
         return get_specs_dir()
-
 
     def get_model_path(self, version: int) -> Path:
         """Get path for a model file."""
@@ -234,8 +236,6 @@ class AudioLoopConfig:
             )
 
         return processor_class(dataset_config)
-
-
 
     def create_directories(self) -> None:
         """Create all necessary directories for this configuration."""

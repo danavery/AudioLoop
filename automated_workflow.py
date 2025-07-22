@@ -308,9 +308,7 @@ Prerequisites:
     )
 
     # Workflow parameters
-    parser.add_argument(
-        "--cycles", type=int, help="Number of active learning cycles (default: 3)"
-    )
+    parser.add_argument("--cycles", type=int, help="Number of active learning cycles (default: 3)")
     parser.add_argument(
         "--auto-label",
         action="store_true",
@@ -423,34 +421,36 @@ Prerequisites:
 
     # Create config with CLI overrides (config-first approach)
     config_overrides = {
-        key: value for key, value in {
-            'experiment_name': args.experiment,
-            'dataset': args.dataset,
-            'max_epochs': args.epochs,
-            'batch_size': args.batch_size,
-            'learning_rate': args.learning_rate,
-            'stopping_criterion_type': args.stopping_criterion,
-            'patience': args.patience,
-            'min_delta': args.min_delta,
-            'accuracy_floor': args.accuracy_floor,
-            'total_candidates': args.candidates,
-            'positive_percentage': args.positive_pct,
-            'min_confidence': args.min_confidence,
-            'selection_mode': args.selection_mode,
-            'basic_transition_f1_threshold': args.basic_transition_f1_threshold,
-            'basic_transition_confidence_threshold': args.basic_transition_confidence_threshold,
-            'basic_transition_variance_threshold': args.basic_transition_variance_threshold,
-            'estimated_positive_pct': args.estimated_positive_pct,
-            'seed': args.seed,
-        }.items() if value is not None
+        key: value
+        for key, value in {
+            "experiment_name": args.experiment,
+            "dataset": args.dataset,
+            "max_epochs": args.epochs,
+            "batch_size": args.batch_size,
+            "learning_rate": args.learning_rate,
+            "stopping_criterion_type": args.stopping_criterion,
+            "patience": args.patience,
+            "min_delta": args.min_delta,
+            "accuracy_floor": args.accuracy_floor,
+            "total_candidates": args.candidates,
+            "positive_percentage": args.positive_pct,
+            "min_confidence": args.min_confidence,
+            "selection_mode": args.selection_mode,
+            "basic_transition_f1_threshold": args.basic_transition_f1_threshold,
+            "basic_transition_confidence_threshold": args.basic_transition_confidence_threshold,
+            "basic_transition_variance_threshold": args.basic_transition_variance_threshold,
+            "estimated_positive_pct": args.estimated_positive_pct,
+            "seed": args.seed,
+        }.items()
+        if value is not None
     }
-    
+
     # Handle boolean flags separately (they're always provided by argparse)
     if args.auto_thresholds:
-        config_overrides['auto_thresholds'] = True
-        
+        config_overrides["auto_thresholds"] = True
+
     config = AudioLoopConfig(**config_overrides)
-    
+
     # Create output directory if it doesn't exist
     os.makedirs(config.output_dir, exist_ok=True)
 

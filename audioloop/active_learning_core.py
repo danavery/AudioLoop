@@ -1,6 +1,5 @@
 import csv
 import os
-from pathlib import Path
 
 import torch
 import torch.nn.functional as F
@@ -327,13 +326,18 @@ def run_active_learning_cycle(
     strategy_kwargs = {}
     if config.selection_mode == "basic_transition":
         strategy_kwargs = {
-            "f1_threshold": None if config.auto_thresholds else config.basic_transition_f1_threshold,
+            "f1_threshold": None
+            if config.auto_thresholds
+            else config.basic_transition_f1_threshold,
             "confidence_threshold": None
             if config.auto_thresholds
             else config.basic_transition_confidence_threshold,
-            "variance_threshold": None if config.auto_thresholds else config.basic_transition_variance_threshold,
+            "variance_threshold": None
+            if config.auto_thresholds
+            else config.basic_transition_variance_threshold,
             "auto_thresholds": config.auto_thresholds,
-            "estimated_positive_pct": config.estimated_positive_pct or 0.05,  # Default 5% if not provided
+            "estimated_positive_pct": config.estimated_positive_pct
+            or 0.05,  # Default 5% if not provided
         }
 
     from .utils.candidate_selection import create_strategy

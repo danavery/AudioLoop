@@ -43,7 +43,6 @@ def get_training_sets_dir(experiment_name: str | None = None) -> Path:
     return output_root / "training_sets"
 
 
-
 def create_output_directories(experiment_name: str | None = None) -> None:
     """Create output and training set directories if they don't exist."""
     get_output_dir(experiment_name).mkdir(parents=True, exist_ok=True)
@@ -56,14 +55,14 @@ def extract_version_from_filename(filepath: Path, file_type: str) -> int | None:
     patterns = {
         "model": r"model_v(\d+)\.pt",
         "predictions": r"predictions_v(\d+)\.csv",
-        "candidates": r"labeling_candidates_v(\d+)\.csv", 
+        "candidates": r"labeling_candidates_v(\d+)\.csv",
         "training_set": r"training_set_v(\d+)\.csv",
-        "binary_labels": r"binary_labels_v(\d+)\.csv"
+        "binary_labels": r"binary_labels_v(\d+)\.csv",
     }
-    
+
     if file_type not in patterns:
         raise ValueError(f"Unknown file type: {file_type}. Supported: {list(patterns.keys())}")
-    
+
     match = re.search(patterns[file_type], str(filepath))
     return int(match.group(1)) if match else None
 

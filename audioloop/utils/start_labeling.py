@@ -32,7 +32,9 @@ def get_matching_samples(
         try:
             positive_class_id = processor.config.name_to_id[class_name]
         except KeyError:
-            raise ValueError(f"Invalid class name: '{class_name}'. Valid names: {list(processor.config.name_to_id.keys())}") from None
+            raise ValueError(
+                f"Invalid class name: '{class_name}'. Valid names: {list(processor.config.name_to_id.keys())}"
+            ) from None
 
     matching_filenames = []
 
@@ -123,7 +125,8 @@ def create_training_set(
     """
     # Generate output path using config if not provided
     if output_path is None:
-        from ..config import AudioLoopConfig
+        from audioloop.config import AudioLoopConfig
+
         config = AudioLoopConfig(experiment_name=experiment_name)
         output_path = str(config.get_training_set_path(1))
 
@@ -207,7 +210,10 @@ Examples:
 
     # Dataset selection
     parser.add_argument(
-        "--dataset", choices=["urbansound8k", "fsd50k"], default=None, help="Dataset to use ('fsd50k' or 'urbansound8k'). Can also be set via AUDIOLOOP_DATASET environment variable."
+        "--dataset",
+        choices=["urbansound8k", "fsd50k"],
+        default=None,
+        help="Dataset to use ('fsd50k' or 'urbansound8k'). Can also be set via AUDIOLOOP_DATASET environment variable.",
     )
 
     # Core parameters
@@ -219,7 +225,9 @@ Examples:
         default=0.75,
         help="Percentage positive (0.0-1.0, default 0.75)",
     )
-    parser.add_argument("--output", default=None, help="Output path (default: auto-generated from config)")
+    parser.add_argument(
+        "--output", default=None, help="Output path (default: auto-generated from config)"
+    )
     parser.add_argument(
         "--experiment",
         type=str,

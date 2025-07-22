@@ -113,24 +113,25 @@ def main():
             args.version = 1
             print("Could not detect version from filename, defaulting to version 1")
 
-
     # Create config with CLI overrides (only when explicitly provided by user)
     config_overrides = {
-        key: value for key, value in {
-            'experiment_name': args.experiment,
-            'max_epochs': args.epochs,
-            'seed': args.seed,
-            'batch_size': args.batch_size,
-            'learning_rate': args.learning_rate,
-            'model_type': args.model_type,
-            'use_batchnorm': False if args.no_batchnorm else None,
-            'stopping_criterion_type': args.stopping_criterion,
-            'patience': args.patience,
-            'min_delta': args.min_delta,
-            'accuracy_floor': args.accuracy_floor,
-        }.items() if value is not None
+        key: value
+        for key, value in {
+            "experiment_name": args.experiment,
+            "max_epochs": args.epochs,
+            "seed": args.seed,
+            "batch_size": args.batch_size,
+            "learning_rate": args.learning_rate,
+            "model_type": args.model_type,
+            "use_batchnorm": False if args.no_batchnorm else None,
+            "stopping_criterion_type": args.stopping_criterion,
+            "patience": args.patience,
+            "min_delta": args.min_delta,
+            "accuracy_floor": args.accuracy_floor,
+        }.items()
+        if value is not None
     }
-    
+
     config = AudioLoopConfig(**config_overrides)
 
     # Run training with clean signature
