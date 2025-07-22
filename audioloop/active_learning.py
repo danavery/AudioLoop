@@ -73,16 +73,10 @@ def run_active_learning_for_class(
     if negative_class_name is None:
         negative_class_name = f"not_{positive_class_name}"
 
-    # Call the main function
-    return run_active_learning_cycle(
-        positive_class_id=positive_class_id,
-        positive_class_name=positive_class_name,
-        negative_class_name=negative_class_name,
-        model_path=model_path,
-        dataset_name=dataset_name,
-        dataset_file=dataset_file,
-        run_number=run_number,
-        training_set_csv=training_set_csv,
+    # Create config with active learning parameters
+    active_learning_config = AudioLoopConfig(
+        experiment_name=experiment_name,
+        dataset=dataset_name,
         total_candidates=total_candidates,
         positive_percentage=positive_percentage,
         min_confidence=min_confidence,
@@ -92,9 +86,19 @@ def run_active_learning_for_class(
         basic_transition_variance_threshold=basic_transition_variance_threshold,
         auto_thresholds=auto_thresholds,
         estimated_positive_pct=estimated_positive_pct,
-        experiment_name=experiment_name,
+    )
+
+    # Call the main function with clean signature
+    return run_active_learning_cycle(
+        config=active_learning_config,
+        positive_class_id=positive_class_id,
+        positive_class_name=positive_class_name,
+        negative_class_name=negative_class_name,
+        run_number=run_number,
+        model_path=model_path,
+        dataset_file=dataset_file,
+        training_set_csv=training_set_csv,
         seed=seed,
-        **dataset_kwargs,
     )
 
 
@@ -247,9 +251,21 @@ Examples:
 
     args = parser.parse_args()
 
-    # Get unified config
+    # Create unified config with all active learning parameters from CLI
     try:
-        config = AudioLoopConfig(experiment_name=args.experiment, dataset=args.dataset)
+        config = AudioLoopConfig(
+            experiment_name=args.experiment,
+            dataset=args.dataset,
+            total_candidates=args.total_candidates,
+            positive_percentage=args.positive_pct,
+            min_confidence=args.min_confidence,
+            selection_mode=args.selection_mode,
+            basic_transition_f1_threshold=args.basic_transition_f1_threshold,
+            basic_transition_confidence_threshold=args.basic_transition_confidence_threshold,
+            basic_transition_variance_threshold=args.basic_transition_variance_threshold,
+            auto_thresholds=args.auto_thresholds,
+            estimated_positive_pct=args.estimated_positive_pct,
+        )
         processor = config.get_dataset_processor()
         dataset_name = config.dataset
     except ValueError as e:
@@ -262,8 +278,7 @@ Examples:
 
     # Default model path based on run_number if not specified
     if not args.model:
-        output_dir = f"outputs_{args.experiment}" if args.experiment else "outputs"
-        args.model = f"{output_dir}/model_v{args.run_number}.pt"
+        args.model = str(config.get_model_path(args.run_number))
         print(f"Using default model path: {args.model}")
     else:
         # If model path provided, try to extract version number from it
@@ -307,26 +322,16 @@ Examples:
     )
     print(f"Min confidence: {args.min_confidence}")
 
-    # Run the active learning cycle
+    # Run the active learning cycle with clean signature (reuse existing config)
     predictions_file, candidates_file = run_active_learning_cycle(
+        config=config,
         positive_class_id=positive_class_id,
         positive_class_name=positive_class_name,
         negative_class_name=negative_class_name,
-        model_path=args.model,
-        dataset_name=dataset_name,
-        dataset_file=args.dataset_file,
         run_number=args.run_number,
+        model_path=args.model,
+        dataset_file=args.dataset_file,
         training_set_csv=args.training_set,
-        total_candidates=args.total_candidates,
-        positive_percentage=args.positive_pct,
-        min_confidence=args.min_confidence,
-        selection_mode=args.selection_mode,
-        basic_transition_f1_threshold=args.basic_transition_f1_threshold,
-        basic_transition_confidence_threshold=args.basic_transition_confidence_threshold,
-        basic_transition_variance_threshold=args.basic_transition_variance_threshold,
-        auto_thresholds=args.auto_thresholds,
-        estimated_positive_pct=args.estimated_positive_pct,
-        experiment_name=args.experiment,
         seed=args.seed,
     )
 
@@ -335,9 +340,8 @@ Examples:
     print(f"🏷️  Candidates: {candidates_file}")
     print("\nNext steps:")
     print(f"1. Label candidates: python -m audioloop.label_audio {candidates_file}")
-    training_sets_dir = f"training_sets_{args.experiment}" if args.experiment else "training_sets"
     print(
-        f"2. Merge labels: python -m audioloop.merge_labels {training_sets_dir}/training_set_v{args.run_number}.csv {candidates_file}"
+        f"2. Merge labels: python -m audioloop.merge_labels {config.get_training_set_path(args.run_number)} {candidates_file}"
     )
 
 

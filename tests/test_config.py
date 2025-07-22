@@ -231,3 +231,112 @@ class TestTrainingParameters:
         # Accuracy should work  
         config2 = AudioLoopConfig(stopping_criterion_type="accuracy")
         assert config2.stopping_criterion_type == "accuracy"
+
+
+class TestActiveLearningParameters:
+    """Test active learning parameter configuration."""
+
+    def test_active_learning_parameter_defaults(self):
+        """Test that active learning parameters have correct defaults."""
+        config = AudioLoopConfig()
+        assert config.total_candidates == 50
+        assert config.positive_percentage == 0.75
+        assert config.min_confidence == 0.8
+        assert config.selection_mode == "confidence"
+        assert config.basic_transition_f1_threshold == 0.2
+        assert config.basic_transition_confidence_threshold == 0.9
+        assert config.basic_transition_variance_threshold == 0.12
+        assert config.auto_thresholds is False
+        assert config.estimated_positive_pct is None
+
+    def test_active_learning_parameter_overrides(self):
+        """Test active learning parameter constructor overrides."""
+        config = AudioLoopConfig(
+            total_candidates=100,
+            positive_percentage=0.6,
+            min_confidence=0.9,
+            selection_mode="entropy",
+            basic_transition_f1_threshold=0.3,
+            basic_transition_confidence_threshold=0.85,
+            basic_transition_variance_threshold=0.15,
+            auto_thresholds=True,
+            estimated_positive_pct=0.1
+        )
+        assert config.total_candidates == 100
+        assert config.positive_percentage == 0.6
+        assert config.min_confidence == 0.9
+        assert config.selection_mode == "entropy"
+        assert config.basic_transition_f1_threshold == 0.3
+        assert config.basic_transition_confidence_threshold == 0.85
+        assert config.basic_transition_variance_threshold == 0.15
+        assert config.auto_thresholds is True
+        assert config.estimated_positive_pct == 0.1
+
+    def test_active_learning_parameter_validation_positive_values(self):
+        """Test validation of positive active learning parameters."""
+        with pytest.raises(ValueError, match="total_candidates must be positive"):
+            AudioLoopConfig(total_candidates=-1)
+        
+        with pytest.raises(ValueError, match="total_candidates must be positive"):
+            AudioLoopConfig(total_candidates=0)
+
+    def test_active_learning_parameter_validation_ranges(self):
+        """Test validation of range-bound active learning parameters."""
+        # positive_percentage validation
+        with pytest.raises(ValueError, match="positive_percentage must be between 0.0 and 1.0"):
+            AudioLoopConfig(positive_percentage=-0.1)
+        
+        with pytest.raises(ValueError, match="positive_percentage must be between 0.0 and 1.0"):
+            AudioLoopConfig(positive_percentage=1.1)
+        
+        # min_confidence validation
+        with pytest.raises(ValueError, match="min_confidence must be between 0.0 and 1.0"):
+            AudioLoopConfig(min_confidence=-0.1)
+        
+        with pytest.raises(ValueError, match="min_confidence must be between 0.0 and 1.0"):
+            AudioLoopConfig(min_confidence=1.1)
+        
+        # estimated_positive_pct validation
+        with pytest.raises(ValueError, match="estimated_positive_pct must be between 0.0 and 1.0"):
+            AudioLoopConfig(estimated_positive_pct=-0.1)
+        
+        with pytest.raises(ValueError, match="estimated_positive_pct must be between 0.0 and 1.0"):
+            AudioLoopConfig(estimated_positive_pct=1.1)
+
+    def test_selection_mode_validation(self):
+        """Test validation of selection mode parameter."""
+        with pytest.raises(ValueError, match="Unknown selection mode"):
+            AudioLoopConfig(selection_mode="invalid")
+        
+        # Valid selection modes should work
+        config1 = AudioLoopConfig(selection_mode="confidence")
+        assert config1.selection_mode == "confidence"
+        
+        config2 = AudioLoopConfig(selection_mode="entropy")
+        assert config2.selection_mode == "entropy"
+        
+        config3 = AudioLoopConfig(selection_mode="basic_transition")
+        assert config3.selection_mode == "basic_transition"
+
+    def test_basic_transition_parameter_validation(self):
+        """Test validation of basic transition parameters."""
+        # f1_threshold validation
+        with pytest.raises(ValueError, match="basic_transition_f1_threshold must be between 0.0 and 1.0"):
+            AudioLoopConfig(basic_transition_f1_threshold=-0.1)
+        
+        with pytest.raises(ValueError, match="basic_transition_f1_threshold must be between 0.0 and 1.0"):
+            AudioLoopConfig(basic_transition_f1_threshold=1.1)
+        
+        # confidence_threshold validation
+        with pytest.raises(ValueError, match="basic_transition_confidence_threshold must be between 0.0 and 1.0"):
+            AudioLoopConfig(basic_transition_confidence_threshold=-0.1)
+        
+        with pytest.raises(ValueError, match="basic_transition_confidence_threshold must be between 0.0 and 1.0"):
+            AudioLoopConfig(basic_transition_confidence_threshold=1.1)
+        
+        # variance_threshold validation
+        with pytest.raises(ValueError, match="basic_transition_variance_threshold must be between 0.0 and 1.0"):
+            AudioLoopConfig(basic_transition_variance_threshold=-0.1)
+        
+        with pytest.raises(ValueError, match="basic_transition_variance_threshold must be between 0.0 and 1.0"):
+            AudioLoopConfig(basic_transition_variance_threshold=1.1)

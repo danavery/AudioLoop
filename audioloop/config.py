@@ -111,6 +111,19 @@ class AudioLoopConfig:
     min_delta: float = 0.01
     accuracy_floor: float | None = None
 
+    # Active learning parameters (experiment configuration)
+    total_candidates: int = 50
+    positive_percentage: float = 0.75
+    min_confidence: float = 0.8
+    selection_mode: str = "confidence"
+
+    # Selection strategy configuration
+    basic_transition_f1_threshold: float = 0.2
+    basic_transition_confidence_threshold: float = 0.9
+    basic_transition_variance_threshold: float = 0.12
+    auto_thresholds: bool = False
+    estimated_positive_pct: float | None = None
+
     def __post_init__(self):
         """Post-initialization validation and setup."""
         # Ensure dataset classes are loaded
@@ -131,6 +144,26 @@ class AudioLoopConfig:
             raise ValueError(f"Unknown stopping criterion: {self.stopping_criterion_type}")
         if self.stopping_criterion_type == "plateau" and self.patience <= 0:
             raise ValueError("patience must be positive for plateau criterion")
+        
+        # Validate active learning parameters
+        if self.total_candidates <= 0:
+            raise ValueError("total_candidates must be positive")
+        if not (0.0 <= self.positive_percentage <= 1.0):
+            raise ValueError("positive_percentage must be between 0.0 and 1.0")
+        if not (0.0 <= self.min_confidence <= 1.0):
+            raise ValueError("min_confidence must be between 0.0 and 1.0")
+        if self.selection_mode not in ["confidence", "entropy", "basic_transition"]:
+            raise ValueError(f"Unknown selection mode: {self.selection_mode}")
+        
+        # Validate selection strategy parameters
+        if not (0.0 <= self.basic_transition_f1_threshold <= 1.0):
+            raise ValueError("basic_transition_f1_threshold must be between 0.0 and 1.0")
+        if not (0.0 <= self.basic_transition_confidence_threshold <= 1.0):
+            raise ValueError("basic_transition_confidence_threshold must be between 0.0 and 1.0")
+        if not (0.0 <= self.basic_transition_variance_threshold <= 1.0):
+            raise ValueError("basic_transition_variance_threshold must be between 0.0 and 1.0")
+        if self.estimated_positive_pct is not None and not (0.0 <= self.estimated_positive_pct <= 1.0):
+            raise ValueError("estimated_positive_pct must be between 0.0 and 1.0")
 
     @property
     def output_dir(self) -> Path:

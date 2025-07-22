@@ -225,8 +225,7 @@ def run_binary_inference(
                 results.append(result)
 
     # Ensure outputs directory exists
-    output_dir = f"outputs_{config.experiment_name}" if config.experiment_name else "outputs"
-    Path(output_dir).mkdir(exist_ok=True)
+    config.create_directories()
 
     # Save results to CSV
     fieldnames = [
@@ -260,69 +259,44 @@ def run_binary_inference(
 
 
 def run_active_learning_cycle(
+    config,
     positive_class_id,
     positive_class_name,
     negative_class_name,
+    run_number,
     model_path=None,
-    dataset_name="urbansound8k",
     dataset_file=None,
-    run_number=1,
     training_set_csv=None,
-    total_candidates=20,
-    positive_percentage=0.6,
-    min_confidence=0.8,
-    selection_mode="confidence",
-    basic_transition_f1_threshold=0.2,
-    basic_transition_confidence_threshold=0.9,
-    basic_transition_variance_threshold=0.12,
-    auto_thresholds=False,
-    estimated_positive_pct=None,
-    experiment_name=None,
     seed=None,
-    **dataset_kwargs,
 ):
     """
-    Run a complete active learning cycle for binary classification.
+    Run a complete active learning cycle for binary classification using config-driven parameters.
 
     Args:
+        config: AudioLoopConfig with all active learning settings (total_candidates, selection_mode, etc.)
         positive_class_id: Audio class ID to treat as positive
         positive_class_name: Human-readable name for positive class
         negative_class_name: Human-readable name for negative class
-        model_path: Path to trained model (default: outputs/model_v{run_number}.pt)
-        dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
-        dataset_file: Path to dataset metadata CSV (auto-detected if None)
         run_number: Version number for output files (e.g., 1 creates v1 files)
-        training_set_csv: Path to training set CSV (auto-detected if None)
-        total_candidates: Total number of candidates to select
-        positive_percentage: Percentage of candidates that should be positive predictions
-        selection_mode: Selection method ('confidence' for high-confidence samples, 'entropy' for high-uncertainty samples, 'basic_transition' for basic transition strategy)
-        basic_transition_f1_threshold: F1 threshold for basic transition (default: 0.2)
-        basic_transition_confidence_threshold: Mean confidence threshold for basic transition (default: 0.9)
-        basic_transition_variance_threshold: Std confidence threshold for basic transition (default: 0.12)
-        auto_thresholds: Automatically calculate thresholds based on dataset characteristics (default: False)
-        estimated_positive_pct: Estimated percentage of positive samples (0.0-1.0). Used with auto_thresholds.
-        experiment_name: Optional experiment name to customize output directory
-        seed: Random seed for reproducibility (default: None)
-        **dataset_kwargs: Additional dataset-specific configuration
+        model_path: Path to trained model (uses config.get_model_path(run_number) if None)
+        dataset_file: Path to dataset metadata CSV (auto-detected from config if None)
+        training_set_csv: Path to training set CSV (uses config.get_training_set_path(run_number) if None)
+        seed: Random seed for reproducibility (overrides config.seed if provided)
 
     Returns:
         tuple: (predictions_file, candidates_file)
     """
 
-    # Determine output directory and ensure it exists
-    output_dir = f"outputs_{experiment_name}" if experiment_name else "outputs"
-    Path(output_dir).mkdir(exist_ok=True)
+    # Ensure output directories exist
+    config.create_directories()
 
     # Use versioned model path if not specified
     if model_path is None:
-        model_path = f"{output_dir}/model_v{run_number}.pt"
+        model_path = str(config.get_model_path(run_number))
 
     # Auto-detect training set if not provided
     if training_set_csv is None:
-        training_sets_dir = (
-            f"training_sets_{experiment_name}" if experiment_name else "training_sets"
-        )
-        training_set_csv = f"{training_sets_dir}/training_set_v{run_number}.csv"
+        training_set_csv = str(config.get_training_set_path(run_number))
 
     print(f"Using model: {model_path}")
     if os.path.exists(training_set_csv):
@@ -332,14 +306,10 @@ def run_active_learning_cycle(
 
     # Step 1: Run inference on all files
     print("\nStep 1: Running binary classification inference...")
-    predictions_file = f"{output_dir}/predictions_v{run_number}.csv"
-
-    # Create config for inference
-    from .config import AudioLoopConfig
-    inference_config = AudioLoopConfig(experiment_name=experiment_name, dataset=dataset_name)
+    predictions_file = str(config.get_predictions_path(run_number))
 
     _ = run_binary_inference(
-        config=inference_config,
+        config=config,
         model_path=model_path,
         predictions_csv=predictions_file,
         positive_class_name=positive_class_name,
@@ -351,33 +321,33 @@ def run_active_learning_cycle(
 
     # Step 2: Select candidates for active learning
     print("\nStep 2: Selecting candidates for human labeling...")
-    candidates_file = f"{output_dir}/labeling_candidates_v{run_number}.csv"
+    candidates_file = str(config.get_candidates_path(run_number))
 
-    # Create strategy with basic transition parameters
+    # Create strategy with parameters from config
     strategy_kwargs = {}
-    if selection_mode == "basic_transition":
+    if config.selection_mode == "basic_transition":
         strategy_kwargs = {
-            "f1_threshold": None if auto_thresholds else basic_transition_f1_threshold,
+            "f1_threshold": None if config.auto_thresholds else config.basic_transition_f1_threshold,
             "confidence_threshold": None
-            if auto_thresholds
-            else basic_transition_confidence_threshold,
-            "variance_threshold": None if auto_thresholds else basic_transition_variance_threshold,
-            "auto_thresholds": auto_thresholds,
-            "estimated_positive_pct": estimated_positive_pct or 0.05,  # Default 5% if not provided
+            if config.auto_thresholds
+            else config.basic_transition_confidence_threshold,
+            "variance_threshold": None if config.auto_thresholds else config.basic_transition_variance_threshold,
+            "auto_thresholds": config.auto_thresholds,
+            "estimated_positive_pct": config.estimated_positive_pct or 0.05,  # Default 5% if not provided
         }
 
     from .utils.candidate_selection import create_strategy
 
-    strategy = create_strategy(selection_mode, **strategy_kwargs)
+    strategy = create_strategy(config.selection_mode, **strategy_kwargs)
 
     print(f"Using strategy: {strategy.get_active_strategy_name()}")
     predictions = load_predictions(predictions_file)
     candidates = strategy.select_candidates(
         predictions=predictions,
-        num_candidates=total_candidates,
+        num_candidates=config.total_candidates,
         positive_class_name=positive_class_name,
         negative_class_name=negative_class_name,
-        positive_percentage=positive_percentage,
+        positive_percentage=config.positive_percentage,
         candidate_pool_multiplier=5,
         random_seed=seed,
     )
@@ -388,7 +358,7 @@ def run_active_learning_cycle(
         strategy_name=strategy.get_active_strategy_name(),
         positive_class_name=positive_class_name,
         negative_class_name=negative_class_name,
-        min_confidence=min_confidence,
+        min_confidence=config.min_confidence,
     )
 
     print("\n🎯 Active Learning Cycle Complete!")
