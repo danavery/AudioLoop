@@ -47,7 +47,6 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from .datasets.dataset_config import DatasetConfig
 
-from .datasets.dataset_config import DatasetConfig
 from .utils.paths import (
     create_output_directories,
     get_output_dir,
@@ -126,26 +125,32 @@ class AudioLoopConfig:
 
     def __post_init__(self):
         """Post-initialization validation and setup."""
-        # Ensure dataset classes are loaded
         _load_dataset_classes()
+        self._validate_dataset()
+        self._validate_training_params()
+        self._validate_active_learning_params()
+        self._validate_selection_strategy_params()
 
-        # Validate dataset is supported
+    def _validate_dataset(self):
+        """Validate that the dataset is supported."""
         if self.dataset not in DATASET_CONFIGS:
             raise ValueError(f"Unknown dataset: {self.dataset}. Supported: {list(DATASET_CONFIGS.keys())}")
-        
-        # Validate training parameters
+
+    def _validate_training_params(self):
+        """Validate core training parameters."""
         if self.max_epochs <= 0:
             raise ValueError("max_epochs must be positive")
         if self.batch_size <= 0:
-            raise ValueError("batch_size must be positive") 
+            raise ValueError("batch_size must be positive")
         if self.learning_rate <= 0:
             raise ValueError("learning_rate must be positive")
         if self.stopping_criterion_type not in ["plateau", "accuracy"]:
             raise ValueError(f"Unknown stopping criterion: {self.stopping_criterion_type}")
         if self.stopping_criterion_type == "plateau" and self.patience <= 0:
             raise ValueError("patience must be positive for plateau criterion")
-        
-        # Validate active learning parameters
+
+    def _validate_active_learning_params(self):
+        """Validate active learning cycle parameters."""
         if self.total_candidates <= 0:
             raise ValueError("total_candidates must be positive")
         if not (0.0 <= self.positive_percentage <= 1.0):
@@ -154,8 +159,9 @@ class AudioLoopConfig:
             raise ValueError("min_confidence must be between 0.0 and 1.0")
         if self.selection_mode not in ["confidence", "entropy", "basic_transition"]:
             raise ValueError(f"Unknown selection mode: {self.selection_mode}")
-        
-        # Validate selection strategy parameters
+
+    def _validate_selection_strategy_params(self):
+        """Validate parameters for specific selection strategies."""
         if not (0.0 <= self.basic_transition_f1_threshold <= 1.0):
             raise ValueError("basic_transition_f1_threshold must be between 0.0 and 1.0")
         if not (0.0 <= self.basic_transition_confidence_threshold <= 1.0):
@@ -230,28 +236,8 @@ class AudioLoopConfig:
 
         return processor_class(dataset_config)
 
-    def is_registry_loaded(self) -> bool:
-        """Check if dataset registry is properly loaded for debugging."""
-        return _CLASSES_LOADED and all(
-            DATASET_CONFIGS.get(dataset) is not None
-            for dataset in ["fsd50k", "urbansound8k"]
-        )
+
 
     def create_directories(self) -> None:
         """Create all necessary directories for this configuration."""
         create_output_directories(self.experiment_name)
-
-    def validate_setup(self) -> dict[str, bool]:
-        """Validate that the configuration is usable."""
-        results = {}
-
-        # Test if we can create output directories
-        try:
-            self.create_directories()
-            results["can_create_outputs"] = True
-        except Exception:
-            results["can_create_outputs"] = False
-
-        results["specs_dir_exists"] = self.specs_dir.exists()
-
-        return results

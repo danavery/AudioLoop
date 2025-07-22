@@ -176,6 +176,7 @@ class FSD50KConfig(DatasetConfig):
     # Cached vocabulary to avoid repeated loading
     _vocabulary: dict[int, str] | None = None
     _name_to_id: dict[str, int] | None = None
+    _metadata_entries: list[dict[str, Any]] | None = None
 
     @property
     def audio_root(self) -> Path:
@@ -203,8 +204,11 @@ class FSD50KConfig(DatasetConfig):
 
     def get_metadata_entries(self) -> list[dict[str, Any]]:
         """Get list of metadata entries for active learning."""
+        if self._metadata_entries is not None:
+            return self._metadata_entries
+
         entries = []
-        vocabulary = load_fsd50k_vocabulary(self.vocabulary_csv)
+        vocabulary = self.vocabulary
 
         with open(self.dev_csv) as f:
             reader = csv.DictReader(f, delimiter="\t")
@@ -221,7 +225,8 @@ class FSD50KConfig(DatasetConfig):
                                 "fold": None,  # FSD50K doesn't use folds
                             }
                         )
-        return entries
+        self._metadata_entries = entries
+        return self._metadata_entries
 
     def get_audio_path(self, filename: str, fold: int | None = None) -> Path:
         """Get full path to audio file."""
