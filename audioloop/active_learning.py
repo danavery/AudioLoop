@@ -177,20 +177,17 @@ Examples:
     parser.add_argument(
         "--total-candidates",
         type=int,
-        default=50,
-        help="Total number of candidates to select (default: 20)",
+        help="Total number of candidates to select (default from config: 50)",
     )
     parser.add_argument(
         "--positive-pct",
         type=float,
-        default=0.75,
-        help="Percentage of candidates that should be positive predictions (default: 0.75 for imbalanced)",
+        help="Percentage of candidates that should be positive predictions (default from config: 0.75)",
     )
     parser.add_argument(
         "--min-confidence",
         type=float,
-        default=0.8,
-        help="Minimum confidence threshold for candidate selection (default: 0.8)",
+        help="Minimum confidence threshold for candidate selection (default from config: 0.8)",
     )
     parser.add_argument(
         "--dataset-file",
@@ -205,28 +202,24 @@ Examples:
     parser.add_argument(
         "--selection-mode",
         choices=["confidence", "entropy", "basic_transition"],
-        default="confidence",
-        help="Selection method: 'confidence', 'entropy', or 'basic_transition' for basic transition strategy",
+        help="Selection method: 'confidence', 'entropy', or 'basic_transition' (default from config: confidence)",
     )
 
     # Basic transition configuration arguments
     parser.add_argument(
         "--basic-transition-f1-threshold",
         type=float,
-        default=0.2,
-        help="F1 threshold for basic transition (default: 0.2)",
+        help="F1 threshold for basic transition (default from config: 0.2)",
     )
     parser.add_argument(
         "--basic-transition-confidence-threshold",
         type=float,
-        default=0.9,
-        help="Mean confidence threshold for basic transition (default: 0.9)",
+        help="Mean confidence threshold for basic transition (default from config: 0.9)",
     )
     parser.add_argument(
         "--basic-transition-variance-threshold",
         type=float,
-        default=0.12,
-        help="Std confidence threshold for basic transition (default: 0.12)",
+        help="Std confidence threshold for basic transition (default from config: 0.12)",
     )
     parser.add_argument(
         "--auto-thresholds",
@@ -251,21 +244,28 @@ Examples:
 
     args = parser.parse_args()
 
-    # Create unified config with all active learning parameters from CLI
+    # Create config with CLI overrides (only when explicitly provided by user)
     try:
-        config = AudioLoopConfig(
-            experiment_name=args.experiment,
-            dataset=args.dataset,
-            total_candidates=args.total_candidates,
-            positive_percentage=args.positive_pct,
-            min_confidence=args.min_confidence,
-            selection_mode=args.selection_mode,
-            basic_transition_f1_threshold=args.basic_transition_f1_threshold,
-            basic_transition_confidence_threshold=args.basic_transition_confidence_threshold,
-            basic_transition_variance_threshold=args.basic_transition_variance_threshold,
-            auto_thresholds=args.auto_thresholds,
-            estimated_positive_pct=args.estimated_positive_pct,
-        )
+        config_overrides = {
+            key: value for key, value in {
+                'experiment_name': args.experiment,
+                'dataset': args.dataset,
+                'total_candidates': args.total_candidates,
+                'positive_percentage': args.positive_pct,
+                'min_confidence': args.min_confidence,
+                'selection_mode': args.selection_mode,
+                'basic_transition_f1_threshold': args.basic_transition_f1_threshold,
+                'basic_transition_confidence_threshold': args.basic_transition_confidence_threshold,
+                'basic_transition_variance_threshold': args.basic_transition_variance_threshold,
+                'estimated_positive_pct': args.estimated_positive_pct,
+            }.items() if value is not None
+        }
+        
+        # Handle boolean flags separately (they're always provided by argparse)
+        if args.auto_thresholds:
+            config_overrides['auto_thresholds'] = True
+        
+        config = AudioLoopConfig(**config_overrides)
         processor = config.get_dataset_processor()
         dataset_name = config.dataset
     except ValueError as e:

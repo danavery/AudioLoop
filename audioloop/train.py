@@ -43,21 +43,20 @@ def main():
         help="Model version number (default: auto-detected from training set filename)",
     )
     parser.add_argument(
-        "-e", "--epochs", type=int, default=1000, help="Maximum training epochs (default: 1000)"
+        "-e", "--epochs", type=int, help="Maximum training epochs (default from config: 1000)"
     )
-    parser.add_argument("-s", "--seed", type=int, default=42, help="Random seed (default: 42)")
-    parser.add_argument("-b", "--batch-size", type=int, default=32, help="Batch size (default: 32)")
+    parser.add_argument("-s", "--seed", type=int, help="Random seed (default from config: 42)")
+    parser.add_argument("-b", "--batch-size", type=int, help="Batch size (default from config: 32)")
     parser.add_argument(
         "--model-type",
         choices=list(MODEL_TYPES.keys()),
-        default="soundcnn",
-        help="Model type to use (default: soundcnn). Use --list-models to see all options",
+        help="Model type to use (default from config: soundcnn). Use --list-models to see all options",
     )
     parser.add_argument(
         "--list-models", action="store_true", help="List available model types and exit"
     )
     parser.add_argument(
-        "-lr", "--learning-rate", type=float, default=0.001, help="Learning rate (default: 0.001)"
+        "-lr", "--learning-rate", type=float, help="Learning rate (default from config: 0.001)"
     )
     parser.add_argument(
         "--no-batchnorm",
@@ -68,27 +67,23 @@ def main():
         "--stopping-criterion",
         type=str,
         choices=["accuracy", "plateau"],
-        default="plateau",
-        help="Stopping criterion to use (default: plateau)",
+        help="Stopping criterion to use (default from config: plateau)",
     )
     parser.add_argument(
         "--patience",
         type=int,
-        default=20,
-        help="Patience for plateau stopping criterion (default: 20)",
+        help="Patience for plateau stopping criterion (default from config: 20)",
     )
     parser.add_argument(
         "--min-delta",
         type=float,
-        default=0.01,
-        help="Minimum delta for plateau stopping criterion (default: 0.01)",
+        help="Minimum delta for plateau stopping criterion (default from config: 0.01)",
     )
 
     parser.add_argument(
         "--accuracy-floor",
         type=float,
-        default=None,
-        help="Only count plateau patience when accuracy >= this threshold (default: None)",
+        help="Only count plateau patience when accuracy >= this threshold (default from config: None)",
     )
     parser.add_argument(
         "--experiment",
@@ -119,20 +114,24 @@ def main():
             print("Could not detect version from filename, defaulting to version 1")
 
 
-    # Create config from arguments (training parameters from CLI override defaults)
-    config = AudioLoopConfig(
-        experiment_name=args.experiment,
-        max_epochs=args.epochs,
-        seed=args.seed,
-        batch_size=args.batch_size,
-        learning_rate=args.learning_rate,
-        model_type=args.model_type,
-        use_batchnorm=False if args.no_batchnorm else None,
-        stopping_criterion_type=args.stopping_criterion,
-        patience=args.patience,
-        min_delta=args.min_delta,
-        accuracy_floor=args.accuracy_floor,
-    )
+    # Create config with CLI overrides (only when explicitly provided by user)
+    config_overrides = {
+        key: value for key, value in {
+            'experiment_name': args.experiment,
+            'max_epochs': args.epochs,
+            'seed': args.seed,
+            'batch_size': args.batch_size,
+            'learning_rate': args.learning_rate,
+            'model_type': args.model_type,
+            'use_batchnorm': False if args.no_batchnorm else None,
+            'stopping_criterion_type': args.stopping_criterion,
+            'patience': args.patience,
+            'min_delta': args.min_delta,
+            'accuracy_floor': args.accuracy_floor,
+        }.items() if value is not None
+    }
+    
+    config = AudioLoopConfig(**config_overrides)
 
     # Run training with clean signature
     accuracy = run_training(
