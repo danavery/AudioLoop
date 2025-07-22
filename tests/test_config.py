@@ -150,3 +150,84 @@ class TestDatasetIntegration:
         # Test required methods exist
         assert callable(dataset_config.get_audio_path)
         assert callable(dataset_config.get_metadata_entries)
+
+
+class TestTrainingParameters:
+    """Test training parameter configuration."""
+
+    def test_training_parameter_defaults(self):
+        """Test that training parameters have correct defaults."""
+        config = AudioLoopConfig()
+        assert config.max_epochs == 1000
+        assert config.seed == 42
+        assert config.batch_size == 32
+        assert config.learning_rate == 0.001
+        assert config.model_type == "soundcnn"
+        assert config.use_batchnorm is None  # Auto-detect
+        assert config.stopping_criterion_type == "plateau"
+        assert config.patience == 20
+        assert config.min_delta == 0.01
+        assert config.accuracy_floor is None
+
+    def test_training_parameter_overrides(self):
+        """Test training parameter constructor overrides."""
+        config = AudioLoopConfig(
+            max_epochs=500,
+            seed=123,
+            batch_size=64,
+            learning_rate=0.01,
+            model_type="simplecnn",
+            use_batchnorm=False,
+            stopping_criterion_type="accuracy",
+            patience=30,
+            min_delta=0.05,
+            accuracy_floor=0.9
+        )
+        assert config.max_epochs == 500
+        assert config.seed == 123
+        assert config.batch_size == 64
+        assert config.learning_rate == 0.01
+        assert config.model_type == "simplecnn"
+        assert config.use_batchnorm is False
+        assert config.stopping_criterion_type == "accuracy"
+        assert config.patience == 30
+        assert config.min_delta == 0.05
+        assert config.accuracy_floor == 0.9
+
+    def test_training_parameter_validation_positive_values(self):
+        """Test validation of positive training parameters."""
+        with pytest.raises(ValueError, match="max_epochs must be positive"):
+            AudioLoopConfig(max_epochs=-1)
+        
+        with pytest.raises(ValueError, match="max_epochs must be positive"):
+            AudioLoopConfig(max_epochs=0)
+            
+        with pytest.raises(ValueError, match="batch_size must be positive"):
+            AudioLoopConfig(batch_size=-1)
+            
+        with pytest.raises(ValueError, match="learning_rate must be positive"):
+            AudioLoopConfig(learning_rate=-0.1)
+            
+        with pytest.raises(ValueError, match="learning_rate must be positive"):
+            AudioLoopConfig(learning_rate=0.0)
+
+    def test_stopping_criterion_validation(self):
+        """Test validation of stopping criterion parameters."""
+        with pytest.raises(ValueError, match="Unknown stopping criterion"):
+            AudioLoopConfig(stopping_criterion_type="invalid")
+        
+        with pytest.raises(ValueError, match="patience must be positive"):
+            AudioLoopConfig(stopping_criterion_type="plateau", patience=-1)
+        
+        with pytest.raises(ValueError, match="patience must be positive"):
+            AudioLoopConfig(stopping_criterion_type="plateau", patience=0)
+
+    def test_valid_stopping_criterion_types(self):
+        """Test that valid stopping criteria work."""
+        # Plateau should work
+        config1 = AudioLoopConfig(stopping_criterion_type="plateau")
+        assert config1.stopping_criterion_type == "plateau"
+        
+        # Accuracy should work  
+        config2 = AudioLoopConfig(stopping_criterion_type="accuracy")
+        assert config2.stopping_criterion_type == "accuracy"

@@ -4,7 +4,6 @@ import re
 from .config import AudioLoopConfig
 from .models import MODEL_TYPES
 from .training_core import run_training, set_seed, train_epoch
-from .utils.stopping_criteria import AccuracyCriterion, PlateauCriterion
 
 # Re-export for backward compatibility
 __all__ = ["main", "run_training", "set_seed", "train_epoch"]
@@ -119,44 +118,28 @@ def main():
             args.version = 1
             print("Could not detect version from filename, defaulting to version 1")
 
-    # Create stopping criterion based on CLI arguments
-    if args.stopping_criterion == "accuracy":
-        stopping_criterion = AccuracyCriterion(max_epochs=args.epochs)
-    elif args.stopping_criterion == "plateau":
-        stopping_criterion = PlateauCriterion(
-            patience=args.patience,
-            min_delta=args.min_delta,
-            max_epochs=args.epochs,
-            accuracy_floor=args.accuracy_floor,
-        )
-    else:
-        stopping_criterion = PlateauCriterion(
-            patience=args.patience,
-            min_delta=args.min_delta,
-            max_epochs=args.epochs,
-            accuracy_floor=args.accuracy_floor,
-        )
 
-    # Create config from arguments
-    config = AudioLoopConfig(experiment_name=args.experiment)
-
-    # Use experiment-aware model path if output not specified
-    if args.output is None:
-        args.output = str(config.get_model_path(args.version))
-
-    # Run training with CLI arguments
-    accuracy = run_training(
-        config=config,
-        labels_file=args.labels_file,
+    # Create config from arguments (training parameters from CLI override defaults)
+    config = AudioLoopConfig(
+        experiment_name=args.experiment,
         max_epochs=args.epochs,
         seed=args.seed,
         batch_size=args.batch_size,
         learning_rate=args.learning_rate,
-        model_path=args.output,
-        version=args.version,
-        use_batchnorm=False if args.no_batchnorm else None,
-        stopping_criterion=stopping_criterion,
         model_type=args.model_type,
+        use_batchnorm=False if args.no_batchnorm else None,
+        stopping_criterion_type=args.stopping_criterion,
+        patience=args.patience,
+        min_delta=args.min_delta,
+        accuracy_floor=args.accuracy_floor,
+    )
+
+    # Run training with clean signature
+    accuracy = run_training(
+        config=config,
+        labels_file=args.labels_file,
+        version=args.version,
+        model_path=args.output,
     )
     print(f"\nFinal training accuracy: {accuracy:.4f}")
 

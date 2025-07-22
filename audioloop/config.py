@@ -40,7 +40,7 @@ Environment Variables:
 """
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -94,35 +94,43 @@ class AudioLoopConfig:
     # Experiment identification
     experiment_name: str | None = None
 
-    # Dataset configuration
-    dataset: str = "fsd50k"  # Default, can be overridden by AUDIOLOOP_DATASET
+    # Dataset configuration (environment variable support)
+    dataset: str = field(default_factory=lambda: os.getenv("AUDIOLOOP_DATASET", "fsd50k"))
 
-    # Internal tracking (not part of public API)
-    _dataset_explicitly_set: bool = False
+    # Training parameters (experiment configuration)
+    max_epochs: int = 1000
+    seed: int = 42
+    batch_size: int = 32
+    learning_rate: float = 0.001
+    model_type: str = "soundcnn"
+    use_batchnorm: bool | None = None  # None = auto-detect based on dataset size
 
-    def __init__(self, experiment_name: str | None = None, dataset: str | None = None):
-        """Initialize configuration with proper precedence handling."""
-        self.experiment_name = experiment_name
+    # Stopping criteria configuration
+    stopping_criterion_type: str = "plateau"
+    patience: int = 20
+    min_delta: float = 0.01
+    accuracy_floor: float | None = None
 
-        # Track whether dataset was explicitly provided
-        if dataset is not None:
-            self.dataset = dataset
-            self._dataset_explicitly_set = True
-        else:
-            # Use environment variable if available, otherwise default
-            env_dataset = os.getenv("AUDIOLOOP_DATASET")
-            if env_dataset:
-                self.dataset = env_dataset
-            else:
-                self.dataset = "fsd50k"
-            self._dataset_explicitly_set = False
-
+    def __post_init__(self):
+        """Post-initialization validation and setup."""
         # Ensure dataset classes are loaded
         _load_dataset_classes()
 
         # Validate dataset is supported
         if self.dataset not in DATASET_CONFIGS:
             raise ValueError(f"Unknown dataset: {self.dataset}. Supported: {list(DATASET_CONFIGS.keys())}")
+        
+        # Validate training parameters
+        if self.max_epochs <= 0:
+            raise ValueError("max_epochs must be positive")
+        if self.batch_size <= 0:
+            raise ValueError("batch_size must be positive") 
+        if self.learning_rate <= 0:
+            raise ValueError("learning_rate must be positive")
+        if self.stopping_criterion_type not in ["plateau", "accuracy"]:
+            raise ValueError(f"Unknown stopping criterion: {self.stopping_criterion_type}")
+        if self.stopping_criterion_type == "plateau" and self.patience <= 0:
+            raise ValueError("patience must be positive for plateau criterion")
 
     @property
     def output_dir(self) -> Path:

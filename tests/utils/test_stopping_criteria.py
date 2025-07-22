@@ -1107,3 +1107,68 @@ class TestPlateauCriterionAccuracyFloor:
         assert best_model is not None
         assert best_model["epoch"] == 3
         assert best_model["loss"] == 0.8
+
+
+class TestStoppingCriterionFactory:
+    """Test the create_stopping_criterion factory function."""
+
+    def test_create_plateau_criterion(self):
+        """Test factory creates PlateauCriterion with correct parameters."""
+        from audioloop.config import AudioLoopConfig
+        from audioloop.utils.stopping_criteria import create_stopping_criterion, PlateauCriterion
+        
+        config = AudioLoopConfig(
+            stopping_criterion_type="plateau",
+            max_epochs=800,
+            patience=25,
+            min_delta=0.02,
+            accuracy_floor=0.85
+        )
+        
+        criterion = create_stopping_criterion(config)
+        
+        assert isinstance(criterion, PlateauCriterion)
+        assert criterion.max_epochs == 800
+        assert criterion.patience == 25
+        assert criterion.min_delta == 0.02
+        assert criterion.accuracy_floor == 0.85
+
+    def test_create_accuracy_criterion(self):
+        """Test factory creates AccuracyCriterion with correct parameters."""
+        from audioloop.config import AudioLoopConfig
+        from audioloop.utils.stopping_criteria import create_stopping_criterion, AccuracyCriterion
+        
+        config = AudioLoopConfig(
+            stopping_criterion_type="accuracy",
+            max_epochs=1200
+        )
+        
+        criterion = create_stopping_criterion(config)
+        
+        assert isinstance(criterion, AccuracyCriterion)
+        assert criterion.max_epochs == 1200
+
+    def test_create_criterion_invalid_type(self):
+        """Test factory raises error for invalid criterion type."""
+        from audioloop.config import AudioLoopConfig
+        from audioloop.utils.stopping_criteria import create_stopping_criterion
+        
+        config = AudioLoopConfig()
+        config.stopping_criterion_type = "invalid_type"  # Bypass validation
+        
+        with pytest.raises(ValueError, match="Unknown stopping criterion: invalid_type"):
+            create_stopping_criterion(config)
+
+    def test_create_criterion_uses_config_defaults(self):
+        """Test factory uses config defaults when not explicitly set."""
+        from audioloop.config import AudioLoopConfig
+        from audioloop.utils.stopping_criteria import create_stopping_criterion, PlateauCriterion
+        
+        config = AudioLoopConfig()  # Use all defaults
+        criterion = create_stopping_criterion(config)
+        
+        assert isinstance(criterion, PlateauCriterion)  # Default type is plateau
+        assert criterion.max_epochs == 1000  # Config default
+        assert criterion.patience == 20  # Config default
+        assert criterion.min_delta == 0.01  # Config default
+        assert criterion.accuracy_floor is None  # Config default

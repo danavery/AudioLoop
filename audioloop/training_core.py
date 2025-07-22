@@ -11,7 +11,7 @@ from .config import AudioLoopConfig
 from .models import MODEL_TYPES
 from .utils.data_utils import get_device, simple_collate_fn
 from .utils.spectrogram_dataset import SpectrogramDataset
-from .utils.stopping_criteria import PlateauCriterion
+from .utils.stopping_criteria import create_stopping_criterion
 
 
 def set_seed(seed):
@@ -73,32 +73,18 @@ def create_model(model_type: str, num_classes: int, dataset_size: int, **kwargs)
 
 def run_training(
     config: AudioLoopConfig,
-    labels_file: str = "labels.csv",
-    max_epochs: int = 1000,
-    seed: int = 42,
-    batch_size: int = 32,
-    learning_rate: float = 1e-3,
+    labels_file: str,
+    version: int,
     model_path: str | None = None,
-    version: int | None = None,
-    use_batchnorm: bool | None = None,
-    stopping_criterion=None,
-    model_type: str = "soundcnn",
 ):
     """
-    Run training for a binary audio classification model.
+    Run training for a binary audio classification model using config-driven parameters.
 
     Args:
-        config: AudioLoopConfig with paths and experiment settings
+        config: AudioLoopConfig with all training settings (epochs, batch_size, learning_rate, etc.)
         labels_file: Path to CSV file with training labels
-        max_epochs: Maximum number of training epochs
-        seed: Random seed for reproducibility
-        batch_size: Training batch size
-        learning_rate: Learning rate for optimizer
-        model_path: Path to save trained model (auto-generated if None)
-        version: Model version number (for auto-generated paths)
-        use_batchnorm: Whether to use BatchNorm (auto-decided if None)
-        stopping_criterion: Training stopping criterion (PlateauCriterion if None)
-        model_type: Type of model to use ("soundcnn" or "simplecnn")
+        version: Model version number (for workflow tracking)
+        model_path: Path to save trained model (uses config.get_model_path(version) if None)
 
     Returns:
         Final training accuracy
@@ -106,7 +92,7 @@ def run_training(
     device = get_device()
     print(f"Using device: {device}")
 
-    set_seed(seed)
+    set_seed(config.seed)
 
     # Create dataset from precomputed spectrograms
     train_dataset = SpectrogramDataset(csv_file=labels_file, specs_dir=str(config.specs_dir))
@@ -123,7 +109,7 @@ def run_training(
     # persistent_workers=True avoids worker recreation overhead
     train_loader = DataLoader(
         train_dataset,
-        batch_size=batch_size,
+        batch_size=config.batch_size,
         shuffle=True,
         num_workers=2,
         persistent_workers=True,  # Keep workers alive between epochs
@@ -131,9 +117,9 @@ def run_training(
         collate_fn=simple_collate_fn,
     )
 
-    # Create model based on specified type
+    # Create model based on config
     model = create_model(
-        model_type=model_type, num_classes=num_classes, dataset_size=len(train_dataset)
+        model_type=config.model_type, num_classes=num_classes, dataset_size=len(train_dataset)
     ).to(device)
 
     # Print model info
@@ -143,10 +129,9 @@ def run_training(
         if model_info["use_batchnorm"]:
             print("Using model WITH BatchNorm")
         else:
-            print("Using model WITHOUT BatchNorm")
-        print(
-            f"⚠️  Small dataset ({len(train_dataset)} samples) detected - using model WITHOUT BatchNorm"
-        )
+            print(
+                f"⚠️  Small dataset ({len(train_dataset)} samples) detected - using model WITHOUT BatchNorm"
+            )
 
     # Print basic model info
     sample = train_dataset[0]
@@ -155,11 +140,10 @@ def run_training(
     print(f"Model created with {sum(p.numel() for p in model.parameters())} parameters")
 
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=learning_rate, weight_decay=1e-5)
+    optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=1e-5)
 
-    # Use default stopping criterion if none provided
-    if stopping_criterion is None:
-        stopping_criterion = PlateauCriterion(max_epochs=max_epochs)
+    # Create stopping criterion from config
+    stopping_criterion = create_stopping_criterion(config)
 
     # Reset stopping criterion for this training run
     stopping_criterion.reset()
@@ -171,7 +155,7 @@ def run_training(
     # Pre-allocate timing list to avoid memory allocation during training
     epoch_times = []
     accuracy = 0.0
-    for epoch in range(max_epochs):
+    for epoch in range(config.max_epochs):
         epoch_start_time = time.time()
         avg_loss, accuracy = train_epoch(model, train_loader, optimizer, criterion, device)
 
@@ -181,7 +165,7 @@ def run_training(
         # Print progress periodically
         if epoch % 10 == 0 or accuracy >= 1.0 or epoch < 5:
             print(
-                f"Epoch {epoch + 1:4d}/{max_epochs} ({epoch_time:.2f}s) - "
+                f"Epoch {epoch + 1:4d}/{config.max_epochs} ({epoch_time:.2f}s) - "
                 f"Loss: {avg_loss:.4f} - Accuracy: {accuracy:.4f} ({accuracy * 100:.2f}%)"
             )
 
@@ -203,14 +187,14 @@ def run_training(
             print("=" * 60)
             break
     else:
-        print(f"\nTraining completed {max_epochs} epochs. Final accuracy: {accuracy:.4f}")
+        print(f"\nTraining completed {config.max_epochs} epochs. Final accuracy: {accuracy:.4f}")
 
     # Save the best model state if available, otherwise save final model
     # This ensures that when early stopping triggers (e.g., patience exhausted),
     # we save the model from the epoch with the best performance, not the final epoch
     config.create_directories()
     if model_path is None:
-        model_path = str(config.get_model_path(version or 1))
+        model_path = str(config.get_model_path(version))
 
     best_model_state = stopping_criterion.get_best_model_state()
     if best_model_state is not None:

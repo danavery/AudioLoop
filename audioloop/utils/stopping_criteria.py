@@ -203,3 +203,28 @@ class PlateauCriterion(TrainingStoppingCriterion):
         self.epochs_without_improvement = 0
         self.best_model_state = None
         self._should_update_best_model = False
+
+
+def create_stopping_criterion(config) -> TrainingStoppingCriterion:
+    """Create a stopping criterion from configuration.
+    
+    Args:
+        config: AudioLoopConfig with stopping criterion settings
+        
+    Returns:
+        TrainingStoppingCriterion instance
+        
+    Raises:
+        ValueError: If stopping_criterion_type is not recognized
+    """
+    if config.stopping_criterion_type == "plateau":
+        return PlateauCriterion(
+            patience=config.patience,
+            min_delta=config.min_delta,
+            max_epochs=config.max_epochs,
+            accuracy_floor=config.accuracy_floor
+        )
+    elif config.stopping_criterion_type == "accuracy":
+        return AccuracyCriterion(max_epochs=config.max_epochs)
+    else:
+        raise ValueError(f"Unknown stopping criterion: {config.stopping_criterion_type}")
