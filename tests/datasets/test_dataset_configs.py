@@ -51,9 +51,6 @@ class TestDatasetConfigInterface:
             def vocabulary(self) -> dict[int, str]:
                 return {0: "test"}
 
-            def get_metadata_entries(self):
-                return []
-
             def load_metadata(self, split="dev"):
                 return []
 
@@ -74,6 +71,7 @@ class TestDatasetConfigInterface:
 
             def create_spectrogram_transform(self):
                 import torch.nn as nn
+
                 return nn.Sequential()
 
             def parse_metadata_row(self, row):
@@ -91,9 +89,9 @@ class TestDatasetConfigInterface:
         config = config_class()
 
         # Test required methods exist and are callable
-        assert hasattr(config, "get_metadata_entries")
+        assert hasattr(config, "load_metadata")
         assert hasattr(config, "get_audio_path")
-        assert callable(config.get_metadata_entries)
+        assert callable(config.load_metadata)
         assert callable(config.get_audio_path)
 
 
@@ -140,46 +138,11 @@ class TestDatasetConfigBehavior:
 
 
 class TestMetadataHandling:
-    """Test metadata entry generation with minimal mocking."""
-
-    @patch(
-        "builtins.open", new_callable=mock_open, read_data="fname\tlabels\tmids\n100032\t1,5\tm1,m5"
-    )
-    @patch("audioloop.datasets.fsd50k.load_fsd50k_vocabulary")
-    def test_fsd50k_metadata_parsing(self, mock_vocab, mock_file):
-        """Test FSD50K metadata entry generation."""
-        mock_vocab.return_value = {1: "Drill", 5: "Music"}
-
-        config = FSD50KConfig()
-        entries = config.get_metadata_entries()
-
-        # Should create entry for each label
-        assert len(entries) == 2
-        assert entries[0]["filename"] == "100032"
-        assert entries[0]["class_name"] in ["Drill", "Music"]
-        assert entries[0]["fold"] is None
-
-    @patch(
-        "builtins.open",
-        new_callable=mock_open,
-        read_data="slice_file_name,fold,classID,class\n7061-6-0-0.wav,5,0,air_conditioner",
-    )
-    @patch("audioloop.datasets.urbansound8k.load_urbansound8k_vocabulary")
-    def test_urbansound8k_metadata_parsing(self, mock_vocab, mock_file):
-        """Test UrbanSound8K metadata entry generation."""
-        mock_vocab.return_value = {0: "air_conditioner"}
-
-        config = UrbanSound8KConfig()
-        entries = config.get_metadata_entries()
-
-        assert len(entries) == 1
-        assert entries[0]["filename"] == "7061-6-0-0.wav"
-        assert entries[0]["class_name"] == "air_conditioner"
-        assert entries[0]["fold"] == 5
+    """Test basic metadata functionality."""
 
     @pytest.mark.parametrize("config_class", [FSD50KConfig, UrbanSound8KConfig])
-    def test_metadata_entries_return_list(self, config_class):
-        """Test that get_metadata_entries returns a list."""
+    def test_load_metadata_returns_list(self, config_class):
+        """Test that load_metadata returns a list."""
         config = config_class()
 
         # Mock file operations to avoid actual file access
@@ -187,12 +150,12 @@ class TestMetadataHandling:
             # Mock vocabulary loading
             if config_class == FSD50KConfig:
                 with patch("audioloop.datasets.fsd50k.load_fsd50k_vocabulary", return_value={}):
-                    entries = config.get_metadata_entries()
+                    entries = config.load_metadata()
             else:
                 with patch(
                     "audioloop.datasets.urbansound8k.load_urbansound8k_vocabulary", return_value={}
                 ):
-                    entries = config.get_metadata_entries()
+                    entries = config.load_metadata()
 
             assert isinstance(entries, list)
 

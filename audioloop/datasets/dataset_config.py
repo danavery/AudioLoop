@@ -47,18 +47,6 @@ class DatasetConfig(ABC):
 
     # === Metadata and File Management ===
     @abstractmethod
-    def get_metadata_entries(self) -> list[dict[str, Any]]:
-        """Get list of metadata entries for active learning.
-
-        Returns:
-            List of dicts with consistent keys:
-            - filename: Audio filename (str)
-            - class_name: Human-readable class name (str)
-            - fold: Fold number if applicable (int or None)
-        """
-        pass
-
-    @abstractmethod
     def load_metadata(self, split: str = "dev") -> list[dict[str, Any]]:
         """Load metadata entries for the specified split.
 

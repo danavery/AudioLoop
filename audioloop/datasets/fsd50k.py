@@ -175,7 +175,6 @@ class FSD50KConfig(DatasetConfig):
     # Cached vocabulary to avoid repeated loading
     _vocabulary: dict[int, str] | None = None
     _name_to_id: dict[str, int] | None = None
-    _metadata_entries: list[dict[str, Any]] | None = None
 
     # === Core Dataset Properties ===
     @property
@@ -211,32 +210,6 @@ class FSD50KConfig(DatasetConfig):
             print(f"{class_id:3d}: {name}")
 
     # === Metadata and File Management ===
-
-    def get_metadata_entries(self) -> list[dict[str, Any]]:
-        """Get list of metadata entries for active learning."""
-        if self._metadata_entries is not None:
-            return self._metadata_entries
-
-        entries = []
-        vocabulary = self.vocabulary
-
-        with open(self.dev_csv) as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                filename = row["fname"]
-                # Handle multiple labels (comma-separated class names)
-                class_names = [x.strip() for x in row["labels"].split(",")]
-                for class_name in class_names:
-                    if class_name in self.name_to_id:
-                        entries.append(
-                            {
-                                "filename": filename,
-                                "class_name": class_name,
-                                "fold": None,  # FSD50K doesn't use folds
-                            }
-                        )
-        self._metadata_entries = entries
-        return self._metadata_entries
 
     def load_metadata(self, split: str = "dev") -> list[dict]:
         """Load metadata for specified split."""

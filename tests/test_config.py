@@ -141,7 +141,7 @@ class TestDatasetIntegration:
 
         # Test required methods exist
         assert callable(dataset_config.get_audio_path)
-        assert callable(dataset_config.get_metadata_entries)
+        assert callable(dataset_config.load_metadata)
 
 
 class TestTrainingParameters:
@@ -173,7 +173,7 @@ class TestTrainingParameters:
             stopping_criterion_type="accuracy",
             patience=30,
             min_delta=0.05,
-            accuracy_floor=0.9
+            accuracy_floor=0.9,
         )
         assert config.max_epochs == 500
         assert config.seed == 123
@@ -190,16 +190,16 @@ class TestTrainingParameters:
         """Test validation of positive training parameters."""
         with pytest.raises(ValueError, match="max_epochs must be positive"):
             AudioLoopConfig(max_epochs=-1)
-        
+
         with pytest.raises(ValueError, match="max_epochs must be positive"):
             AudioLoopConfig(max_epochs=0)
-            
+
         with pytest.raises(ValueError, match="batch_size must be positive"):
             AudioLoopConfig(batch_size=-1)
-            
+
         with pytest.raises(ValueError, match="learning_rate must be positive"):
             AudioLoopConfig(learning_rate=-0.1)
-            
+
         with pytest.raises(ValueError, match="learning_rate must be positive"):
             AudioLoopConfig(learning_rate=0.0)
 
@@ -207,10 +207,10 @@ class TestTrainingParameters:
         """Test validation of stopping criterion parameters."""
         with pytest.raises(ValueError, match="Unknown stopping criterion"):
             AudioLoopConfig(stopping_criterion_type="invalid")
-        
+
         with pytest.raises(ValueError, match="patience must be positive"):
             AudioLoopConfig(stopping_criterion_type="plateau", patience=-1)
-        
+
         with pytest.raises(ValueError, match="patience must be positive"):
             AudioLoopConfig(stopping_criterion_type="plateau", patience=0)
 
@@ -219,8 +219,8 @@ class TestTrainingParameters:
         # Plateau should work
         config1 = AudioLoopConfig(stopping_criterion_type="plateau")
         assert config1.stopping_criterion_type == "plateau"
-        
-        # Accuracy should work  
+
+        # Accuracy should work
         config2 = AudioLoopConfig(stopping_criterion_type="accuracy")
         assert config2.stopping_criterion_type == "accuracy"
 
@@ -252,7 +252,7 @@ class TestActiveLearningParameters:
             basic_transition_confidence_threshold=0.85,
             basic_transition_variance_threshold=0.15,
             auto_thresholds=True,
-            estimated_positive_pct=0.1
+            estimated_positive_pct=0.1,
         )
         assert config.total_candidates == 100
         assert config.positive_percentage == 0.6
@@ -268,7 +268,7 @@ class TestActiveLearningParameters:
         """Test validation of positive active learning parameters."""
         with pytest.raises(ValueError, match="total_candidates must be positive"):
             AudioLoopConfig(total_candidates=-1)
-        
+
         with pytest.raises(ValueError, match="total_candidates must be positive"):
             AudioLoopConfig(total_candidates=0)
 
@@ -277,21 +277,21 @@ class TestActiveLearningParameters:
         # positive_percentage validation
         with pytest.raises(ValueError, match="positive_percentage must be between 0.0 and 1.0"):
             AudioLoopConfig(positive_percentage=-0.1)
-        
+
         with pytest.raises(ValueError, match="positive_percentage must be between 0.0 and 1.0"):
             AudioLoopConfig(positive_percentage=1.1)
-        
+
         # min_confidence validation
         with pytest.raises(ValueError, match="min_confidence must be between 0.0 and 1.0"):
             AudioLoopConfig(min_confidence=-0.1)
-        
+
         with pytest.raises(ValueError, match="min_confidence must be between 0.0 and 1.0"):
             AudioLoopConfig(min_confidence=1.1)
-        
+
         # estimated_positive_pct validation
         with pytest.raises(ValueError, match="estimated_positive_pct must be between 0.0 and 1.0"):
             AudioLoopConfig(estimated_positive_pct=-0.1)
-        
+
         with pytest.raises(ValueError, match="estimated_positive_pct must be between 0.0 and 1.0"):
             AudioLoopConfig(estimated_positive_pct=1.1)
 
@@ -299,36 +299,48 @@ class TestActiveLearningParameters:
         """Test validation of selection mode parameter."""
         with pytest.raises(ValueError, match="Unknown selection mode"):
             AudioLoopConfig(selection_mode="invalid")
-        
+
         # Valid selection modes should work
         config1 = AudioLoopConfig(selection_mode="confidence")
         assert config1.selection_mode == "confidence"
-        
+
         config2 = AudioLoopConfig(selection_mode="entropy")
         assert config2.selection_mode == "entropy"
-        
+
         config3 = AudioLoopConfig(selection_mode="basic_transition")
         assert config3.selection_mode == "basic_transition"
 
     def test_basic_transition_parameter_validation(self):
         """Test validation of basic transition parameters."""
         # f1_threshold validation
-        with pytest.raises(ValueError, match="basic_transition_f1_threshold must be between 0.0 and 1.0"):
+        with pytest.raises(
+            ValueError, match="basic_transition_f1_threshold must be between 0.0 and 1.0"
+        ):
             AudioLoopConfig(basic_transition_f1_threshold=-0.1)
-        
-        with pytest.raises(ValueError, match="basic_transition_f1_threshold must be between 0.0 and 1.0"):
+
+        with pytest.raises(
+            ValueError, match="basic_transition_f1_threshold must be between 0.0 and 1.0"
+        ):
             AudioLoopConfig(basic_transition_f1_threshold=1.1)
-        
+
         # confidence_threshold validation
-        with pytest.raises(ValueError, match="basic_transition_confidence_threshold must be between 0.0 and 1.0"):
+        with pytest.raises(
+            ValueError, match="basic_transition_confidence_threshold must be between 0.0 and 1.0"
+        ):
             AudioLoopConfig(basic_transition_confidence_threshold=-0.1)
-        
-        with pytest.raises(ValueError, match="basic_transition_confidence_threshold must be between 0.0 and 1.0"):
+
+        with pytest.raises(
+            ValueError, match="basic_transition_confidence_threshold must be between 0.0 and 1.0"
+        ):
             AudioLoopConfig(basic_transition_confidence_threshold=1.1)
-        
+
         # variance_threshold validation
-        with pytest.raises(ValueError, match="basic_transition_variance_threshold must be between 0.0 and 1.0"):
+        with pytest.raises(
+            ValueError, match="basic_transition_variance_threshold must be between 0.0 and 1.0"
+        ):
             AudioLoopConfig(basic_transition_variance_threshold=-0.1)
-        
-        with pytest.raises(ValueError, match="basic_transition_variance_threshold must be between 0.0 and 1.0"):
+
+        with pytest.raises(
+            ValueError, match="basic_transition_variance_threshold must be between 0.0 and 1.0"
+        ):
             AudioLoopConfig(basic_transition_variance_threshold=1.1)

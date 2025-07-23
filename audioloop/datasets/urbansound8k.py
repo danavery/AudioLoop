@@ -152,24 +152,6 @@ class UrbanSound8KConfig(DatasetConfig):
 
     # === Metadata and File Management ===
 
-    def get_metadata_entries(self) -> list[dict[str, Any]]:
-        """Get list of metadata entries for active learning."""
-        entries = []
-        vocabulary = load_urbansound8k_vocabulary()
-
-        with open(self.metadata_csv) as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                filename = row["slice_file_name"]
-                class_id = int(row["classID"])
-                fold = int(row["fold"])
-
-                if class_id in vocabulary:
-                    entries.append(
-                        {"filename": filename, "class_name": vocabulary[class_id], "fold": fold}
-                    )
-        return entries
-
     def load_metadata(self, split: str = "dev") -> list[dict]:
         """Load all metadata for the UrbanSound8K dataset."""
         if not self.metadata_csv.exists():
