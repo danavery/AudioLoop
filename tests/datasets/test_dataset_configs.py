@@ -43,11 +43,44 @@ class TestDatasetConfigInterface:
             def audio_root(self) -> Path:
                 return Path("test_audio")
 
+            @property
+            def name_to_id(self) -> dict[str, int]:
+                return {"test": 0}
+
+            @property
+            def vocabulary(self) -> dict[int, str]:
+                return {0: "test"}
+
             def get_metadata_entries(self):
                 return []
 
+            def load_metadata(self, split="dev"):
+                return []
+
+            def list_classes(self):
+                print("test class")
+
             def get_audio_path(self, filename, fold=None):
                 return Path(filename)
+
+            def get_audio_processing_params(self):
+                return {}
+
+            def is_positive_class(self, class_name, positive_class):
+                return class_name == positive_class
+
+            def get_spectrogram_path(self, filename, specs_dir):
+                return specs_dir / f"{filename}.pt"
+
+            def create_spectrogram_transform(self):
+                import torch.nn as nn
+                return nn.Sequential()
+
+            def parse_metadata_row(self, row):
+                return row
+
+            def get_binary_label(self, item, positive_class_id, positive_class_name):
+                return True
 
         config = CompleteConfig()
         assert isinstance(config, DatasetConfig)

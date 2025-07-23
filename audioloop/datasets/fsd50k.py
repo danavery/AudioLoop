@@ -171,7 +171,6 @@ class FSD50KConfig(DatasetConfig):
     dev_csv: Path = Path("data/FSD50K/FSD50K.ground_truth/dev.csv")
     _dataset_csv: Path = Path("data/FSD50K/FSD50K.ground_truth/dev.csv")  # Common interface
     eval_csv: Path = Path("data/FSD50K/FSD50K.ground_truth/eval.csv")
-    inference_csv: Path = Path("outputs/fsd50k_files.csv")
 
     # Cached vocabulary to avoid repeated loading
     _vocabulary: dict[int, str] | None = None
@@ -234,40 +233,47 @@ class FSD50KConfig(DatasetConfig):
             return self.audio_root / filename
         return self.audio_root / f"{filename}.wav"
 
-    def list_classes(self) -> None:
-        """Print all available FSD50K classes."""
-        print("FSD50K Classes (200 total):")
-        print("=" * 40)
-        for class_id in sorted(self.vocabulary.keys()):
-            name = self.vocabulary[class_id]
-            print(f"{class_id:3d}: {name}")
+    def get_audio_processing_params(self) -> dict[str, Any]:
+        """Get audio processing parameters for spectrogram generation."""
+        return {
+            "sample_rate": self.sample_rate,
+            "n_fft": self.n_fft,
+            "hop_length": self.hop_length,
+            "n_mels": self.n_mels,
+            "top_db": self.top_db,
+            "fixed_length": self.fixed_length,
+        }
 
+    def is_positive_class(self, class_name: str, positive_class: str | int) -> bool:
+        """Determine if a class matches the positive class for binary classification."""
+        if isinstance(positive_class, str):
+            return class_name == positive_class
+        if isinstance(positive_class, int):
+            return (
+                positive_class in self.name_to_id
+                and self.name_to_id.get(class_name) == positive_class
+            )
+        return False
 
-class FSD50KProcessor:
-    """Handles FSD50K-specific dataset operations."""
+    def get_spectrogram_path(self, filename: str, specs_dir: Path) -> Path:
+        """Get path where spectrogram should be stored."""
+        spec_filename = filename.replace(".wav", "") + ".pt"
+        return specs_dir / spec_filename
 
-    def __init__(self, config: FSD50KConfig):
-        self.config = config
-        self.spec_transform = self._create_transform()
-
-    def _create_transform(self) -> nn.Sequential:
-        """Create the spectrogram transform pipeline."""
+    def create_spectrogram_transform(self):
+        """Create PyTorch transform pipeline for generating spectrograms."""
         return nn.Sequential(
             torchaudio.transforms.MelSpectrogram(
-                sample_rate=self.config.sample_rate,
-                n_fft=self.config.n_fft,
-                hop_length=self.config.hop_length,
-                n_mels=self.config.n_mels,
+                sample_rate=self.sample_rate,
+                n_fft=self.n_fft,
+                hop_length=self.hop_length,
+                n_mels=self.n_mels,
             ),
-            LogNormalize(top_db=self.config.top_db),
+            LogNormalize(top_db=self.top_db),
         )
 
-    def get_audio_path(self, filename: str) -> Path:
-        """Get full path to audio file given filename."""
-        return self.config.get_audio_path(filename)
-
-    def parse_metadata_row(self, row: dict[str, str]) -> dict:
-        """Parse a metadata CSV row into standardized format."""
+    def parse_metadata_row(self, row: dict[str, str]) -> dict[str, Any]:
+        """Parse a single CSV row into standardized metadata format."""
         labels = row["labels"].split(",")
         mids = row["mids"].split(",")
 
@@ -279,208 +285,16 @@ class FSD50KProcessor:
             "audio_path": self.get_audio_path(row["fname"]),
         }
 
-    def load_metadata(self, split: str = "dev") -> list[dict]:
-        """Load metadata for specified split.
-
-        Args:
-            split: 'dev' for development set or 'eval' for evaluation set
-
-        Returns:
-            List of parsed metadata dictionaries
-        """
-        csv_path = self.config.dev_csv if split == "dev" else self.config.eval_csv
-
-        if not csv_path.exists():
-            raise FileNotFoundError(f"Metadata CSV not found: {csv_path}")
-
-        audio_files = []
-        with csv_path.open("r") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                parsed = self.parse_metadata_row(row)
-                audio_files.append(parsed)
-
-        return audio_files
-
-    def get_binary_label(self, item: dict, positive_class_id: int, positive_class_name: str) -> int:
-        """Get binary label for an item based on positive class criteria.
-
-        Args:
-            item: Metadata item from load_metadata()
-            positive_class_id: ID of the positive class (unused for FSD50K)
-            positive_class_name: Name of the positive class
-
-        Returns:
-            1 if positive class, 0 otherwise
-        """
+    def get_binary_label(
+        self, item: dict[str, Any], positive_class_id: int, positive_class_name: str
+    ) -> int:
+        """Get binary label for an item based on positive class criteria."""
         return 1 if positive_class_name in item["labels"] else 0
-
-    def get_spectrogram_filename(self, item: dict) -> str:
-        """Convert audio filename to spectrogram filename.
-
-        Args:
-            item: Metadata item from load_metadata()
-
-        Returns:
-            Spectrogram filename
-        """
-        return f"{item['filename']}.pt"
-
-    def create_binary_labels_one_vs_all(
-        self,
-        positive_class: str,
-        split: str = "dev",
-        output_csv: str = "outputs/fsd50k_binary_labels.csv",
-    ) -> str:
-        """Create binary labels using one-vs-all strategy.
-
-        Args:
-            positive_class: Class name to treat as positive
-            split: Dataset split to use ('dev' or 'eval')
-            output_csv: Path for output binary labels CSV
-
-        Returns:
-            Path to created binary labels CSV
-        """
-        # Validate class name
-        if positive_class not in self.config.name_to_id:
-            raise ValueError(
-                f"Invalid class name: '{positive_class}'. Valid names: {list(self.config.name_to_id.keys())}"
-            )
-
-        # Load metadata
-        metadata = self.load_metadata(split)
-
-        binary_data = []
-        positive_count = 0
-        negative_count = 0
-
-        for item in metadata:
-            filename = item["filename"]
-            labels = item["labels"]
-
-            # Binary classification: positive_class vs everything else
-            is_positive = 1 if positive_class in labels else 0
-
-            if is_positive:
-                positive_count += 1
-            else:
-                negative_count += 1
-
-            binary_data.append(
-                {
-                    "filename": filename,
-                    "label": is_positive,
-                    "original_labels": ",".join(labels),
-                    "strategy": f"one_vs_all_{positive_class}",
-                    "split": item["split"],
-                }
-            )
-
-        # Write binary labels CSV
-        import os
-
-        os.makedirs("outputs", exist_ok=True)
-
-        with open(output_csv, "w", newline="") as f:
-            fieldnames = ["filename", "label", "original_labels", "strategy", "split"]
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(binary_data)
-
-        negative_class_name = f"not_{positive_class}"
-        print(f"Created FSD50K binary labels: {output_csv}")
-        print(f"{positive_class} samples: {positive_count}")
-        print(f"{negative_class_name} samples: {negative_count}")
-        print(f"Total samples: {len(binary_data)}")
-        print(f"Split: {split}")
-
-        return output_csv
-
-    def create_binary_labels_semantic_group(
-        self,
-        group_name: str,
-        positive_classes: set[str] | None = None,
-        split: str = "dev",
-        output_csv: str = "outputs/fsd50k_binary_labels.csv",
-    ) -> str:
-        """Create binary labels using semantic grouping strategy.
-
-        Args:
-            group_name: Name of predefined group or custom name
-            positive_classes: Set of class names to treat as positive (if None, uses predefined group)
-            split: Dataset split to use ('dev' or 'eval')
-            output_csv: Path for output binary labels CSV
-
-        Returns:
-            Path to created binary labels CSV
-        """
-        if positive_classes is None:
-            if group_name not in SEMANTIC_GROUPS:
-                available_groups = list(SEMANTIC_GROUPS.keys())
-                raise ValueError(
-                    f"Unknown semantic group: '{group_name}'. Available: {available_groups}"
-                )
-            positive_classes = SEMANTIC_GROUPS[group_name]
-
-        # Validate class names
-        for class_name in positive_classes:
-            if class_name not in self.config.name_to_id:
-                raise ValueError(f"Invalid class name in group: '{class_name}'")
-
-        # Load metadata
-        metadata = self.load_metadata(split)
-
-        binary_data = []
-        positive_count = 0
-        negative_count = 0
-
-        for item in metadata:
-            filename = item["filename"]
-            labels = item["labels"]
-
-            # Binary classification: any positive class vs none
-            is_positive = 1 if any(label in positive_classes for label in labels) else 0
-
-            if is_positive:
-                positive_count += 1
-            else:
-                negative_count += 1
-
-            binary_data.append(
-                {
-                    "filename": filename,
-                    "label": is_positive,
-                    "original_labels": ",".join(labels),
-                    "strategy": f"semantic_group_{group_name}",
-                    "split": item["split"],
-                }
-            )
-
-        # Write binary labels CSV
-        import os
-
-        os.makedirs("outputs", exist_ok=True)
-
-        with open(output_csv, "w", newline="") as f:
-            fieldnames = ["filename", "label", "original_labels", "strategy", "split"]
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(binary_data)
-
-        negative_class_name = f"not_{group_name}"
-        print(f"Created FSD50K binary labels: {output_csv}")
-        print(f"{group_name} samples: {positive_count}")
-        print(f"{negative_class_name} samples: {negative_count}")
-        print(f"Total samples: {len(binary_data)}")
-        print(f"Split: {split}")
-
-        return output_csv
 
     def fix_spectrogram_length(self, spec: torch.Tensor) -> torch.Tensor:
         """Fix spectrogram to target length by padding or cropping."""
         current_length = spec.shape[-1]  # Time dimension is last
-        target_length = self.config.fixed_length
+        target_length = self.fixed_length
 
         if current_length < target_length:
             # Pad with zeros on the right
@@ -493,16 +307,8 @@ class FSD50KProcessor:
 
         return spec
 
-    def list_classes(self) -> None:
-        """Print all available FSD50K classes."""
-        self.config.list_classes()
-
     def process_single_file(self, file_info: dict, output_dir: Path) -> tuple[bool, int | None]:
-        """Process a single audio file and save its spectrogram.
-
-        Returns:
-            Tuple of (success, original_spectrogram_length)
-        """
+        """Process a single audio file and save its spectrogram."""
         try:
             audio_path = file_info["audio_path"]
             filename = file_info["filename"]
@@ -520,7 +326,8 @@ class FSD50KProcessor:
                 waveform = waveform.mean(dim=0, keepdim=True)
 
             # Create spectrogram
-            spec = self.spec_transform(waveform)
+            spec_transform = self.create_spectrogram_transform()
+            spec = spec_transform(waveform)
 
             # Store original length before fixing
             original_length = spec.shape[-1]
@@ -538,3 +345,27 @@ class FSD50KProcessor:
         except Exception as e:
             logger.error(f"Error processing {file_info['filename']}: {e}")
             return False, None
+
+    def load_metadata(self, split: str = "dev") -> list[dict]:
+        """Load metadata for specified split."""
+        csv_path = self.dev_csv if split == "dev" else self.eval_csv
+
+        if not csv_path.exists():
+            raise FileNotFoundError(f"Metadata CSV not found: {csv_path}")
+
+        audio_files = []
+        with csv_path.open("r") as f:
+            reader = csv.DictReader(f, delimiter="\t")
+            for row in reader:
+                parsed = self.parse_metadata_row(row)
+                audio_files.append(parsed)
+
+        return audio_files
+
+    def list_classes(self) -> None:
+        """Print all available FSD50K classes."""
+        print("FSD50K Classes (200 total):")
+        print("=" * 40)
+        for class_id in sorted(self.vocabulary.keys()):
+            name = self.vocabulary[class_id]
+            print(f"{class_id:3d}: {name}")

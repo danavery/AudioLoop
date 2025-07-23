@@ -134,14 +134,6 @@ class TestDatasetIntegration:
         assert dataset_config is not None
         assert hasattr(dataset_config, "get_audio_path")
 
-        # Should be able to get processor (this may fail due to missing files)
-        try:
-            processor = config.get_dataset_processor()
-            assert processor is not None
-        except FileNotFoundError:
-            # Expected if dataset files don't exist - that's OK for this test
-            pass
-
     def test_dataset_config_interface(self):
         """Test dataset config implements required interface."""
         config = AudioLoopConfig(dataset="fsd50k")

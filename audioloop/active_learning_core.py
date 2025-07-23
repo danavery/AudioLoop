@@ -84,8 +84,7 @@ def run_binary_inference(
     if predictions_csv is None:
         predictions_csv = str(config.output_dir / "predictions.csv")
 
-    # Get dataset processor and dataset config from unified config
-    processor = config.get_dataset_processor()
+    # Get dataset config from unified config
     dataset_config = config.get_dataset_config()
 
     # Auto-detect dataset file if not provided
@@ -93,7 +92,7 @@ def run_binary_inference(
         dataset_file = str(dataset_config.dataset_csv)
 
     # Load all available metadata and create binary labels inline
-    metadata = processor.load_metadata(split="dev")
+    metadata = dataset_config.load_metadata(split="dev")
     print(f"Found {len(metadata)} total samples in dataset")
 
     # Load training set filenames to exclude
@@ -105,18 +104,19 @@ def run_binary_inference(
     dataset_entries = []
     filtered_count = 0
     for item in metadata:
-        # Use processor's filename conversion method
-        spec_filename = processor.get_spectrogram_filename(item)
+        # Use dataset config's path conversion method
+        spec_path = dataset_config.get_spectrogram_path(item["filename"], config.specs_dir)
+        spec_filename = spec_path.name
 
         # Skip if already in training set
         if spec_filename in training_filenames:
             filtered_count += 1
             continue
 
-        # Use processor's binary classification method
-        is_positive = processor.get_binary_label(item, positive_class_id, positive_class_name)
+        # Use dataset config's binary classification method
+        is_positive = dataset_config.get_binary_label(item, positive_class_id, positive_class_name)
 
-        spec_path = str(config.specs_dir / spec_filename)
+        spec_path = str(spec_path)
 
         # Get original class info
         original_class = getattr(item, "classID", getattr(item, "class_id", -1))

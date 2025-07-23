@@ -1,16 +1,14 @@
 """
-Dataset configurations and processors for AudioLoop.
+Dataset configurations for AudioLoop.
 
-This module provides dataset-specific configurations and processors
+This module provides dataset-specific configurations
 for different audio datasets used in the AudioLoop framework.
 """
 
-from .fsd50k import FSD50KConfig, FSD50KProcessor
-from .urbansound8k import UrbanSound8KConfig, UrbanSound8KProcessor
+from .fsd50k import FSD50KConfig
+from .urbansound8k import UrbanSound8KConfig
 
 __all__ = [
     "FSD50KConfig",
-    "FSD50KProcessor",
     "UrbanSound8KConfig",
-    "UrbanSound8KProcessor",
 ]

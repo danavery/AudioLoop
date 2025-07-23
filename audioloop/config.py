@@ -42,7 +42,6 @@ Environment Variables:
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 from .datasets.dataset_config import DatasetConfig
 from .utils.paths import (
@@ -58,10 +57,6 @@ DATASET_CONFIGS: dict[str, type["DatasetConfig"] | None] = {
     "fsd50k": None,  # Lazy loaded
 }
 
-DATASET_PROCESSORS: dict[str, type[Any] | None] = {
-    "urbansound8k": None,  # Lazy loaded
-    "fsd50k": None,  # Lazy loaded
-}
 
 # Track loading state to avoid repeated imports
 _CLASSES_LOADED = False
@@ -73,13 +68,11 @@ def _load_dataset_classes() -> None:
     if _CLASSES_LOADED:
         return
 
-    from .datasets.fsd50k import FSD50KConfig, FSD50KProcessor
-    from .datasets.urbansound8k import UrbanSound8KConfig, UrbanSound8KProcessor
+    from .datasets.fsd50k import FSD50KConfig
+    from .datasets.urbansound8k import UrbanSound8KConfig
 
     DATASET_CONFIGS["fsd50k"] = FSD50KConfig
     DATASET_CONFIGS["urbansound8k"] = UrbanSound8KConfig
-    DATASET_PROCESSORS["fsd50k"] = FSD50KProcessor
-    DATASET_PROCESSORS["urbansound8k"] = UrbanSound8KProcessor
 
     _CLASSES_LOADED = True
 
@@ -208,6 +201,10 @@ class AudioLoopConfig:
         """Get path for a binary labels file."""
         return self.output_dir / f"binary_labels_v{version}.csv"
 
+    def get_inference_csv_path(self, dataset_name: str) -> Path:
+        """Get path for the inference CSV file."""
+        return self.output_dir / f"{dataset_name}_files.csv"
+
     def get_dataset_config(self) -> DatasetConfig:
         """Get the dataset configuration for the current dataset."""
         _load_dataset_classes()
@@ -221,21 +218,6 @@ class AudioLoopConfig:
             )
 
         return config_class()
-
-    def get_dataset_processor(self):
-        """Get the dataset processor for the current dataset."""
-        _load_dataset_classes()
-        dataset_config = self.get_dataset_config()
-
-        processor_class = DATASET_PROCESSORS.get(self.dataset)
-        if processor_class is None:
-            raise ValueError(
-                f"Dataset processor not available for '{self.dataset}'. "
-                f"Supported datasets: {list(DATASET_PROCESSORS.keys())}. "
-                f"This may indicate a loading error or unsupported dataset."
-            )
-
-        return processor_class(dataset_config)
 
     def create_directories(self) -> None:
         """Create all necessary directories for this configuration."""

@@ -120,7 +120,6 @@ class UrbanSound8KConfig(DatasetConfig):
     _dataset_csv: Path = Path("data/urbansound8k/UrbanSound8K.csv")  # Common interface
     _audio_root: Path = Path("data/urbansound8k")
     output_dir: Path = Path("data/all_specs")
-    inference_csv: Path = Path("outputs/urbansound8k_files.csv")
 
     @property
     def dataset_csv(self) -> Path:
@@ -172,40 +171,46 @@ class UrbanSound8KConfig(DatasetConfig):
         # Return most likely path if not found
         return self.audio_root / "fold1" / filename
 
-    def list_classes(self) -> None:
-        """Print all available UrbanSound8K classes."""
-        print("UrbanSound8K Classes:")
-        print("=" * 30)
-        for class_id in sorted(self.vocabulary.keys()):
-            name = self.vocabulary[class_id]
-            print(f"{class_id}: {name}")
+    def get_audio_processing_params(self) -> dict[str, Any]:
+        """Get audio processing parameters for spectrogram generation."""
+        return {
+            "sample_rate": self.sample_rate,
+            "n_fft": self.n_fft,
+            "hop_length": self.hop_length,
+            "n_mels": self.n_mels,
+            "top_db": self.top_db,
+            "fixed_length": self.fixed_length,
+        }
 
+    def is_positive_class(self, class_name: str, positive_class: str | int) -> bool:
+        """Determine if a class matches the positive class for binary classification."""
+        if isinstance(positive_class, str):
+            return class_name == positive_class
+        if isinstance(positive_class, int):
+            return (
+                positive_class in self.vocabulary and self.vocabulary[positive_class] == class_name
+            )
+        return False
 
-class UrbanSound8KProcessor:
-    """Handles UrbanSound8K-specific dataset operations."""
+    def get_spectrogram_path(self, filename: str, specs_dir: Path) -> Path:
+        """Get path where spectrogram should be stored."""
+        spec_filename = filename.replace(".wav", ".pt")
+        return specs_dir / spec_filename
 
-    def __init__(self, config: UrbanSound8KConfig):
-        self.config = config
-        self.spec_transform = self._create_transform()
-
-    def _create_transform(self) -> nn.Sequential:
-        """Create the spectrogram transform pipeline."""
+    def create_spectrogram_transform(self):
+        """Create PyTorch transform pipeline for generating spectrograms."""
         return nn.Sequential(
             torchaudio.transforms.MelSpectrogram(
-                sample_rate=self.config.sample_rate,
-                n_fft=self.config.n_fft,
-                hop_length=self.config.hop_length,
-                n_mels=self.config.n_mels,
+                sample_rate=self.sample_rate,
+                n_fft=self.n_fft,
+                hop_length=self.hop_length,
+                n_mels=self.n_mels,
             ),
-            LogNormalize(top_db=self.config.top_db),
+            LogNormalize(top_db=self.top_db),
         )
 
-    def get_audio_path(self, filename: str, fold: int) -> Path:
-        """Get full path to audio file given filename and fold."""
-        return self.config.get_audio_path(filename, fold)
-
-    def parse_metadata_row(self, row: dict[str, str]) -> dict:
-        """Parse a metadata CSV row into standardized format."""
+    def parse_metadata_row(self, row: dict[str, str]) -> dict[str, Any]:
+        """Parse a single CSV row into standardized metadata format."""
         class_name = row["class"]
         return {
             "filename": row["slice_file_name"],
@@ -213,31 +218,19 @@ class UrbanSound8KProcessor:
             "class_name": class_name,
             "labels": [class_name],  # Convert single label to array for consistency
             "fold": int(row["fold"]),
+            "audio_path": self.get_audio_path(row["slice_file_name"], int(row["fold"])),
         }
 
-    def load_metadata(self, split: str = "dev") -> list[dict]:
-        """Load all metadata for the UrbanSound8K dataset.
-
-        Args:
-            split: Ignored for UrbanSound8K (kept for interface consistency with FSD50K)
-        """
-        if not self.config.metadata_csv.exists():
-            raise FileNotFoundError(f"Metadata CSV not found: {self.config.metadata_csv}")
-
-        audio_files = []
-        with self.config.metadata_csv.open("r") as f:
-            csv_reader = csv.DictReader(f)
-            for row in csv_reader:
-                parsed = self.parse_metadata_row(row)
-                parsed["audio_path"] = self.get_audio_path(parsed["filename"], parsed["fold"])
-                audio_files.append(parsed)
-
-        return audio_files
+    def get_binary_label(
+        self, item: dict[str, Any], positive_class_id: int, positive_class_name: str
+    ) -> int:
+        """Get binary label for an item based on positive class criteria."""
+        return 1 if item["class_id"] == positive_class_id else 0
 
     def fix_spectrogram_length(self, spec: torch.Tensor) -> torch.Tensor:
         """Fix spectrogram to target length by padding or cropping."""
         current_length = spec.shape[-1]  # Time dimension is last
-        target_length = self.config.fixed_length
+        target_length = self.fixed_length
 
         if current_length < target_length:
             # Pad with zeros on the right
@@ -250,40 +243,8 @@ class UrbanSound8KProcessor:
 
         return spec
 
-    def list_classes(self) -> None:
-        """Print all available UrbanSound8K classes."""
-        self.config.list_classes()
-
-    def get_binary_label(self, item: dict, positive_class_id: int, positive_class_name: str) -> int:
-        """Get binary label for an item based on positive class criteria.
-
-        Args:
-            item: Metadata item from load_metadata()
-            positive_class_id: ID of the positive class
-            positive_class_name: Name of the positive class (unused for UrbanSound8K)
-
-        Returns:
-            1 if positive class, 0 otherwise
-        """
-        return 1 if item["class_id"] == positive_class_id else 0
-
-    def get_spectrogram_filename(self, item: dict) -> str:
-        """Convert audio filename to spectrogram filename.
-
-        Args:
-            item: Metadata item from load_metadata()
-
-        Returns:
-            Spectrogram filename
-        """
-        return item["filename"].replace(".wav", ".pt")
-
     def process_single_file(self, file_info: dict, output_dir: Path) -> tuple[bool, int | None]:
-        """Process a single audio file and save its spectrogram.
-
-        Returns:
-            Tuple of (success, original_spectrogram_length)
-        """
+        """Process a single audio file and save its spectrogram."""
         try:
             audio_path = file_info["audio_path"]
             filename = file_info["filename"]
@@ -301,7 +262,8 @@ class UrbanSound8KProcessor:
                 waveform = waveform.mean(dim=0, keepdim=True)
 
             # Create spectrogram
-            spec = self.spec_transform(waveform)
+            spec_transform = self.create_spectrogram_transform()
+            spec = spec_transform(waveform)
 
             # Store original length before fixing
             original_length = spec.shape[-1]
@@ -319,3 +281,25 @@ class UrbanSound8KProcessor:
         except Exception as e:
             logger.error(f"Error processing {file_info['filename']}: {e}")
             return False, None
+
+    def load_metadata(self, split: str = "dev") -> list[dict]:
+        """Load all metadata for the UrbanSound8K dataset."""
+        if not self.metadata_csv.exists():
+            raise FileNotFoundError(f"Metadata CSV not found: {self.metadata_csv}")
+
+        audio_files = []
+        with self.metadata_csv.open("r") as f:
+            csv_reader = csv.DictReader(f)
+            for row in csv_reader:
+                parsed = self.parse_metadata_row(row)
+                audio_files.append(parsed)
+
+        return audio_files
+
+    def list_classes(self) -> None:
+        """Print all available UrbanSound8K classes."""
+        print("UrbanSound8K Classes:")
+        print("=" * 30)
+        for class_id in sorted(self.vocabulary.keys()):
+            name = self.vocabulary[class_id]
+            print(f"{class_id}: {name}")

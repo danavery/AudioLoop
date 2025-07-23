@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# type: ignore
 """
 Example script showing how to use FSD50K dataset with AudioLoop's binary classification workflow.
 
@@ -29,7 +30,6 @@ import argparse
 
 from audioloop.datasets.fsd50k import (
     FSD50KConfig,
-    FSD50KProcessor,
     list_semantic_groups,
 )
 
@@ -39,19 +39,18 @@ def create_binary_labels_example(class_name=None, group_name=None, output_csv=No
     print("Creating FSD50K binary labels...")
     print("-" * 40)
 
-    config = FSD50KConfig()
-    processor = FSD50KProcessor(config)
+    dataset_config = FSD50KConfig()
 
     if class_name:
         print(f"Strategy: One-vs-all for class '{class_name}'")
-        result_path = processor.create_binary_labels_one_vs_all(
+        result_path = dataset_config.create_binary_labels_one_vs_all(
             positive_class=class_name,
             split=split,
             output_csv=output_csv or f"outputs/fsd50k_{class_name.lower()}_binary.csv",
         )
     elif group_name:
         print(f"Strategy: Semantic group '{group_name}'")
-        result_path = processor.create_binary_labels_semantic_group(
+        result_path = dataset_config.create_binary_labels_semantic_group(
             group_name=group_name,
             split=split,
             output_csv=output_csv or f"outputs/fsd50k_{group_name}_binary.csv",
@@ -68,11 +67,10 @@ def create_spectrograms_example(labels_csv, max_files=100):
     print("Creating spectrograms from FSD50K audio...")
     print("-" * 40)
 
-    config = FSD50KConfig()
-    processor = FSD50KProcessor(config)
+    dataset_config = FSD50KConfig()
 
     # Create output directory
-    config.output_dir.mkdir(parents=True, exist_ok=True)
+    dataset_config.output_dir.mkdir(parents=True, exist_ok=True)
 
     # Load binary labels to get list of files to process
     import csv
@@ -86,7 +84,7 @@ def create_spectrograms_example(labels_csv, max_files=100):
                 break
 
             filename = row["filename"]
-            audio_path = processor.get_audio_path(filename)
+            audio_path = dataset_config.get_audio_path(filename)
 
             files_to_process.append(
                 {
@@ -101,7 +99,7 @@ def create_spectrograms_example(labels_csv, max_files=100):
     processed_count = 0
     for file_info in files_to_process:
         if file_info["audio_path"].exists():
-            success = processor.process_single_file(file_info, config.output_dir)
+            success = dataset_config.process_single_file(file_info, dataset_config.output_dir)
             if success:
                 processed_count += 1
                 if processed_count % 10 == 0:
@@ -110,7 +108,7 @@ def create_spectrograms_example(labels_csv, max_files=100):
             print(f"  ⚠️ Audio file not found: {file_info['audio_path']}")
 
     print(f"✅ Successfully processed {processed_count}/{len(files_to_process)} spectrograms")
-    print(f"   Saved to: {config.output_dir}")
+    print(f"   Saved to: {dataset_config.output_dir}")
 
     return processed_count
 
@@ -142,8 +140,8 @@ def integration_example(class_name):
         )
     else:
         print("\n⚠️ No audio files found. Make sure FSD50K audio is available at:")
-        config = FSD50KConfig()
-        print(f"   {config.audio_root}")
+        dataset_config = FSD50KConfig()
+        print(f"   {dataset_config.audio_root}")
 
 
 def comparison_example():
@@ -151,18 +149,17 @@ def comparison_example():
     print("FSD50K Binary Classification Strategy Comparison")
     print("=" * 60)
 
-    config = FSD50KConfig()
-    processor = FSD50KProcessor(config)
+    dataset_config = FSD50KConfig()
 
     # Example 1: One-vs-all for specific instrument
     print("\n1. One-vs-all: Piano vs everything else")
-    piano_csv = processor.create_binary_labels_one_vs_all(
+    piano_csv = dataset_config.create_binary_labels_one_vs_all(
         positive_class="Piano", output_csv="outputs/fsd50k_piano_onevsall.csv"
     )
 
     # Example 2: Semantic group: All musical instruments
     print("\n2. Semantic group: Musical instruments vs everything else")
-    music_csv = processor.create_binary_labels_semantic_group(
+    music_csv = dataset_config.create_binary_labels_semantic_group(
         group_name="musical_instruments", output_csv="outputs/fsd50k_music_semantic.csv"
     )
 
@@ -176,7 +173,7 @@ def comparison_example():
         "Plucked_string_instrument",
         "Bowed_string_instrument",
     }
-    strings_csv = processor.create_binary_labels_semantic_group(
+    strings_csv = dataset_config.create_binary_labels_semantic_group(
         group_name="string_instruments",
         positive_classes=string_instruments,
         output_csv="outputs/fsd50k_strings_custom.csv",
@@ -242,9 +239,8 @@ def main():
 
     # Handle information commands
     if args.list_classes:
-        config = FSD50KConfig()
-        processor = FSD50KProcessor(config)
-        processor.list_classes()
+        dataset_config = FSD50KConfig()
+        dataset_config.list_classes()
         return None
 
     if args.list_groups:

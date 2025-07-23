@@ -20,20 +20,20 @@ def get_matching_samples(
         List of spectrogram filenames (not full paths)
     """
     config = AudioLoopConfig(dataset=dataset_name)
-    processor = config.get_dataset_processor()
+    dataset_config = config.get_dataset_config()
 
     # Get split parameter (FSD50K uses it, UrbanSound8K ignores it)
     split = kwargs.get("split", "dev")
-    metadata = processor.load_metadata(split=split)
+    metadata = dataset_config.load_metadata(split=split)
 
     # Get positive class ID if we have a class name
     positive_class_id = None
     if class_name is not None:
         try:
-            positive_class_id = processor.config.name_to_id[class_name]
+            positive_class_id = dataset_config.name_to_id[class_name]
         except KeyError:
             raise ValueError(
-                f"Invalid class name: '{class_name}'. Valid names: {list(processor.config.name_to_id.keys())}"
+                f"Invalid class name: '{class_name}'. Valid names: {list(dataset_config.name_to_id.keys())}"
             ) from None
 
     matching_filenames = []
@@ -45,16 +45,16 @@ def get_matching_samples(
         else:
             # positive_class_id is guaranteed to be int when class_name is not None
             assert positive_class_id is not None
-            is_positive = processor.get_binary_label(item, positive_class_id, class_name)
+            is_positive = dataset_config.get_binary_label(item, positive_class_id, class_name)
             match = bool(is_positive)
 
         if invert:
             match = not match
 
         if match:
-            # Use processor's method to get spectrogram filename
-            spec_filename = processor.get_spectrogram_filename(item)
-            matching_filenames.append(spec_filename)
+            # Use config's method to get spectrogram path
+            spec_path = dataset_config.get_spectrogram_path(item["filename"], config.specs_dir)
+            matching_filenames.append(spec_path.name)
 
     return matching_filenames
 
@@ -170,14 +170,14 @@ def list_available_classes(dataset_name: str, **kwargs) -> None:
         **kwargs: Additional dataset-specific parameters
     """
     config = AudioLoopConfig(dataset=dataset_name)
-    processor = config.get_dataset_processor()
+    dataset_config = config.get_dataset_config()
 
     if dataset_name == "urbansound8k":
-        processor.list_classes()
+        dataset_config.list_classes()
     elif dataset_name == "fsd50k":
         from audioloop.datasets.fsd50k import list_semantic_groups
 
-        processor.list_classes()
+        dataset_config.list_classes()
         print("\n")
         list_semantic_groups()
     else:

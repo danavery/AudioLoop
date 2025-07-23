@@ -11,8 +11,8 @@ import torchaudio
 from tqdm import tqdm
 
 from .config import AudioLoopConfig
-from .datasets import UrbanSound8KConfig, UrbanSound8KProcessor
-from .datasets.fsd50k import FSD50KConfig, FSD50KProcessor
+from .datasets import UrbanSound8KConfig
+from .datasets.fsd50k import FSD50KConfig
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -142,45 +142,43 @@ class ProcessingStats:
         return histogram
 
 
-def create_specs(processor, config=None, clear_output=True) -> tuple[int, int]:
+def create_specs(config, dataset_config, clear_output=True) -> tuple[int, int]:
     """
-    Create spectrograms for any dataset using the provided processor.
+    Create spectrograms for any dataset using the provided configurations.
 
     Args:
-        processor: Dataset processor that handles dataset-specific operations
-        config: Dataset configuration. If None, uses processor's config.
+        config: Central AudioLoopConfig for output directory (specs_dir)
+        dataset_config: Dataset configuration that handles dataset-specific operations
         clear_output: Whether to clear existing spectrograms before processing
 
     Returns:
         Tuple of (successful_count, failed_count)
     """
-    if config is None:
-        config = processor.config
 
     # Validate inputs
     # Check for metadata file - different datasets have different attribute names
     metadata_file = None
-    if hasattr(config, "metadata_csv"):
-        metadata_file = config.metadata_csv
-    elif hasattr(config, "dev_csv"):
-        metadata_file = config.dev_csv
+    if hasattr(dataset_config, "metadata_csv"):
+        metadata_file = dataset_config.metadata_csv
+    elif hasattr(dataset_config, "dev_csv"):
+        metadata_file = dataset_config.dev_csv
 
     if metadata_file and not metadata_file.exists():
         raise FileNotFoundError(f"Metadata file not found: {metadata_file}")
 
-    if not config.audio_root.exists():
-        raise FileNotFoundError(f"Audio root directory not found: {config.audio_root}")
+    if not dataset_config.audio_root.exists():
+        raise FileNotFoundError(f"Audio root directory not found: {dataset_config.audio_root}")
 
     # Clear and create output directory
-    if clear_output and config.output_dir.exists():
-        logger.info(f"Clearing existing spectrograms in {config.output_dir}")
-        shutil.rmtree(config.output_dir)
+    if clear_output and config.specs_dir.exists():
+        logger.info(f"Clearing existing spectrograms in {config.specs_dir}")
+        shutil.rmtree(config.specs_dir)
 
-    config.output_dir.mkdir(parents=True, exist_ok=True)
+    config.specs_dir.mkdir(parents=True, exist_ok=True)
 
     # Load metadata
-    logger.info(f"Loading {processor.__class__.__name__} metadata...")
-    audio_files = processor.load_metadata(split="dev")
+    logger.info(f"Loading {dataset_config.__class__.__name__} metadata...")
+    audio_files = dataset_config.load_metadata(split="dev")
     logger.info(f"Found {len(audio_files)} audio files in dataset")
 
     # Process files
@@ -189,7 +187,7 @@ def create_specs(processor, config=None, clear_output=True) -> tuple[int, int]:
     for i, file_info in enumerate(tqdm(audio_files, desc="Creating spectrograms")):
         start_time = time.time()
 
-        success, spec_length = processor.process_single_file(file_info, config.output_dir)
+        success, spec_length = dataset_config.process_single_file(file_info, config.specs_dir)
 
         processing_time = time.time() - start_time
 
@@ -200,8 +198,8 @@ def create_specs(processor, config=None, clear_output=True) -> tuple[int, int]:
             if i == 0:
                 try:
                     waveform, _ = torchaudio.load(file_info["audio_path"])
-                    sample_spec = processor.spec_transform(waveform)
-                    fixed_spec = processor.fix_spectrogram_length(sample_spec)
+                    sample_spec = dataset_config.spec_transform(waveform)
+                    fixed_spec = dataset_config.fix_spectrogram_length(sample_spec)
                     logger.info(f"Sample audio_path: {file_info['audio_path']}")
                     logger.info(f"Sample audio shape: {waveform.shape}")
                     logger.info(f"Sample spectrogram shape (before fixing): {sample_spec.shape}")
@@ -213,28 +211,25 @@ def create_specs(processor, config=None, clear_output=True) -> tuple[int, int]:
 
     # Print summary
     logger.info("\n" + stats.summary())
-    logger.info(f"Output directory: {config.output_dir}")
+    logger.info(f"Output directory: {config.specs_dir}")
 
     return stats.successful, stats.failed
 
 
-def create_inference_csv(processor, config=None) -> Path:
+def create_inference_csv(config, dataset_config) -> Path:
     """
     Create a CSV file listing all dataset files for inference.
     Format: filename,labels (labels as comma-separated string)
 
     Args:
-        processor: Dataset processor that handles dataset-specific operations
-        config: Dataset configuration. If None, uses processor's config.
+        config: Central AudioLoopConfig for output path
+        dataset_config: Dataset configuration that handles dataset-specific operations
 
     Returns:
         Path to created inference CSV
     """
-    if config is None:
-        config = processor.config
-
     # Load metadata
-    audio_files = processor.load_metadata(split="dev")
+    audio_files = dataset_config.load_metadata(split="dev")
 
     # Prepare data for CSV - use labels arrays consistently
     files_data = []
@@ -243,18 +238,21 @@ def create_inference_csv(processor, config=None) -> Path:
             {"filename": file_info["filename"], "labels": ",".join(file_info["labels"])}
         )
 
+    # Get inference CSV path from central config
+    inference_csv_path = config.get_inference_csv_path(config.dataset)
+
     # Ensure output directory exists
-    config.inference_csv.parent.mkdir(parents=True, exist_ok=True)
+    inference_csv_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Write to CSV
-    with config.inference_csv.open("w", newline="") as f:
+    with inference_csv_path.open("w", newline="") as f:
         fieldnames = ["filename", "labels"]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(files_data)
 
-    logger.info(f"Created inference CSV with {len(files_data)} files: {config.inference_csv}")
-    return config.inference_csv
+    logger.info(f"Created inference CSV with {len(files_data)} files: {inference_csv_path}")
+    return inference_csv_path
 
 
 if __name__ == "__main__":
@@ -297,22 +295,20 @@ Examples:
         logger.error(f"Dataset error: {e}")
         exit(1)
 
-    # Set up dataset processor
+    # Set up dataset config (processor functionality now merged into config)
     if dataset_name == "fsd50k":
-        config = FSD50KConfig()
-        processor = FSD50KProcessor(config)
+        dataset_config = FSD50KConfig()
         logger.info("Processing FSD50K dataset")
     else:
-        config = UrbanSound8KConfig()
-        processor = UrbanSound8KProcessor(config)
+        dataset_config = UrbanSound8KConfig()
         logger.info("Processing UrbanSound8K dataset")
 
     # Create spectrograms
-    successful, failed = create_specs(processor, clear_output=not args.no_clear)
+    successful, failed = create_specs(config, dataset_config, clear_output=not args.no_clear)
 
     # Create CSV for inference
     if successful > 0:
-        inference_csv = create_inference_csv(processor)
+        inference_csv = create_inference_csv(config, dataset_config)
         logger.info(f"Ready for inference! Use: {inference_csv}")
     else:
         logger.error("No spectrograms were created successfully")

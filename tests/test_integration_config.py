@@ -93,19 +93,6 @@ class TestDatasetIntegration:
         assert hasattr(dataset_config, "get_audio_path")
         assert hasattr(dataset_config, "get_metadata_entries")
 
-    def test_dataset_processor_integration(self):
-        """Test dataset processor integration with graceful file handling."""
-        config = AudioLoopConfig(dataset="urbansound8k")
-
-        # Should be able to get processor, but might fail due to missing files
-        try:
-            processor = config.get_dataset_processor()
-            assert processor is not None
-            assert hasattr(processor, "load_metadata")
-        except FileNotFoundError:
-            # Expected if dataset files don't exist - test passes
-            pass
-
 
 class TestVersionedWorkflow:
     """Test versioned file workflow integration."""

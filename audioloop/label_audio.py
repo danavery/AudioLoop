@@ -72,12 +72,11 @@ class SimpleAudioLabeler:
             dataset_kwargs["audio_root"] = audio_dir
 
         config = AudioLoopConfig(dataset=self.dataset_name)
-        self.processor = config.get_dataset_processor()
-        self.config = config.get_dataset_config()
+        self.dataset_config = config.get_dataset_config()
 
         # Set default audio directory if not provided
         if audio_dir is None:
-            self.audio_dir = str(self.config.audio_root)
+            self.audio_dir = str(self.dataset_config.audio_root)
         else:
             self.audio_dir = audio_dir
 
