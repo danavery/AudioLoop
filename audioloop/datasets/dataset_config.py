@@ -15,6 +15,7 @@ import torch.nn as nn
 class DatasetConfig(ABC):
     """Common interface for dataset configurations used in active learning."""
 
+    # === Core Dataset Properties ===
     @property
     @abstractmethod
     def dataset_csv(self) -> Path:
@@ -40,6 +41,12 @@ class DatasetConfig(ABC):
         pass
 
     @abstractmethod
+    def list_classes(self) -> None:
+        """Print available classes for this dataset."""
+        pass
+
+    # === Metadata and File Management ===
+    @abstractmethod
     def get_metadata_entries(self) -> list[dict[str, Any]]:
         """Get list of metadata entries for active learning.
 
@@ -64,8 +71,15 @@ class DatasetConfig(ABC):
         pass
 
     @abstractmethod
-    def list_classes(self) -> None:
-        """Print available classes for this dataset."""
+    def parse_metadata_row(self, row: dict[str, str]) -> dict[str, Any]:
+        """Parse a single CSV row into standardized metadata format.
+
+        Args:
+            row: Raw CSV row as dict
+
+        Returns:
+            Standardized metadata dict with consistent keys
+        """
         pass
 
     @abstractmethod
@@ -82,28 +96,6 @@ class DatasetConfig(ABC):
         pass
 
     @abstractmethod
-    def get_audio_processing_params(self) -> dict[str, Any]:
-        """Get audio processing parameters for spectrogram generation.
-
-        Returns:
-            Dict with keys: sample_rate, n_fft, hop_length, n_mels, top_db, fixed_length
-        """
-        pass
-
-    @abstractmethod
-    def is_positive_class(self, class_name: str, positive_class: str | int) -> bool:
-        """Determine if a class matches the positive class for binary classification.
-
-        Args:
-            class_name: Class name from metadata entry
-            positive_class: Target positive class (name or ID)
-
-        Returns:
-            True if this is a positive class, False otherwise
-        """
-        pass
-
-    @abstractmethod
     def get_spectrogram_path(self, filename: str, specs_dir: Path) -> Path:
         """Get path where spectrogram should be stored.
 
@@ -116,6 +108,16 @@ class DatasetConfig(ABC):
         """
         pass
 
+    # === Audio Processing ===
+    @abstractmethod
+    def get_audio_processing_params(self) -> dict[str, Any]:
+        """Get audio processing parameters for spectrogram generation.
+
+        Returns:
+            Dict with keys: sample_rate, n_fft, hop_length, n_mels, top_db, fixed_length
+        """
+        pass
+
     @abstractmethod
     def create_spectrogram_transform(self) -> nn.Sequential:
         """Create PyTorch transform pipeline for generating spectrograms.
@@ -125,15 +127,17 @@ class DatasetConfig(ABC):
         """
         pass
 
+    # === Binary Classification ===
     @abstractmethod
-    def parse_metadata_row(self, row: dict[str, str]) -> dict[str, Any]:
-        """Parse a single CSV row into standardized metadata format.
+    def is_positive_class(self, class_name: str, positive_class: str | int) -> bool:
+        """Determine if a class matches the positive class for binary classification.
 
         Args:
-            row: Raw CSV row as dict
+            class_name: Class name from metadata entry
+            positive_class: Target positive class (name or ID)
 
         Returns:
-            Standardized metadata dict with consistent keys
+            True if this is a positive class, False otherwise
         """
         pass
 

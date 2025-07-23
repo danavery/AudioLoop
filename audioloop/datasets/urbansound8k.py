@@ -121,6 +121,7 @@ class UrbanSound8KConfig(DatasetConfig):
     _audio_root: Path = Path("data/urbansound8k")
     output_dir: Path = Path("data/all_specs")
 
+    # === Core Dataset Properties ===
     @property
     def dataset_csv(self) -> Path:
         """Path to the main dataset CSV file."""
@@ -141,6 +142,16 @@ class UrbanSound8KConfig(DatasetConfig):
         """Get class name to ID mapping."""
         return {name: class_id for class_id, name in self.vocabulary.items()}
 
+    def list_classes(self) -> None:
+        """Print all available UrbanSound8K classes."""
+        print("UrbanSound8K Classes:")
+        print("=" * 30)
+        for class_id in sorted(self.vocabulary.keys()):
+            name = self.vocabulary[class_id]
+            print(f"{class_id}: {name}")
+
+    # === Metadata and File Management ===
+
     def get_metadata_entries(self) -> list[dict[str, Any]]:
         """Get list of metadata entries for active learning."""
         entries = []
@@ -159,55 +170,19 @@ class UrbanSound8KConfig(DatasetConfig):
                     )
         return entries
 
-    def get_audio_path(self, filename: str, fold: int | None = None) -> Path:
-        """Get full path to audio file."""
-        if fold is not None:
-            return self.audio_root / f"fold{fold}" / filename
-        # Try to find the file in any fold (less efficient but works)
-        for fold_num in range(1, 11):
-            path = self.audio_root / f"fold{fold_num}" / filename
-            if path.exists():
-                return path
-        # Return most likely path if not found
-        return self.audio_root / "fold1" / filename
+    def load_metadata(self, split: str = "dev") -> list[dict]:
+        """Load all metadata for the UrbanSound8K dataset."""
+        if not self.metadata_csv.exists():
+            raise FileNotFoundError(f"Metadata CSV not found: {self.metadata_csv}")
 
-    def get_audio_processing_params(self) -> dict[str, Any]:
-        """Get audio processing parameters for spectrogram generation."""
-        return {
-            "sample_rate": self.sample_rate,
-            "n_fft": self.n_fft,
-            "hop_length": self.hop_length,
-            "n_mels": self.n_mels,
-            "top_db": self.top_db,
-            "fixed_length": self.fixed_length,
-        }
+        audio_files = []
+        with self.metadata_csv.open("r") as f:
+            csv_reader = csv.DictReader(f)
+            for row in csv_reader:
+                parsed = self.parse_metadata_row(row)
+                audio_files.append(parsed)
 
-    def is_positive_class(self, class_name: str, positive_class: str | int) -> bool:
-        """Determine if a class matches the positive class for binary classification."""
-        if isinstance(positive_class, str):
-            return class_name == positive_class
-        if isinstance(positive_class, int):
-            return (
-                positive_class in self.vocabulary and self.vocabulary[positive_class] == class_name
-            )
-        return False
-
-    def get_spectrogram_path(self, filename: str, specs_dir: Path) -> Path:
-        """Get path where spectrogram should be stored."""
-        spec_filename = filename.replace(".wav", ".pt")
-        return specs_dir / spec_filename
-
-    def create_spectrogram_transform(self):
-        """Create PyTorch transform pipeline for generating spectrograms."""
-        return nn.Sequential(
-            torchaudio.transforms.MelSpectrogram(
-                sample_rate=self.sample_rate,
-                n_fft=self.n_fft,
-                hop_length=self.hop_length,
-                n_mels=self.n_mels,
-            ),
-            LogNormalize(top_db=self.top_db),
-        )
+        return audio_files
 
     def parse_metadata_row(self, row: dict[str, str]) -> dict[str, Any]:
         """Parse a single CSV row into standardized metadata format."""
@@ -221,11 +196,47 @@ class UrbanSound8KConfig(DatasetConfig):
             "audio_path": self.get_audio_path(row["slice_file_name"], int(row["fold"])),
         }
 
-    def get_binary_label(
-        self, item: dict[str, Any], positive_class_id: int, positive_class_name: str
-    ) -> int:
-        """Get binary label for an item based on positive class criteria."""
-        return 1 if item["class_id"] == positive_class_id else 0
+    def get_audio_path(self, filename: str, fold: int | None = None) -> Path:
+        """Get full path to audio file."""
+        if fold is not None:
+            return self.audio_root / f"fold{fold}" / filename
+        # Try to find the file in any fold (less efficient but works)
+        for fold_num in range(1, 11):
+            path = self.audio_root / f"fold{fold_num}" / filename
+            if path.exists():
+                return path
+        # Return most likely path if not found
+        return self.audio_root / "fold1" / filename
+
+    def get_spectrogram_path(self, filename: str, specs_dir: Path) -> Path:
+        """Get path where spectrogram should be stored."""
+        spec_filename = filename.replace(".wav", ".pt")
+        return specs_dir / spec_filename
+
+    # === Audio Processing ===
+
+    def get_audio_processing_params(self) -> dict[str, Any]:
+        """Get audio processing parameters for spectrogram generation."""
+        return {
+            "sample_rate": self.sample_rate,
+            "n_fft": self.n_fft,
+            "hop_length": self.hop_length,
+            "n_mels": self.n_mels,
+            "top_db": self.top_db,
+            "fixed_length": self.fixed_length,
+        }
+
+    def create_spectrogram_transform(self):
+        """Create PyTorch transform pipeline for generating spectrograms."""
+        return nn.Sequential(
+            torchaudio.transforms.MelSpectrogram(
+                sample_rate=self.sample_rate,
+                n_fft=self.n_fft,
+                hop_length=self.hop_length,
+                n_mels=self.n_mels,
+            ),
+            LogNormalize(top_db=self.top_db),
+        )
 
     def fix_spectrogram_length(self, spec: torch.Tensor) -> torch.Tensor:
         """Fix spectrogram to target length by padding or cropping."""
@@ -282,24 +293,19 @@ class UrbanSound8KConfig(DatasetConfig):
             logger.error(f"Error processing {file_info['filename']}: {e}")
             return False, None
 
-    def load_metadata(self, split: str = "dev") -> list[dict]:
-        """Load all metadata for the UrbanSound8K dataset."""
-        if not self.metadata_csv.exists():
-            raise FileNotFoundError(f"Metadata CSV not found: {self.metadata_csv}")
+    # === Binary Classification ===
+    def is_positive_class(self, class_name: str, positive_class: str | int) -> bool:
+        """Determine if a class matches the positive class for binary classification."""
+        if isinstance(positive_class, str):
+            return class_name == positive_class
+        if isinstance(positive_class, int):
+            return (
+                positive_class in self.vocabulary and self.vocabulary[positive_class] == class_name
+            )
+        return False
 
-        audio_files = []
-        with self.metadata_csv.open("r") as f:
-            csv_reader = csv.DictReader(f)
-            for row in csv_reader:
-                parsed = self.parse_metadata_row(row)
-                audio_files.append(parsed)
-
-        return audio_files
-
-    def list_classes(self) -> None:
-        """Print all available UrbanSound8K classes."""
-        print("UrbanSound8K Classes:")
-        print("=" * 30)
-        for class_id in sorted(self.vocabulary.keys()):
-            name = self.vocabulary[class_id]
-            print(f"{class_id}: {name}")
+    def get_binary_label(
+        self, item: dict[str, Any], positive_class_id: int, positive_class_name: str
+    ) -> int:
+        """Get binary label for an item based on positive class criteria."""
+        return 1 if item["class_id"] == positive_class_id else 0

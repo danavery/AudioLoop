@@ -39,6 +39,7 @@ Environment Variables:
     AUDIOLOOP_SPECS_DIR: Spectrograms subdirectory (default: 'all_specs')
 """
 
+import functools
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -58,23 +59,14 @@ DATASET_CONFIGS: dict[str, type["DatasetConfig"] | None] = {
 }
 
 
-# Track loading state to avoid repeated imports
-_CLASSES_LOADED = False
-
-
+@functools.cache
 def _load_dataset_classes() -> None:
     """Lazy load dataset classes to avoid circular imports."""
-    global _CLASSES_LOADED
-    if _CLASSES_LOADED:
-        return
-
     from .datasets.fsd50k import FSD50KConfig
     from .datasets.urbansound8k import UrbanSound8KConfig
 
     DATASET_CONFIGS["fsd50k"] = FSD50KConfig
     DATASET_CONFIGS["urbansound8k"] = UrbanSound8KConfig
-
-    _CLASSES_LOADED = True
 
 
 @dataclass

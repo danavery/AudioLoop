@@ -177,6 +177,7 @@ class FSD50KConfig(DatasetConfig):
     _name_to_id: dict[str, int] | None = None
     _metadata_entries: list[dict[str, Any]] | None = None
 
+    # === Core Dataset Properties ===
     @property
     def audio_root(self) -> Path:
         """Root directory containing audio files."""
@@ -200,6 +201,16 @@ class FSD50KConfig(DatasetConfig):
         if self._name_to_id is None:
             self._name_to_id = {name: class_id for class_id, name in self.vocabulary.items()}
         return self._name_to_id
+
+    def list_classes(self) -> None:
+        """Print all available FSD50K classes."""
+        print("FSD50K Classes (200 total):")
+        print("=" * 40)
+        for class_id in sorted(self.vocabulary.keys()):
+            name = self.vocabulary[class_id]
+            print(f"{class_id:3d}: {name}")
+
+    # === Metadata and File Management ===
 
     def get_metadata_entries(self) -> list[dict[str, Any]]:
         """Get list of metadata entries for active learning."""
@@ -227,50 +238,21 @@ class FSD50KConfig(DatasetConfig):
         self._metadata_entries = entries
         return self._metadata_entries
 
-    def get_audio_path(self, filename: str, fold: int | None = None) -> Path:
-        """Get full path to audio file."""
-        if filename.endswith(".wav"):
-            return self.audio_root / filename
-        return self.audio_root / f"{filename}.wav"
+    def load_metadata(self, split: str = "dev") -> list[dict]:
+        """Load metadata for specified split."""
+        csv_path = self.dev_csv if split == "dev" else self.eval_csv
 
-    def get_audio_processing_params(self) -> dict[str, Any]:
-        """Get audio processing parameters for spectrogram generation."""
-        return {
-            "sample_rate": self.sample_rate,
-            "n_fft": self.n_fft,
-            "hop_length": self.hop_length,
-            "n_mels": self.n_mels,
-            "top_db": self.top_db,
-            "fixed_length": self.fixed_length,
-        }
+        if not csv_path.exists():
+            raise FileNotFoundError(f"Metadata CSV not found: {csv_path}")
 
-    def is_positive_class(self, class_name: str, positive_class: str | int) -> bool:
-        """Determine if a class matches the positive class for binary classification."""
-        if isinstance(positive_class, str):
-            return class_name == positive_class
-        if isinstance(positive_class, int):
-            return (
-                positive_class in self.name_to_id
-                and self.name_to_id.get(class_name) == positive_class
-            )
-        return False
+        audio_files = []
+        with csv_path.open("r") as f:
+            reader = csv.DictReader(f, delimiter="\t")
+            for row in reader:
+                parsed = self.parse_metadata_row(row)
+                audio_files.append(parsed)
 
-    def get_spectrogram_path(self, filename: str, specs_dir: Path) -> Path:
-        """Get path where spectrogram should be stored."""
-        spec_filename = filename.replace(".wav", "") + ".pt"
-        return specs_dir / spec_filename
-
-    def create_spectrogram_transform(self):
-        """Create PyTorch transform pipeline for generating spectrograms."""
-        return nn.Sequential(
-            torchaudio.transforms.MelSpectrogram(
-                sample_rate=self.sample_rate,
-                n_fft=self.n_fft,
-                hop_length=self.hop_length,
-                n_mels=self.n_mels,
-            ),
-            LogNormalize(top_db=self.top_db),
-        )
+        return audio_files
 
     def parse_metadata_row(self, row: dict[str, str]) -> dict[str, Any]:
         """Parse a single CSV row into standardized metadata format."""
@@ -285,11 +267,41 @@ class FSD50KConfig(DatasetConfig):
             "audio_path": self.get_audio_path(row["fname"]),
         }
 
-    def get_binary_label(
-        self, item: dict[str, Any], positive_class_id: int, positive_class_name: str
-    ) -> int:
-        """Get binary label for an item based on positive class criteria."""
-        return 1 if positive_class_name in item["labels"] else 0
+    def get_audio_path(self, filename: str, fold: int | None = None) -> Path:
+        """Get full path to audio file."""
+        if filename.endswith(".wav"):
+            return self.audio_root / filename
+        return self.audio_root / f"{filename}.wav"
+
+    def get_spectrogram_path(self, filename: str, specs_dir: Path) -> Path:
+        """Get path where spectrogram should be stored."""
+        spec_filename = filename.replace(".wav", "") + ".pt"
+        return specs_dir / spec_filename
+
+    # === Audio Processing ===
+
+    def get_audio_processing_params(self) -> dict[str, Any]:
+        """Get audio processing parameters for spectrogram generation."""
+        return {
+            "sample_rate": self.sample_rate,
+            "n_fft": self.n_fft,
+            "hop_length": self.hop_length,
+            "n_mels": self.n_mels,
+            "top_db": self.top_db,
+            "fixed_length": self.fixed_length,
+        }
+
+    def create_spectrogram_transform(self):
+        """Create PyTorch transform pipeline for generating spectrograms."""
+        return nn.Sequential(
+            torchaudio.transforms.MelSpectrogram(
+                sample_rate=self.sample_rate,
+                n_fft=self.n_fft,
+                hop_length=self.hop_length,
+                n_mels=self.n_mels,
+            ),
+            LogNormalize(top_db=self.top_db),
+        )
 
     def fix_spectrogram_length(self, spec: torch.Tensor) -> torch.Tensor:
         """Fix spectrogram to target length by padding or cropping."""
@@ -346,26 +358,20 @@ class FSD50KConfig(DatasetConfig):
             logger.error(f"Error processing {file_info['filename']}: {e}")
             return False, None
 
-    def load_metadata(self, split: str = "dev") -> list[dict]:
-        """Load metadata for specified split."""
-        csv_path = self.dev_csv if split == "dev" else self.eval_csv
+    # === Binary Classification ===
+    def is_positive_class(self, class_name: str, positive_class: str | int) -> bool:
+        """Determine if a class matches the positive class for binary classification."""
+        if isinstance(positive_class, str):
+            return class_name == positive_class
+        if isinstance(positive_class, int):
+            return (
+                positive_class in self.name_to_id
+                and self.name_to_id.get(class_name) == positive_class
+            )
+        return False
 
-        if not csv_path.exists():
-            raise FileNotFoundError(f"Metadata CSV not found: {csv_path}")
-
-        audio_files = []
-        with csv_path.open("r") as f:
-            reader = csv.DictReader(f, delimiter="\t")
-            for row in reader:
-                parsed = self.parse_metadata_row(row)
-                audio_files.append(parsed)
-
-        return audio_files
-
-    def list_classes(self) -> None:
-        """Print all available FSD50K classes."""
-        print("FSD50K Classes (200 total):")
-        print("=" * 40)
-        for class_id in sorted(self.vocabulary.keys()):
-            name = self.vocabulary[class_id]
-            print(f"{class_id:3d}: {name}")
+    def get_binary_label(
+        self, item: dict[str, Any], positive_class_id: int, positive_class_name: str
+    ) -> int:
+        """Get binary label for an item based on positive class criteria."""
+        return 1 if positive_class_name in item["labels"] else 0
