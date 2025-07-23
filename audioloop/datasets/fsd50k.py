@@ -221,17 +221,17 @@ class FSD50KConfig(DatasetConfig):
         vocabulary = self.vocabulary
 
         with open(self.dev_csv) as f:
-            reader = csv.DictReader(f, delimiter="\t")
+            reader = csv.DictReader(f)
             for row in reader:
                 filename = row["fname"]
-                # Handle multiple labels (comma-separated)
-                label_ids = [int(x) for x in row["labels"].split(",")]
-                for label_id in label_ids:
-                    if label_id in vocabulary:
+                # Handle multiple labels (comma-separated class names)
+                class_names = [x.strip() for x in row["labels"].split(",")]
+                for class_name in class_names:
+                    if class_name in self.name_to_id:
                         entries.append(
                             {
                                 "filename": filename,
-                                "class_name": vocabulary[label_id],
+                                "class_name": class_name,
                                 "fold": None,  # FSD50K doesn't use folds
                             }
                         )
@@ -247,7 +247,7 @@ class FSD50KConfig(DatasetConfig):
 
         audio_files = []
         with csv_path.open("r") as f:
-            reader = csv.DictReader(f, delimiter="\t")
+            reader = csv.DictReader(f)
             for row in reader:
                 parsed = self.parse_metadata_row(row)
                 audio_files.append(parsed)
@@ -261,7 +261,7 @@ class FSD50KConfig(DatasetConfig):
 
         return {
             "filename": row["fname"],
-            "labels": labels,
+            "labels": labels,  # This contains class names, not IDs
             "mids": mids,
             "split": row.get("split", "eval"),  # eval.csv doesn't have split column
             "audio_path": self.get_audio_path(row["fname"]),
@@ -374,4 +374,5 @@ class FSD50KConfig(DatasetConfig):
         self, item: dict[str, Any], positive_class_id: int, positive_class_name: str
     ) -> int:
         """Get binary label for an item based on positive class criteria."""
+        # item["labels"] already contains class names, not IDs
         return 1 if positive_class_name in item["labels"] else 0
