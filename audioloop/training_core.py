@@ -155,6 +155,7 @@ def run_training(
     # Pre-allocate timing list to avoid memory allocation during training
     epoch_times = []
     accuracy = 0.0
+    best_accuracy = None  # Track accuracy of best saved model
     for epoch in range(config.max_epochs):
         epoch_start_time = time.time()
         avg_loss, accuracy = train_epoch(model, train_loader, optimizer, criterion, device)
@@ -175,6 +176,7 @@ def run_training(
         # Update best model state if criterion indicates we should
         if stopping_criterion.should_update_best_model():
             stopping_criterion.update_best_model(model.state_dict().copy())
+            best_accuracy = accuracy  # Track best accuracy separately
             print(f"    💾 Best model updated (epoch {epoch + 1})")
 
         # Stop if criterion says to stop
@@ -183,11 +185,24 @@ def run_training(
             print("=" * 60)
             print(f"🛑 Stopping criterion met ({stopping_criterion.__class__.__name__})")
             print(f"Training completed in {epoch + 1} epochs")
-            print(f"Final accuracy: {accuracy:.4f}")
+
+            # Report best accuracy if available, otherwise final epoch accuracy
+            if best_accuracy is not None:
+                print(f"Final accuracy: {best_accuracy:.4f} (best saved model)")
+            else:
+                print(f"Final accuracy: {accuracy:.4f} (final epoch)")
             print("=" * 60)
             break
     else:
-        print(f"\nTraining completed {config.max_epochs} epochs. Final accuracy: {accuracy:.4f}")
+        # Report best accuracy if available, otherwise final epoch accuracy
+        if best_accuracy is not None:
+            print(
+                f"\nTraining completed {config.max_epochs} epochs. Final accuracy: {best_accuracy:.4f} (best saved model)"
+            )
+        else:
+            print(
+                f"\nTraining completed {config.max_epochs} epochs. Final accuracy: {accuracy:.4f} (final epoch)"
+            )
 
     # Save the best model state if available, otherwise save final model
     # This ensures that when early stopping triggers (e.g., patience exhausted),
@@ -206,9 +221,10 @@ def run_training(
         model.save_model(model_path)
         print(f"📁 Final model saved to: {model_path}")
 
-    # Clean up and return
+    # Clean up and return the best accuracy if available, otherwise final accuracy
     del train_loader
     del model
     torch.cuda.empty_cache() if torch.cuda.is_available() else None
 
-    return accuracy
+    # Return the accuracy of the best saved model, not the final epoch
+    return best_accuracy if best_accuracy is not None else accuracy
