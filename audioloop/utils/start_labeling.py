@@ -175,7 +175,7 @@ def list_available_classes(dataset_name: str, **kwargs) -> None:
     if dataset_name == "urbansound8k":
         dataset_config.list_classes()
     elif dataset_name == "fsd50k":
-        from audioloop.datasets.fsd50k import list_semantic_groups
+        from audioloop.datasets.fsd50k_config import list_semantic_groups
 
         dataset_config.list_classes()
         print("\n")

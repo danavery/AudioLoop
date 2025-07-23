@@ -89,7 +89,7 @@ import torch
 import torch.nn as nn
 from typing import Dict, Any
 
-from .base import AudioLoopModel
+from .audio_loop_model import AudioLoopModel
 
 
 class MyCustomModel(nn.Module, AudioLoopModel):
@@ -206,7 +206,7 @@ import torch.nn as nn
 from transformers import ASTModel, ASTFeatureExtractor
 from typing import Dict, Any
 
-from .base import AudioLoopModel
+from .audio_loop_model import AudioLoopModel
 
 
 class AudioSpectrogramTransformer(nn.Module, AudioLoopModel):

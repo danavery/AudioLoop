@@ -3,10 +3,10 @@ from typing import Any
 import torch
 import torch.nn as nn
 
-from .base import AudioLoopModel
+from .audio_loop_model import AudioLoopModel
 
 
-class SoundCNN(nn.Module, AudioLoopModel):
+class CNN5Layer(nn.Module, AudioLoopModel):
     def __init__(
         self,
         num_classes,
@@ -141,12 +141,12 @@ class SoundCNN(nn.Module, AudioLoopModel):
             "kernel_size": self.kernel_size,
             "use_batchnorm": self.use_batchnorm,
             "batchnorm_threshold": self.batchnorm_threshold,
-            "model_type": "SoundCNN",
+            "model_type": "CNN5Layer",
         }
         torch.save(save_dict, path)
 
     @classmethod
-    def load_model(cls, path: str, device: torch.device) -> "SoundCNN":
+    def load_model(cls, path: str, device: torch.device) -> "CNN5Layer":
         """Load model from disk."""
         checkpoint = torch.load(path, map_location=device)
 
@@ -164,7 +164,7 @@ class SoundCNN(nn.Module, AudioLoopModel):
     def get_model_info(self) -> dict:
         """Get model metadata."""
         return {
-            "model_type": "SoundCNN",
+            "model_type": "CNN5Layer",
             "num_classes": self.num_classes,
             "kernel_size": self.kernel_size,
             "use_batchnorm": self.use_batchnorm,

@@ -12,7 +12,7 @@ from tqdm import tqdm
 
 from .config import AudioLoopConfig
 from .datasets import UrbanSound8KConfig
-from .datasets.fsd50k import FSD50KConfig
+from .datasets.fsd50k_config import FSD50KConfig
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)

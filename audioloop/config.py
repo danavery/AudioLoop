@@ -62,8 +62,8 @@ DATASET_CONFIGS: dict[str, type["DatasetConfig"] | None] = {
 @functools.cache
 def _load_dataset_classes() -> None:
     """Lazy load dataset classes to avoid circular imports."""
-    from .datasets.fsd50k import FSD50KConfig
-    from .datasets.urbansound8k import UrbanSound8KConfig
+    from .datasets.fsd50k_config import FSD50KConfig
+    from .datasets.urbansound8k_config import UrbanSound8KConfig
 
     DATASET_CONFIGS["fsd50k"] = FSD50KConfig
     DATASET_CONFIGS["urbansound8k"] = UrbanSound8KConfig
@@ -84,7 +84,7 @@ class AudioLoopConfig:
     seed: int = 42
     batch_size: int = 32
     learning_rate: float = 0.001
-    model_type: str = "soundcnn"
+    model_type: str = "cnn5layer"
     use_batchnorm: bool | None = None  # None = auto-detect based on dataset size
 
     # Stopping criteria configuration

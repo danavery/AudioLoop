@@ -12,7 +12,7 @@ __all__ = ["main", "run_training", "set_seed", "train_epoch"]
 def get_available_models():
     """Get a list of available model types."""
     model_descriptions = {
-        "soundcnn": "5-layer CNN with adaptive pooling (default)",
+        "cnn5layer": "5-layer CNN with adaptive pooling (default)",
         "simplecnn": "Lightweight 2-layer CNN",
         # Add more descriptions here as models are added
     }
@@ -50,7 +50,7 @@ def main():
     parser.add_argument(
         "--model-type",
         choices=list(MODEL_TYPES.keys()),
-        help="Model type to use (default from config: soundcnn). Use --list-models to see all options",
+        help="Model type to use (default from config: cnn5layer). Use --list-models to see all options",
     )
     parser.add_argument(
         "--list-models", action="store_true", help="List available model types and exit"

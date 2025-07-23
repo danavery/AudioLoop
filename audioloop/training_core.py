@@ -66,7 +66,7 @@ def create_model(model_type: str, num_classes: int, dataset_size: int, **kwargs)
     model_class = MODEL_TYPES[model_type]
 
     # Create model with appropriate parameters based on type
-    if model_type == "soundcnn":
+    if model_type == "cnn5layer":
         return model_class(num_classes=num_classes, kernel_size=(3, 3), dataset_size=dataset_size)
     return model_class(num_classes=num_classes)
 

@@ -46,7 +46,7 @@ Key components:
 
 #### 1. One-vs-All Strategy
 ```python
-from audioloop.datasets.fsd50k import FSD50KConfig, FSD50KProcessor
+from audioloop.datasets.fsd50k_config import FSD50KConfig, FSD50KProcessor
 
 config = FSD50KConfig()
 processor = FSD50KProcessor(config)
@@ -92,10 +92,10 @@ The module includes 5 predefined semantic groups:
 ### Basic Usage
 ```bash
 # List all FSD50K classes
-python -c "from audioloop.datasets.fsd50k import list_classes; list_classes()"
+python -c "from audioloop.datasets.fsd50k_config import list_classes; list_classes()"
 
 # List semantic groups
-python -c "from audioloop.datasets.fsd50k import list_semantic_groups; list_semantic_groups()"
+python -c "from audioloop.datasets.fsd50k_config import list_semantic_groups; list_semantic_groups()"
 
 # Create binary labels for piano detection
 python fsd50k_example.py --class Piano --output outputs/piano_labels.csv

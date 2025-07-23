@@ -28,7 +28,7 @@ Usage examples:
 
 import argparse
 
-from audioloop.datasets.fsd50k import (
+from audioloop.datasets.fsd50k_config import (
     FSD50KConfig,
     list_semantic_groups,
 )

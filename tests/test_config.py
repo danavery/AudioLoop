@@ -154,7 +154,7 @@ class TestTrainingParameters:
         assert config.seed == 42
         assert config.batch_size == 32
         assert config.learning_rate == 0.001
-        assert config.model_type == "soundcnn"
+        assert config.model_type == "cnn5layer"
         assert config.use_batchnorm is None  # Auto-detect
         assert config.stopping_criterion_type == "plateau"
         assert config.patience == 20

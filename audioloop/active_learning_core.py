@@ -36,8 +36,8 @@ def load_model(model_path, num_classes, device):
     # Load checkpoint to detect model type
     checkpoint = torch.load(model_path, map_location=device)
     model_type = checkpoint.get(
-        "model_type", "SoundCNN"
-    )  # Default to SoundCNN for backward compatibility
+        "model_type", "CNN5Layer"
+    )  # Default to CNN5Layer for backward compatibility
 
     # Use centralized model registry
     if model_type not in MODEL_REGISTRY:

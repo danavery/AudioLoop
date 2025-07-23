@@ -10,8 +10,8 @@ from unittest.mock import mock_open, patch
 import pytest
 
 from audioloop.datasets.dataset_config import DatasetConfig
-from audioloop.datasets.fsd50k import FSD50KConfig
-from audioloop.datasets.urbansound8k import UrbanSound8KConfig
+from audioloop.datasets.fsd50k_config import FSD50KConfig
+from audioloop.datasets.urbansound8k_config import UrbanSound8KConfig
 
 
 class TestDatasetConfigInterface:
@@ -149,11 +149,14 @@ class TestMetadataHandling:
         with patch("builtins.open", mock_open(read_data="")):
             # Mock vocabulary loading
             if config_class == FSD50KConfig:
-                with patch("audioloop.datasets.fsd50k.load_fsd50k_vocabulary", return_value={}):
+                with patch(
+                    "audioloop.datasets.fsd50k_config.load_fsd50k_vocabulary", return_value={}
+                ):
                     entries = config.load_metadata()
             else:
                 with patch(
-                    "audioloop.datasets.urbansound8k.load_urbansound8k_vocabulary", return_value={}
+                    "audioloop.datasets.urbansound8k_config.load_urbansound8k_vocabulary",
+                    return_value={},
                 ):
                     entries = config.load_metadata()
 

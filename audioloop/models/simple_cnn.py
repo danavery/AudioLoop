@@ -3,7 +3,7 @@ from typing import Any
 import torch
 import torch.nn as nn
 
-from .base import AudioLoopModel
+from .audio_loop_model import AudioLoopModel
 
 
 class SimpleCNN(nn.Module, AudioLoopModel):
@@ -11,7 +11,7 @@ class SimpleCNN(nn.Module, AudioLoopModel):
 
     A simple 2-layer CNN with global average pooling, designed for
     binary classification of audio spectrograms. Much lighter than
-    the 5-layer SoundCNN while maintaining good performance.
+    the 5-layer CNN5Layer while maintaining good performance.
     """
 
     def __init__(self, num_classes=2, **kwargs):

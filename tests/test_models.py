@@ -7,7 +7,7 @@ from typing import Any
 import pytest
 import torch
 
-from audioloop.models import AudioLoopModel, SimpleCNN, SoundCNN
+from audioloop.models import AudioLoopModel, CNN5Layer, SimpleCNN
 
 
 class TestAudioLoopModel:
@@ -61,12 +61,12 @@ class TestAudioLoopModel:
         assert isinstance(model, torch.nn.Module)
 
 
-class TestSoundCNN:
-    """Test the SoundCNN model implementation."""
+class TestCNN5Layer:
+    """Test the CNN5Layer model implementation."""
 
     def test_basic_initialization(self):
-        """Test basic SoundCNN initialization."""
-        model = SoundCNN(num_classes=2)
+        """Test basic CNN5Layer initialization."""
+        model = CNN5Layer(num_classes=2)
 
         assert model.num_classes == 2
         assert model.kernel_size == (3, 3)
@@ -77,7 +77,7 @@ class TestSoundCNN:
 
     def test_batchnorm_decision_large_dataset(self):
         """Test BatchNorm decision for large datasets."""
-        model = SoundCNN(num_classes=2, dataset_size=150)
+        model = CNN5Layer(num_classes=2, dataset_size=150)
 
         assert model.use_batchnorm is True
         assert hasattr(model, "bn1")
@@ -85,7 +85,7 @@ class TestSoundCNN:
 
     def test_batchnorm_decision_small_dataset(self):
         """Test BatchNorm decision for small datasets."""
-        model = SoundCNN(num_classes=2, dataset_size=50)
+        model = CNN5Layer(num_classes=2, dataset_size=50)
 
         assert model.use_batchnorm is False
         assert not hasattr(model, "bn1")
@@ -94,16 +94,16 @@ class TestSoundCNN:
 
     def test_batchnorm_decision_at_threshold(self):
         """Test BatchNorm decision exactly at threshold."""
-        model = SoundCNN(num_classes=2, dataset_size=100)
+        model = CNN5Layer(num_classes=2, dataset_size=100)
 
         assert model.use_batchnorm is True
 
-        model_below = SoundCNN(num_classes=2, dataset_size=99)
+        model_below = CNN5Layer(num_classes=2, dataset_size=99)
         assert model_below.use_batchnorm is False
 
     def test_custom_batchnorm_threshold(self):
         """Test custom BatchNorm threshold."""
-        model = SoundCNN(num_classes=2, dataset_size=50, batchnorm_threshold=40)
+        model = CNN5Layer(num_classes=2, dataset_size=50, batchnorm_threshold=40)
 
         assert model.use_batchnorm is True
         assert model.batchnorm_threshold == 40
@@ -111,22 +111,22 @@ class TestSoundCNN:
     def test_custom_threshold_extreme_values(self):
         """Test extreme threshold values."""
         # Always use BatchNorm
-        model_always = SoundCNN(num_classes=2, dataset_size=1, batchnorm_threshold=0)
+        model_always = CNN5Layer(num_classes=2, dataset_size=1, batchnorm_threshold=0)
         assert model_always.use_batchnorm is True
 
         # Never use BatchNorm
-        model_never = SoundCNN(num_classes=2, dataset_size=1000, batchnorm_threshold=float("inf"))
+        model_never = CNN5Layer(num_classes=2, dataset_size=1000, batchnorm_threshold=float("inf"))
         assert model_never.use_batchnorm is False
 
     def test_no_dataset_size_defaults_to_batchnorm(self):
         """Test that missing dataset_size defaults to using BatchNorm."""
-        model = SoundCNN(num_classes=2)
+        model = CNN5Layer(num_classes=2)
 
         assert model.use_batchnorm is True
 
     def test_custom_parameters(self):
         """Test custom kernel size and other parameters."""
-        model = SoundCNN(
+        model = CNN5Layer(
             num_classes=5, kernel_size=(5, 5), dataset_size=200, batchnorm_threshold=150
         )
 
@@ -137,7 +137,7 @@ class TestSoundCNN:
 
     def test_forward_pass_with_batchnorm(self):
         """Test forward pass with BatchNorm enabled."""
-        model = SoundCNN(num_classes=2, dataset_size=150)
+        model = CNN5Layer(num_classes=2, dataset_size=150)
 
         # Create a sample input (batch=1, channels=1, height=128, width=128)
         x = torch.randn(1, 1, 128, 128)
@@ -149,7 +149,7 @@ class TestSoundCNN:
 
     def test_forward_pass_without_batchnorm(self):
         """Test forward pass without BatchNorm."""
-        model = SoundCNN(num_classes=2, dataset_size=50)
+        model = CNN5Layer(num_classes=2, dataset_size=50)
 
         # Create a sample input
         x = torch.randn(1, 1, 128, 128)
@@ -161,11 +161,11 @@ class TestSoundCNN:
 
     def test_model_info(self):
         """Test get_model_info method."""
-        model = SoundCNN(num_classes=3, dataset_size=75, batchnorm_threshold=80)
+        model = CNN5Layer(num_classes=3, dataset_size=75, batchnorm_threshold=80)
 
         info = model.get_model_info()
 
-        assert info["model_type"] == "SoundCNN"
+        assert info["model_type"] == "CNN5Layer"
         assert info["num_classes"] == 3
         assert info["kernel_size"] == (3, 3)
         assert info["use_batchnorm"] is False  # 75 < 80
@@ -175,8 +175,8 @@ class TestSoundCNN:
 
     def test_parameter_count_difference(self):
         """Test that BatchNorm affects parameter count."""
-        model_with_bn = SoundCNN(num_classes=2, dataset_size=150)
-        model_without_bn = SoundCNN(num_classes=2, dataset_size=50)
+        model_with_bn = CNN5Layer(num_classes=2, dataset_size=150)
+        model_without_bn = CNN5Layer(num_classes=2, dataset_size=50)
 
         params_with_bn = model_with_bn.get_model_info()["num_parameters"]
         params_without_bn = model_without_bn.get_model_info()["num_parameters"]
@@ -185,7 +185,7 @@ class TestSoundCNN:
 
     def test_save_model(self):
         """Test model saving functionality."""
-        model = SoundCNN(num_classes=2, dataset_size=50, batchnorm_threshold=75)
+        model = CNN5Layer(num_classes=2, dataset_size=50, batchnorm_threshold=75)
 
         with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
             temp_path = f.name
@@ -198,7 +198,7 @@ class TestSoundCNN:
 
             # Verify file contains expected data
             checkpoint = torch.load(temp_path, map_location="cpu")
-            assert checkpoint["model_type"] == "SoundCNN"
+            assert checkpoint["model_type"] == "CNN5Layer"
             assert checkpoint["num_classes"] == 2
             assert checkpoint["kernel_size"] == (3, 3)
             assert checkpoint["use_batchnorm"] is False
@@ -210,7 +210,7 @@ class TestSoundCNN:
 
     def test_load_model(self):
         """Test model loading functionality."""
-        original_model = SoundCNN(num_classes=3, dataset_size=25, batchnorm_threshold=50)
+        original_model = CNN5Layer(num_classes=3, dataset_size=25, batchnorm_threshold=50)
 
         with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
             temp_path = f.name
@@ -221,7 +221,7 @@ class TestSoundCNN:
 
             # Load it back
             device = torch.device("cpu")
-            loaded_model = SoundCNN.load_model(temp_path, device)
+            loaded_model = CNN5Layer.load_model(temp_path, device)
 
             # Verify loaded model has same properties
             assert loaded_model.num_classes == original_model.num_classes
@@ -241,7 +241,7 @@ class TestSoundCNN:
         """Test that loading preserves the original BatchNorm decision."""
         # Create a model where dataset_size < threshold but we want to load
         # the exact same architecture that was saved
-        model = SoundCNN(num_classes=2, dataset_size=50, batchnorm_threshold=75)
+        model = CNN5Layer(num_classes=2, dataset_size=50, batchnorm_threshold=75)
         assert model.use_batchnorm is False
 
         with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
@@ -252,7 +252,7 @@ class TestSoundCNN:
 
             # Load model - should preserve the original BatchNorm decision
             device = torch.device("cpu")
-            loaded_model = SoundCNN.load_model(temp_path, device)
+            loaded_model = CNN5Layer.load_model(temp_path, device)
 
             # Should preserve the original decision, not recalculate
             assert loaded_model.use_batchnorm is False
@@ -264,7 +264,7 @@ class TestSoundCNN:
     def test_load_model_backward_compatibility(self):
         """Test loading models saved without batchnorm_threshold."""
         # Simulate an old saved model format
-        model = SoundCNN(num_classes=2, dataset_size=150)
+        model = CNN5Layer(num_classes=2, dataset_size=150)
 
         # Create a checkpoint without batchnorm_threshold
         checkpoint = {
@@ -272,7 +272,7 @@ class TestSoundCNN:
             "num_classes": 2,
             "kernel_size": (3, 3),
             "use_batchnorm": True,
-            "model_type": "SoundCNN",
+            "model_type": "CNN5Layer",
             # Note: no batchnorm_threshold
         }
 
@@ -284,7 +284,7 @@ class TestSoundCNN:
 
             # Should load successfully with default threshold
             device = torch.device("cpu")
-            loaded_model = SoundCNN.load_model(temp_path, device)
+            loaded_model = CNN5Layer.load_model(temp_path, device)
 
             assert loaded_model.batchnorm_threshold == 100  # Default value
             assert loaded_model.use_batchnorm is True
@@ -294,7 +294,7 @@ class TestSoundCNN:
 
     def test_model_training_mode_switching(self):
         """Test that model can switch between train and eval modes."""
-        model = SoundCNN(num_classes=2, dataset_size=150)
+        model = CNN5Layer(num_classes=2, dataset_size=150)
 
         # Test train mode
         model.train()
@@ -306,7 +306,7 @@ class TestSoundCNN:
 
     def test_model_device_movement(self):
         """Test moving model between devices."""
-        model = SoundCNN(num_classes=2, dataset_size=150)
+        model = CNN5Layer(num_classes=2, dataset_size=150)
 
         # Move to CPU (should work regardless of CUDA availability)
         model.to(torch.device("cpu"))
@@ -320,20 +320,20 @@ class TestSoundCNN:
     def test_private_use_batchnorm_parameter(self):
         """Test the private _use_batchnorm parameter for loading."""
         # This parameter should override the automatic decision
-        model = SoundCNN(num_classes=2, dataset_size=50, _use_batchnorm=True)
+        model = CNN5Layer(num_classes=2, dataset_size=50, _use_batchnorm=True)
 
         # Even though dataset_size=50 < 100, _use_batchnorm=True should override
         assert model.use_batchnorm is True
 
-        model2 = SoundCNN(num_classes=2, dataset_size=150, _use_batchnorm=False)
+        model2 = CNN5Layer(num_classes=2, dataset_size=150, _use_batchnorm=False)
 
         # Even though dataset_size=150 >= 100, _use_batchnorm=False should override
         assert model2.use_batchnorm is False
 
     def test_multiple_model_instances(self):
         """Test that multiple model instances don't interfere with each other."""
-        model1 = SoundCNN(num_classes=2, dataset_size=50)
-        model2 = SoundCNN(num_classes=3, dataset_size=150)
+        model1 = CNN5Layer(num_classes=2, dataset_size=50)
+        model2 = CNN5Layer(num_classes=3, dataset_size=150)
 
         assert model1.use_batchnorm is False
         assert model2.use_batchnorm is True
@@ -439,10 +439,10 @@ class TestSimpleCNN:
         finally:
             Path(temp_path).unlink(missing_ok=True)
 
-    def test_simplecnn_vs_soundcnn_parameters(self):
-        """Test that SimpleCNN has fewer parameters than SoundCNN."""
+    def test_simplecnn_vs_cnn5layer_parameters(self):
+        """Test that SimpleCNN has fewer parameters than CNN5Layer."""
         simple_model = SimpleCNN(num_classes=2)
-        sound_model = SoundCNN(num_classes=2, dataset_size=150)
+        sound_model = CNN5Layer(num_classes=2, dataset_size=150)
 
         simple_params = simple_model.get_model_info()["num_parameters"]
         sound_params = sound_model.get_model_info()["num_parameters"]
