@@ -39,7 +39,6 @@ Environment Variables:
     AUDIOLOOP_SPECS_DIR: Spectrograms subdirectory (default: 'all_specs')
 """
 
-import functools
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -52,21 +51,7 @@ from .utils.paths import (
     get_training_sets_dir,
 )
 
-# Registry with better typing - avoid runtime import of DatasetConfig
-DATASET_CONFIGS: dict[str, type["DatasetConfig"] | None] = {
-    "urbansound8k": None,  # Lazy loaded
-    "fsd50k": None,  # Lazy loaded
-}
-
-
-@functools.cache
-def _load_dataset_classes() -> None:
-    """Lazy load dataset classes to avoid circular imports."""
-    from .datasets.fsd50k_config import FSD50KConfig
-    from .datasets.urbansound8k_config import UrbanSound8KConfig
-
-    DATASET_CONFIGS["fsd50k"] = FSD50KConfig
-    DATASET_CONFIGS["urbansound8k"] = UrbanSound8KConfig
+# Dynamic dataset discovery - no hardcoded registry needed
 
 
 @dataclass
@@ -108,7 +93,6 @@ class AudioLoopConfig:
 
     def __post_init__(self):
         """Post-initialization validation and setup."""
-        _load_dataset_classes()
         self._validate_dataset()
         self._validate_training_params()
         self._validate_active_learning_params()
@@ -116,9 +100,12 @@ class AudioLoopConfig:
 
     def _validate_dataset(self):
         """Validate that the dataset is supported."""
-        if self.dataset not in DATASET_CONFIGS:
+        from .datasets.registry import list_available_datasets
+        
+        available = list_available_datasets()
+        if self.dataset not in available:
             raise ValueError(
-                f"Unknown dataset: {self.dataset}. Supported: {list(DATASET_CONFIGS.keys())}"
+                f"Unknown dataset: {self.dataset}. Supported: {', '.join(sorted(available))}"
             )
 
     def _validate_training_params(self):
@@ -199,16 +186,9 @@ class AudioLoopConfig:
 
     def get_dataset_config(self) -> DatasetConfig:
         """Get the dataset configuration for the current dataset."""
-        _load_dataset_classes()
-
-        config_class = DATASET_CONFIGS.get(self.dataset)
-        if config_class is None:
-            raise ValueError(
-                f"Dataset config not available for '{self.dataset}'. "
-                f"Supported datasets: {list(DATASET_CONFIGS.keys())}. "
-                f"This may indicate a loading error or unsupported dataset."
-            )
-
+        from .datasets.registry import get_dataset_config_class
+        
+        config_class = get_dataset_config_class(self.dataset)
         return config_class()
 
     def create_directories(self) -> None:
