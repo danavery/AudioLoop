@@ -273,7 +273,7 @@ Examples:
     )
 
     # Dynamic dataset discovery
-    from audioloop.datasets.registry import list_available_datasets
+    from audioloop.datasets.dataset_registry import list_available_datasets
     available_datasets = list_available_datasets()
     
     parser.add_argument(

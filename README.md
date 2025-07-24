@@ -273,6 +273,31 @@ filename,predicted_is_positive,confidence,needs_human_label,prediction,entropy,p
 - **Diversity Sampling**: Ensures feature space coverage
 - **Hybrid Approaches**: Combine multiple strategies
 
+## Extensibility
+
+AudioLoop is designed to be easily extensible with custom datasets and models:
+
+### Adding Custom Datasets
+```bash
+# Copy template to create your dataset
+cp audioloop/datasets/templates/simple_audio_template.py audioloop/datasets/my_dataset_config.py
+
+# Edit the file and use immediately
+python -m audioloop.utils.start_labeling --dataset my_dataset --list-classes
+```
+
+### Adding Custom Models
+```python
+# Create audioloop/models/my_model.py
+class MyModel(AudioLoopModel):
+    # Implement required methods
+    
+# Use immediately
+python -m audioloop.train training_set.csv --model-type my_model
+```
+
+Both systems use dynamic discovery - no registration required, just drop files in place and they're automatically available throughout AudioLoop.
+
 ## Dependencies
 
 - **PyTorch**: Neural network training and inference

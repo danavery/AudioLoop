@@ -6,7 +6,7 @@ import torch.nn as nn
 from .audio_loop_model import AudioLoopModel
 
 
-class SimpleCNN(nn.Module, AudioLoopModel):
+class SimpleCnn(AudioLoopModel):
     """Lightweight CNN for audio classification.
 
     A simple 2-layer CNN with global average pooling, designed for
@@ -55,12 +55,12 @@ class SimpleCNN(nn.Module, AudioLoopModel):
         save_dict = {
             "model_state_dict": self.state_dict(),
             "num_classes": self.num_classes,
-            "model_type": "SimpleCNN",
+            "model_type": "simplecnn",
         }
         torch.save(save_dict, path)
 
     @classmethod
-    def load_model(cls, path: str, device: torch.device) -> "SimpleCNN":
+    def load_model(cls, path: str, device: torch.device) -> "SimpleCnn":
         """Load model from disk."""
         checkpoint = torch.load(path, map_location=device)
 
@@ -72,7 +72,7 @@ class SimpleCNN(nn.Module, AudioLoopModel):
     def get_model_info(self) -> dict:
         """Get model metadata."""
         return {
-            "model_type": "SimpleCNN",
+            "model_type": "simplecnn",
             "num_classes": self.num_classes,
             "num_parameters": sum(p.numel() for p in self.parameters()),
         }

@@ -2,7 +2,7 @@ import argparse
 import re
 
 from .config import AudioLoopConfig
-from .models import MODEL_TYPES
+from .models.model_registry import list_available_models
 from .training_core import run_training, set_seed, train_epoch
 
 # Re-export for backward compatibility
@@ -16,8 +16,9 @@ def get_available_models():
         "simplecnn": "Lightweight 2-layer CNN",
         # Add more descriptions here as models are added
     }
-    # Return descriptions for all models in registry
-    return {k: model_descriptions.get(k, f"{k} model") for k in MODEL_TYPES}
+    # Return descriptions for all models discovered dynamically
+    available_models = list_available_models()
+    return {k: model_descriptions.get(k, f"{k} model") for k in available_models}
 
 
 def list_models():
@@ -49,7 +50,7 @@ def main():
     parser.add_argument("-b", "--batch-size", type=int, help="Batch size (default from config: 32)")
     parser.add_argument(
         "--model-type",
-        choices=list(MODEL_TYPES.keys()),
+        choices=list_available_models(),
         help="Model type to use (default from config: cnn5layer). Use --list-models to see all options",
     )
     parser.add_argument(

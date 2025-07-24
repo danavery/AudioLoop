@@ -7,7 +7,9 @@ from typing import Any
 import pytest
 import torch
 
-from audioloop.models import AudioLoopModel, CNN5Layer, SimpleCNN
+from audioloop.models import AudioLoopModel
+from audioloop.models.cnn5layer import CNN5Layer
+from audioloop.models.simplecnn import SimpleCnn
 
 
 class TestAudioLoopModel:
@@ -30,7 +32,7 @@ class TestAudioLoopModel:
     def test_complete_subclass_can_be_instantiated(self):
         """Test that complete subclasses can be instantiated."""
 
-        class CompleteModel(torch.nn.Module, AudioLoopModel):
+        class CompleteModel(AudioLoopModel):
             def __init__(self):
                 super().__init__()
                 self.linear = torch.nn.Linear(10, 1)
@@ -165,7 +167,7 @@ class TestCNN5Layer:
 
         info = model.get_model_info()
 
-        assert info["model_type"] == "CNN5Layer"
+        assert info["model_type"] == "cnn5layer"
         assert info["num_classes"] == 3
         assert info["kernel_size"] == (3, 3)
         assert info["use_batchnorm"] is False  # 75 < 80
@@ -198,7 +200,7 @@ class TestCNN5Layer:
 
             # Verify file contains expected data
             checkpoint = torch.load(temp_path, map_location="cpu")
-            assert checkpoint["model_type"] == "CNN5Layer"
+            assert checkpoint["model_type"] == "cnn5layer"
             assert checkpoint["num_classes"] == 2
             assert checkpoint["kernel_size"] == (3, 3)
             assert checkpoint["use_batchnorm"] is False
@@ -272,7 +274,7 @@ class TestCNN5Layer:
             "num_classes": 2,
             "kernel_size": (3, 3),
             "use_batchnorm": True,
-            "model_type": "CNN5Layer",
+            "model_type": "cnn5layer",
             # Note: no batchnorm_threshold
         }
 
@@ -351,26 +353,26 @@ class TestCNN5Layer:
         assert not torch.equal(output1[:, :2], output2[:, :2])  # Should be different
 
 
-class TestSimpleCNN:
-    """Test the SimpleCNN model implementation."""
+class TestSimpleCnn:
+    """Test the SimpleCnn model implementation."""
 
     def test_basic_initialization(self):
-        """Test basic SimpleCNN initialization."""
-        model = SimpleCNN()
+        """Test basic SimpleCnn initialization."""
+        model = SimpleCnn()
 
         assert model.num_classes == 2
         assert isinstance(model, AudioLoopModel)
         assert isinstance(model, torch.nn.Module)
 
     def test_custom_num_classes(self):
-        """Test SimpleCNN with custom number of classes."""
-        model = SimpleCNN(num_classes=5)
+        """Test SimpleCnn with custom number of classes."""
+        model = SimpleCnn(num_classes=5)
 
         assert model.num_classes == 5
 
     def test_forward_pass(self):
-        """Test SimpleCNN forward pass."""
-        model = SimpleCNN(num_classes=3)
+        """Test SimpleCnn forward pass."""
+        model = SimpleCnn(num_classes=3)
 
         # Create a sample input (batch=2, channels=1, height=64, width=64)
         x = torch.randn(2, 1, 64, 64)
@@ -382,18 +384,18 @@ class TestSimpleCNN:
 
     def test_model_info(self):
         """Test get_model_info method."""
-        model = SimpleCNN(num_classes=4)
+        model = SimpleCnn(num_classes=4)
 
         info = model.get_model_info()
 
-        assert info["model_type"] == "SimpleCNN"
+        assert info["model_type"] == "simplecnn"
         assert info["num_classes"] == 4
         assert "num_parameters" in info
         assert info["num_parameters"] > 0
 
     def test_save_model(self):
-        """Test SimpleCNN saving functionality."""
-        model = SimpleCNN(num_classes=3)
+        """Test SimpleCnn saving functionality."""
+        model = SimpleCnn(num_classes=3)
 
         with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
             temp_path = f.name
@@ -406,7 +408,7 @@ class TestSimpleCNN:
 
             # Verify file contains expected data
             checkpoint = torch.load(temp_path, map_location="cpu")
-            assert checkpoint["model_type"] == "SimpleCNN"
+            assert checkpoint["model_type"] == "simplecnn"
             assert checkpoint["num_classes"] == 3
             assert "model_state_dict" in checkpoint
 
@@ -414,8 +416,8 @@ class TestSimpleCNN:
             Path(temp_path).unlink(missing_ok=True)
 
     def test_load_model(self):
-        """Test SimpleCNN loading functionality."""
-        original_model = SimpleCNN(num_classes=5)
+        """Test SimpleCnn loading functionality."""
+        original_model = SimpleCnn(num_classes=5)
 
         with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
             temp_path = f.name
@@ -426,7 +428,7 @@ class TestSimpleCNN:
 
             # Load it back
             device = torch.device("cpu")
-            loaded_model = SimpleCNN.load_model(temp_path, device)
+            loaded_model = SimpleCnn.load_model(temp_path, device)
 
             # Verify loaded model has same properties
             assert loaded_model.num_classes == original_model.num_classes
@@ -440,8 +442,8 @@ class TestSimpleCNN:
             Path(temp_path).unlink(missing_ok=True)
 
     def test_simplecnn_vs_cnn5layer_parameters(self):
-        """Test that SimpleCNN has fewer parameters than CNN5Layer."""
-        simple_model = SimpleCNN(num_classes=2)
+        """Test that SimpleCnn has fewer parameters than CNN5Layer."""
+        simple_model = SimpleCnn(num_classes=2)
         sound_model = CNN5Layer(num_classes=2, dataset_size=150)
 
         simple_params = simple_model.get_model_info()["num_parameters"]
@@ -450,8 +452,8 @@ class TestSimpleCNN:
         assert simple_params < sound_params
 
     def test_model_training_mode_switching(self):
-        """Test that SimpleCNN can switch between train and eval modes."""
-        model = SimpleCNN(num_classes=2)
+        """Test that SimpleCnn can switch between train and eval modes."""
+        model = SimpleCnn(num_classes=2)
 
         # Test train mode
         model.train()

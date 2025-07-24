@@ -6,7 +6,7 @@ import torch.nn as nn
 from .audio_loop_model import AudioLoopModel
 
 
-class CNN5Layer(nn.Module, AudioLoopModel):
+class CNN5Layer(AudioLoopModel):
     def __init__(
         self,
         num_classes,
@@ -141,7 +141,7 @@ class CNN5Layer(nn.Module, AudioLoopModel):
             "kernel_size": self.kernel_size,
             "use_batchnorm": self.use_batchnorm,
             "batchnorm_threshold": self.batchnorm_threshold,
-            "model_type": "CNN5Layer",
+            "model_type": "cnn5layer",
         }
         torch.save(save_dict, path)
 
@@ -164,7 +164,7 @@ class CNN5Layer(nn.Module, AudioLoopModel):
     def get_model_info(self) -> dict:
         """Get model metadata."""
         return {
-            "model_type": "CNN5Layer",
+            "model_type": "cnn5layer",
             "num_classes": self.num_classes,
             "kernel_size": self.kernel_size,
             "use_batchnorm": self.use_batchnorm,

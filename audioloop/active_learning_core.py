@@ -6,7 +6,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from .models import MODEL_REGISTRY
+from .models.model_registry import get_model_class, list_available_models
 from .utils.candidate_selection import (
     load_predictions,
     print_selection_statistics,
@@ -35,17 +35,16 @@ def load_model(model_path, num_classes, device):
     """Load a trained model from disk, detecting model type automatically."""
     # Load checkpoint to detect model type
     checkpoint = torch.load(model_path, map_location=device)
-    model_type = checkpoint.get(
-        "model_type", "CNN5Layer"
-    )  # Default to CNN5Layer for backward compatibility
+    model_type = checkpoint.get("model_type", "cnn5layer")  # Default to cnn5layer
 
-    # Use centralized model registry
-    if model_type not in MODEL_REGISTRY:
+    # Use dynamic model discovery
+    try:
+        model_class = get_model_class(model_type)
+    except ValueError:
+        available = list_available_models()
         raise ValueError(
-            f"Unknown model type: {model_type}. Available: {list(MODEL_REGISTRY.keys())}"
-        )
-
-    model_class = MODEL_REGISTRY[model_type]
+            f"Unknown model type: {model_type}. Available: {', '.join(sorted(available))}"
+        ) from None
     model = model_class.load_model(model_path, device)
     model.eval()
     return model

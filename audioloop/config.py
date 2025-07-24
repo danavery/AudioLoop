@@ -42,6 +42,7 @@ Environment Variables:
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from .datasets.dataset_config import DatasetConfig
 from .utils.paths import (
@@ -70,6 +71,7 @@ class AudioLoopConfig:
     batch_size: int = 32
     learning_rate: float = 0.001
     model_type: str = "cnn5layer"
+    model_kwargs: dict[str, Any] = field(default_factory=dict)
     use_batchnorm: bool | None = None  # None = auto-detect based on dataset size
 
     # Stopping criteria configuration
@@ -100,7 +102,7 @@ class AudioLoopConfig:
 
     def _validate_dataset(self):
         """Validate that the dataset is supported."""
-        from .datasets.registry import list_available_datasets
+        from .datasets.dataset_registry import list_available_datasets
         
         available = list_available_datasets()
         if self.dataset not in available:
@@ -186,7 +188,7 @@ class AudioLoopConfig:
 
     def get_dataset_config(self) -> DatasetConfig:
         """Get the dataset configuration for the current dataset."""
-        from .datasets.registry import get_dataset_config_class
+        from .datasets.dataset_registry import get_dataset_config_class
         
         config_class = get_dataset_config_class(self.dataset)
         return config_class()

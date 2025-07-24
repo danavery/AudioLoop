@@ -4,9 +4,10 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 import torch
+import torch.nn as nn
 
 
-class AudioLoopModel(ABC):
+class AudioLoopModel(nn.Module, ABC):
     """Abstract base class for all AudioLoop models."""
 
     @abstractmethod

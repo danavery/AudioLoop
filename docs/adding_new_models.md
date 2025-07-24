@@ -13,9 +13,10 @@ All models in AudioLoop must implement the `AudioLoopModel` abstract base class:
 ```python
 from abc import ABC, abstractmethod
 import torch
+import torch.nn as nn
 from typing import Dict, Any
 
-class AudioLoopModel(ABC):
+class AudioLoopModel(nn.Module, ABC):
     @abstractmethod
     def forward(self, batch: Dict[str, Any]) -> torch.Tensor:
         """Forward pass through the model."""
@@ -92,7 +93,7 @@ from typing import Dict, Any
 from .audio_loop_model import AudioLoopModel
 
 
-class MyCustomModel(nn.Module, AudioLoopModel):
+class MyCustomModel(AudioLoopModel):
     def __init__(self, num_classes: int, **kwargs):
         super().__init__()
         self.num_classes = num_classes
@@ -176,16 +177,44 @@ outputs = model.forward(model_inputs)
 print(f"Output shape: {outputs.shape}")  # Should be (4, 2)
 ```
 
-### Step 3: Integration
+### Step 3: Register Your Model
 
-Your model can now be used with AudioLoop's training and inference pipeline:
+AudioLoop uses a dynamic model registry that automatically discovers models in the `audioloop/models/` directory. No registration is required - just place your model file in the correct location.
+
+**File naming convention:**
+- `my_model.py` → model name `"my_model"`
+- Class name can be anything (e.g., `MyCustomModel`, `ResNet50`, etc.)
+- The registry automatically finds any class that inherits from `AudioLoopModel`
+
+### Step 4: Use Your Model
+
+Your model is now automatically available throughout AudioLoop:
+
+```bash
+# List all available models
+python -m audioloop.train --list-models
+
+# Train with your custom model
+python -m audioloop.train training_set.csv --model-type my_model
+
+# Use in active learning (will automatically use the trained model)
+python -m audioloop.active_learning --class-name Drill --run-number 1
+```
+
+You can also use it programmatically:
 
 ```python
-# In training_core.py or wherever you create models
-from audioloop.models.my_model import MyCustomModel
+from audioloop.config import AudioLoopConfig
+from audioloop.training_core import run_training
 
-model = MyCustomModel(num_classes=2)
-# The rest of the training pipeline works automatically
+# Configure training with your model
+config = AudioLoopConfig(
+    model_type="my_model",
+    model_kwargs={"custom_param": 42}  # Pass custom parameters
+)
+
+# Train
+run_training(config, labels_file="training_set.csv", version=1)
 ```
 
 ## Adding a HuggingFace Model
@@ -209,7 +238,7 @@ from typing import Dict, Any
 from .audio_loop_model import AudioLoopModel
 
 
-class AudioSpectrogramTransformer(nn.Module, AudioLoopModel):
+class AudioSpectrogramTransformer(AudioLoopModel):
     def __init__(self, num_classes: int, model_name: str = "MIT/ast-finetuned-audioset-10-10-0.4593"):
         super().__init__()
         self.num_classes = num_classes
@@ -455,8 +484,8 @@ def create_my_model(variant: str, num_classes: int) -> MyCustomModel:
 ## Examples
 
 See the existing models in `audioloop/audioloop/models/` for reference:
-- `cnn_5layer.py`: Complex CNN with batch normalization
-- `simple_cnn.py`: Lightweight CNN example
+- `cnn5layer.py`: Complex CNN with batch normalization (class: `CNN5Layer`)
+- `simplecnn.py`: Lightweight CNN example (class: `SimpleCnn`)
 
 ## Contributing
 

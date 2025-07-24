@@ -8,7 +8,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from .config import AudioLoopConfig
-from .models import MODEL_TYPES
+from .models.model_registry import get_model_class, list_available_models
 from .utils.data_utils import get_device, simple_collate_fn
 from .utils.spectrogram_dataset import SpectrogramDataset
 from .utils.stopping_criteria import create_stopping_criterion
@@ -60,15 +60,14 @@ def train_epoch(model, train_loader, optimizer, criterion, device):
 
 def create_model(model_type: str, num_classes: int, dataset_size: int, **kwargs):
     """Create a model based on the specified type."""
-    if model_type not in MODEL_TYPES:
-        raise ValueError(f"Unknown model type: {model_type}. Available: {list(MODEL_TYPES.keys())}")
+    try:
+        model_class = get_model_class(model_type)
+    except ValueError:
+        available = list_available_models()
+        raise ValueError(f"Unknown model type: {model_type}. Available: {', '.join(sorted(available))}") from None
 
-    model_class = MODEL_TYPES[model_type]
-
-    # Create model with appropriate parameters based on type
-    if model_type == "cnn5layer":
-        return model_class(num_classes=num_classes, kernel_size=(3, 3), dataset_size=dataset_size)
-    return model_class(num_classes=num_classes)
+    # Create model with flexible kwargs - let each model handle its own parameters
+    return model_class(num_classes=num_classes, dataset_size=dataset_size, **kwargs)
 
 
 def run_training(
@@ -119,7 +118,10 @@ def run_training(
 
     # Create model based on config
     model = create_model(
-        model_type=config.model_type, num_classes=num_classes, dataset_size=len(train_dataset)
+        model_type=config.model_type, 
+        num_classes=num_classes, 
+        dataset_size=len(train_dataset),
+        **config.model_kwargs
     ).to(device)
 
     # Print model info
