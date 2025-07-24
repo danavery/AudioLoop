@@ -48,8 +48,8 @@ def list_available_datasets() -> list[str]:
     available = []
     
     for py_file in datasets_dir.glob("*_config.py"):
-        # Skip the base DatasetConfig file
-        if py_file.name == "dataset_config.py":
+        # Skip the base DatasetConfig file and files in templates/ directory
+        if py_file.name == "dataset_config.py" or "templates/" in str(py_file):
             continue
             
         # Extract dataset name by removing _config suffix

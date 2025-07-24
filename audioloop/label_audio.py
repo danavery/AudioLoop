@@ -553,10 +553,14 @@ Dataset to use ('fsd50k' or 'urbansound8k'). Can also be set via AUDIOLOOP_DATAS
         "candidates_csv", help="Path to labeling candidates CSV from active learning"
     )
 
+    # Dynamic dataset discovery
+    from audioloop.datasets.registry import list_available_datasets
+    available_datasets = list_available_datasets()
+    
     parser.add_argument(
         "--dataset",
-        choices=["urbansound8k", "fsd50k"],
-        help="Dataset type (uses AUDIOLOOP_DATASET env var or default if not specified)",
+        choices=available_datasets,
+        help=f"Dataset type. Available: {', '.join(available_datasets)}. Uses AUDIOLOOP_DATASET env var or default if not specified.",
     )
 
     parser.add_argument(

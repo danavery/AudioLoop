@@ -272,11 +272,15 @@ Examples:
         """,
     )
 
+    # Dynamic dataset discovery
+    from audioloop.datasets.registry import list_available_datasets
+    available_datasets = list_available_datasets()
+    
     parser.add_argument(
         "--dataset",
-        choices=["urbansound8k", "fsd50k"],
+        choices=available_datasets,
         default=None,
-        help="Dataset to process ('fsd50k' or 'urbansound8k'). Can also be set via AUDIOLOOP_DATASET environment variable.",
+        help=f"Dataset to process. Available: {', '.join(available_datasets)}. Can also be set via AUDIOLOOP_DATASET environment variable.",
     )
 
     parser.add_argument(

@@ -172,16 +172,18 @@ def list_available_classes(dataset_name: str, **kwargs) -> None:
     config = AudioLoopConfig(dataset=dataset_name)
     dataset_config = config.get_dataset_config()
 
-    if dataset_name == "urbansound8k":
-        dataset_config.list_classes()
-    elif dataset_name == "fsd50k":
-        from audioloop.datasets.fsd50k_config import list_semantic_groups
-
-        dataset_config.list_classes()
-        print("\n")
-        list_semantic_groups()
-    else:
-        raise ValueError(f"Unsupported dataset: {dataset_name}")
+    # All datasets support list_classes()
+    dataset_config.list_classes()
+    
+    # FSD50K has additional semantic groups information
+    if dataset_name == "fsd50k":
+        try:
+            from audioloop.datasets.fsd50k_config import list_semantic_groups
+            print("\n")
+            list_semantic_groups()
+        except ImportError:
+            # If semantic groups function not available, just continue
+            pass
 
 
 if __name__ == "__main__":
@@ -208,12 +210,15 @@ Examples:
         """,
     )
 
-    # Dataset selection
+    # Dataset selection - use dynamic discovery
+    from audioloop.datasets.registry import list_available_datasets
+    available_datasets = list_available_datasets()
+    
     parser.add_argument(
         "--dataset",
-        choices=["urbansound8k", "fsd50k"],
+        choices=available_datasets,
         default=None,
-        help="Dataset to use ('fsd50k' or 'urbansound8k'). Can also be set via AUDIOLOOP_DATASET environment variable.",
+        help=f"Dataset to use. Available: {', '.join(available_datasets)}. Can also be set via AUDIOLOOP_DATASET environment variable.",
     )
 
     # Core parameters
