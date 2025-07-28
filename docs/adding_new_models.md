@@ -1,10 +1,10 @@
 # Adding New Models to AudioLoop
 
-This guide explains how to add new models to the AudioLoop active learning framework. AudioLoop uses a pluggable model architecture that allows you to easily integrate custom PyTorch models or HuggingFace models while maintaining compatibility with the existing training and inference pipeline.
+This guide explains how to add new models to the AudioLoop active learning framework. AudioLoop uses a pluggable model architecture that allows you to easily integrate custom PyTorch models while maintaining full compatibility with PyTorch conventions and the existing training/inference pipeline.
 
 ## Overview
 
-AudioLoop uses an abstract base class (`AudioLoopModel`) that defines a consistent interface for all models. This allows the training, inference, and active learning code to work with any model that implements this interface.
+AudioLoop uses a minimal abstract base class (`AudioLoopModel`) that extends `nn.Module` with just metadata requirements. All models use standard PyTorch patterns while being automatically discoverable by the framework.
 
 ## The AudioLoopModel Interface
 
@@ -14,70 +14,23 @@ All models in AudioLoop must implement the `AudioLoopModel` abstract base class:
 from abc import ABC, abstractmethod
 import torch
 import torch.nn as nn
-from typing import Dict, Any
 
 class AudioLoopModel(nn.Module, ABC):
     @abstractmethod
-    def forward(self, batch: Dict[str, Any]) -> torch.Tensor:
-        """Forward pass through the model."""
-        pass
-
-    @abstractmethod
-    def prepare_input(self, batch: Dict[str, Any]) -> Dict[str, Any]:
-        """Prepare input batch for the model's expected format."""
-        pass
-
-    @abstractmethod
-    def get_device(self) -> torch.device:
-        """Get the device this model is on."""
-        pass
-
-    @abstractmethod
-    def save_model(self, path: str) -> None:
-        """Save the model to disk with metadata."""
-        pass
-
-    @classmethod
-    @abstractmethod
-    def load_model(cls, path: str, device: torch.device) -> "AudioLoopModel":
-        """Load a model from disk."""
-        pass
-
-    @abstractmethod
     def get_model_info(self) -> dict:
-        """Get model metadata."""
+        """Get model metadata for tracking and logging."""
         pass
 ```
 
-## Method Responsibilities
+That's it! AudioLoop models are standard PyTorch modules with just one additional method for metadata.
 
-### `forward(batch: Dict[str, Any]) -> torch.Tensor`
-- **Purpose**: Perform the forward pass through the model
-- **Input**: Dictionary containing model inputs (typically with "data" key)
-- **Output**: Logits tensor of shape `(batch_size, num_classes)`
-- **Note**: This replaces the standard PyTorch `forward(x)` method
+## Key Design Principles
 
-### `prepare_input(batch: Dict[str, Any]) -> Dict[str, Any]`
-- **Purpose**: Convert raw batch data into the format expected by your model
-- **Input**: Raw batch from the dataloader
-- **Output**: Dictionary with model-ready inputs
-- **Use Cases**: Device placement, data type conversion, preprocessing
-
-### `get_device() -> torch.device`
-- **Purpose**: Return the device the model is currently on
-- **Typical Implementation**: `return next(self.parameters()).device`
-
-### `save_model(path: str) -> None`
-- **Purpose**: Save the model state and metadata to disk
-- **Requirements**: Must save enough information to reconstruct the model
-
-### `load_model(cls, path: str, device: torch.device) -> "AudioLoopModel"`
-- **Purpose**: Class method to load a saved model
-- **Requirements**: Must recreate the model and load its state
-
-### `get_model_info() -> dict`
-- **Purpose**: Return metadata about the model
-- **Typical Contents**: Model type, architecture details, parameter count
+- **Standard PyTorch Interface**: Models use the normal `forward(x: torch.Tensor)` signature
+- **Ecosystem Compatibility**: Works with PyTorch hooks, torchscript, optimization tools
+- **Automatic Discovery**: Just create a file - no manual registration needed
+- **Metadata Preservation**: Constructor parameters are automatically saved/restored
+- **Flexible Parameters**: Use `**kwargs` pattern for model-specific options
 
 ## Adding a Custom PyTorch Model
 
@@ -88,7 +41,7 @@ Create a new file in `audioloop/audioloop/models/` (e.g., `my_model.py`):
 ```python
 import torch
 import torch.nn as nn
-from typing import Dict, Any
+import torch.nn.functional as F
 
 from .audio_loop_model import AudioLoopModel
 
@@ -98,66 +51,46 @@ class MyCustomModel(AudioLoopModel):
         super().__init__()
         self.num_classes = num_classes
         
+        # Extract model-specific parameters from kwargs
+        self.dropout_rate = kwargs.get('dropout_rate', 0.5)
+        
         # Define your architecture here
         self.conv1 = nn.Conv2d(1, 32, kernel_size=3, padding=1)
         self.conv2 = nn.Conv2d(32, 64, kernel_size=3, padding=1)
         self.pool = nn.MaxPool2d(2)
         self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.dropout = nn.Dropout(self.dropout_rate)
         self.classifier = nn.Linear(64, num_classes)
         
-    def forward(self, batch: Dict[str, Any]) -> torch.Tensor:
-        """Forward pass expecting spectrogram data."""
-        features = batch["data"]
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Standard PyTorch forward pass.
         
-        # Add channel dimension if needed
-        if features.ndim == 3:
-            features = features.unsqueeze(1)
+        Args:
+            x: Input tensor of shape (batch_size, channels, height, width)
+               or (batch_size, height, width) - channel dim will be added
+               
+        Returns:
+            Logits tensor of shape (batch_size, num_classes)
+        """
+        # Add channel dimension if needed (for spectrograms)
+        if x.ndim == 3:
+            x = x.unsqueeze(1)
         
-        # Your forward implementation
-        x = self.pool(torch.relu(self.conv1(features)))
-        x = self.pool(torch.relu(self.conv2(x)))
+        # Standard CNN forward pass
+        x = self.pool(F.relu(self.conv1(x)))
+        x = self.pool(F.relu(self.conv2(x)))
         x = self.global_pool(x)
-        x = x.view(x.size(0), -1)
+        x = x.flatten(1)  # Better than view for dynamic shapes
+        x = self.dropout(x)
         x = self.classifier(x)
         return x
-    
-    def prepare_input(self, batch: Dict[str, Any]) -> Dict[str, Any]:
-        """Prepare input for custom model."""
-        features = batch["data"].to(self.get_device())
-        return {"data": features}
-    
-    def get_device(self) -> torch.device:
-        """Get the device this model is on."""
-        return next(self.parameters()).device
-    
-    def save_model(self, path: str) -> None:
-        """Save model with metadata."""
-        save_dict = {
-            "model_state_dict": self.state_dict(),
-            "num_classes": self.num_classes,
-            "model_type": "MyCustomModel",
-            # Add any other parameters needed to reconstruct the model
-        }
-        torch.save(save_dict, path)
-    
-    @classmethod
-    def load_model(cls, path: str, device: torch.device) -> "MyCustomModel":
-        """Load model from disk."""
-        checkpoint = torch.load(path, map_location=device)
-        
-        model = cls(
-            num_classes=checkpoint["num_classes"],
-            # Pass any other constructor parameters from checkpoint
-        )
-        model.load_state_dict(checkpoint["model_state_dict"])
-        model.to(device)
-        return model
     
     def get_model_info(self) -> dict:
         """Get model metadata."""
         return {
-            "model_type": "MyCustomModel",
+            "model_type": "my_model",  # Should match filename
             "num_classes": self.num_classes,
+            "dropout_rate": self.dropout_rate,
             "num_parameters": sum(p.numel() for p in self.parameters()),
         }
 ```
@@ -167,14 +100,18 @@ class MyCustomModel(AudioLoopModel):
 Create a simple test to verify your model works:
 
 ```python
-# Test your model
-model = MyCustomModel(num_classes=2)
-batch = {"data": torch.randn(4, 128, 100)}  # 4 spectrograms
+# Test your model with standard PyTorch interface
+model = MyCustomModel(num_classes=2, dropout_rate=0.3)
 
-# Test the interface
-model_inputs = model.prepare_input(batch)
-outputs = model.forward(model_inputs)
+# Test forward pass with tensor input (standard PyTorch)
+x = torch.randn(4, 128, 100)  # 4 spectrograms (batch, height, width)
+outputs = model(x)  # Standard PyTorch calling convention
 print(f"Output shape: {outputs.shape}")  # Should be (4, 2)
+
+# Test that model info contains constructor parameters
+info = model.get_model_info()
+print(f"Model info: {info}")
+assert info['dropout_rate'] == 0.3
 ```
 
 ### Step 3: Register Your Model
@@ -194,26 +131,29 @@ Your model is now automatically available throughout AudioLoop:
 # List all available models
 python -m audioloop.train --list-models
 
-# Train with your custom model
+# Train with your custom model (basic usage)
 python -m audioloop.train training_set.csv --model-type my_model
 
 # Use in active learning (will automatically use the trained model)
 python -m audioloop.active_learning --class-name Drill --run-number 1
 ```
 
-You can also use it programmatically:
+You can also use it programmatically with custom parameters:
 
 ```python
 from audioloop.config import AudioLoopConfig
 from audioloop.training_core import run_training
 
-# Configure training with your model
+# Configure training with your model and custom parameters
 config = AudioLoopConfig(
     model_type="my_model",
-    model_kwargs={"custom_param": 42}  # Pass custom parameters
+    model_kwargs={
+        "dropout_rate": 0.3,  # Custom parameter
+        "other_param": "value"
+    }
 )
 
-# Train
+# Train - parameters are automatically saved and restored
 run_training(config, labels_file="training_set.csv", version=1)
 ```
 
@@ -233,30 +173,41 @@ For example, integrating the Audio Spectrogram Transformer:
 import torch
 import torch.nn as nn
 from transformers import ASTModel, ASTFeatureExtractor
-from typing import Dict, Any
 
 from .audio_loop_model import AudioLoopModel
 
 
 class AudioSpectrogramTransformer(AudioLoopModel):
-    def __init__(self, num_classes: int, model_name: str = "MIT/ast-finetuned-audioset-10-10-0.4593"):
+    def __init__(self, num_classes: int, **kwargs):
         super().__init__()
         self.num_classes = num_classes
-        self.model_name = model_name
+        self.model_name = kwargs.get('model_name', "MIT/ast-finetuned-audioset-10-10-0.4593")
         
         # Load pre-trained HuggingFace model
-        self.backbone = ASTModel.from_pretrained(model_name)
-        self.feature_extractor = ASTFeatureExtractor.from_pretrained(model_name)
+        self.backbone = ASTModel.from_pretrained(self.model_name)
+        self.feature_extractor = ASTFeatureExtractor.from_pretrained(self.model_name)
         
         # Add classification head for your task
         self.classifier = nn.Linear(self.backbone.config.hidden_size, num_classes)
         
-    def forward(self, batch: Dict[str, Any]) -> torch.Tensor:
-        """Forward pass through HuggingFace model."""
-        inputs = batch["input_values"]
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Standard PyTorch forward pass.
+        
+        Args:
+            x: Input tensor (AudioLoop will handle data extraction from batches)
+               
+        Returns:
+            Logits tensor of shape (batch_size, num_classes)
+        """
+        # Convert AudioLoop spectrograms to HuggingFace format
+        # Note: This example shows the concept - actual preprocessing 
+        # would depend on your specific HuggingFace model requirements
+        
+        # Process with HuggingFace feature extractor if needed
+        # For this example, assume x is already in the right format
         
         # Forward through HuggingFace model
-        outputs = self.backbone(inputs)
+        outputs = self.backbone(x)
         
         # Extract features (model-specific)
         features = outputs.last_hidden_state.mean(dim=1)  # Global average pooling
@@ -264,136 +215,106 @@ class AudioSpectrogramTransformer(AudioLoopModel):
         # Classification
         return self.classifier(features)
     
-    def prepare_input(self, batch: Dict[str, Any]) -> Dict[str, Any]:
-        """Prepare input for HuggingFace model."""
-        # Convert AudioLoop spectrograms to HuggingFace format
-        spectrograms = batch["data"]
-        
-        # Process with HuggingFace feature extractor
-        processed = self.feature_extractor(
-            spectrograms.squeeze(1).numpy(),  # Model-specific preprocessing
-            return_tensors="pt",
-            sampling_rate=16000
-        )
-        
-        return {"input_values": processed.input_values.to(self.get_device())}
-    
-    def get_device(self) -> torch.device:
-        """Get the device this model is on."""
-        return next(self.parameters()).device
-    
-    def save_model(self, path: str) -> None:
-        """Save HuggingFace model wrapper."""
-        save_dict = {
-            "model_name": self.model_name,
-            "num_classes": self.num_classes,
-            "backbone_state_dict": self.backbone.state_dict(),
-            "classifier_state_dict": self.classifier.state_dict(),
-            "model_type": "AudioSpectrogramTransformer",
-        }
-        torch.save(save_dict, path)
-    
-    @classmethod
-    def load_model(cls, path: str, device: torch.device) -> "AudioSpectrogramTransformer":
-        """Load HuggingFace model wrapper."""
-        checkpoint = torch.load(path, map_location=device)
-        
-        model = cls(
-            num_classes=checkpoint["num_classes"],
-            model_name=checkpoint["model_name"]
-        )
-        
-        model.backbone.load_state_dict(checkpoint["backbone_state_dict"])
-        model.classifier.load_state_dict(checkpoint["classifier_state_dict"])
-        model.to(device)
-        return model
-    
     def get_model_info(self) -> dict:
         """Get model metadata."""
         return {
-            "model_type": "AudioSpectrogramTransformer",
+            "model_type": "audio_spectrogram_transformer",
             "model_name": self.model_name,
             "num_classes": self.num_classes,
             "num_parameters": sum(p.numel() for p in self.parameters()),
         }
 ```
 
-## Data Pipeline Considerations
+**Note**: The above example shows the structure, but HuggingFace models often require specific preprocessing. You may need to customize the data pipeline in AudioLoop to work with your specific HuggingFace model's expected input format.
+
+## Data Pipeline Integration
 
 ### Current System: Spectrograms
-AudioLoop currently processes audio into spectrograms using `create_all_specs.py`. Models that work with spectrograms (like CNNs and AST) can use the existing pipeline:
+AudioLoop currently processes audio into spectrograms using `create_all_specs.py`. The training pipeline extracts spectrograms from batches and passes them as tensors to your model:
 
-```bash
-# Pre-process audio to spectrograms
-python -m audioloop.create_all_specs
-
-# Train with any spectrogram-compatible model
-python -m audioloop.train training_set.csv
+```python
+# In training_core.py, your model receives:
+features = batch["data"].to(device)  # Tensor of spectrograms
+outputs = model(features)  # Standard PyTorch call
 ```
 
-### Future: Raw Audio Models
-For models that require raw audio (like Wav2Vec2, Whisper), the data pipeline would need to be extended. This is planned for future development.
+### Spectrogram Input Format
+Your model will receive spectrograms as tensors with shape:
+- `(batch_size, height, width)` - raw spectrograms
+- Models typically add channel dimension: `x.unsqueeze(1)` → `(batch_size, 1, height, width)`
+
+### Custom Preprocessing
+If your model needs different preprocessing, you can handle it in the `forward()` method:
+
+```python
+def forward(self, x: torch.Tensor) -> torch.Tensor:
+    # Custom preprocessing here
+    x = your_preprocessing_function(x)
+    
+    # Your model's forward pass
+    return your_model_forward(x)
+```
 
 ## Best Practices
 
 ### 1. Input Validation
-Always validate that inputs are in the expected format:
+Validate inputs in your forward method:
 
 ```python
-def prepare_input(self, batch: Dict[str, Any]) -> Dict[str, Any]:
-    features = batch["data"]
-    
+def forward(self, x: torch.Tensor) -> torch.Tensor:
     # Validate input shape
-    if features.ndim not in [3, 4]:
-        raise ValueError(f"Expected 3D or 4D input, got {features.ndim}D")
+    if x.ndim not in [3, 4]:
+        raise ValueError(f"Expected 3D or 4D input, got {x.ndim}D")
     
-    # Rest of preprocessing...
+    # Add channel dimension if needed
+    if x.ndim == 3:
+        x = x.unsqueeze(1)
+    
+    # Rest of forward pass...
 ```
 
-### 2. Device Management
-Always ensure tensors are on the right device:
+### 2. Use **kwargs Pattern
+Make your models flexible with the **kwargs pattern:
 
 ```python
-def prepare_input(self, batch: Dict[str, Any]) -> Dict[str, Any]:
-    features = batch["data"].to(self.get_device())
-    return {"data": features}
+def __init__(self, num_classes: int, **kwargs):
+    super().__init__()
+    self.num_classes = num_classes
+    
+    # Extract optional parameters with defaults
+    self.dropout_rate = kwargs.get('dropout_rate', 0.5)
+    self.hidden_size = kwargs.get('hidden_size', 128)
+    self.activation = kwargs.get('activation', 'relu')
 ```
 
-### 3. Error Handling
-Include proper error handling in your model loading:
-
-```python
-@classmethod
-def load_model(cls, path: str, device: torch.device) -> "MyModel":
-    try:
-        checkpoint = torch.load(path, map_location=device)
-    except Exception as e:
-        raise RuntimeError(f"Failed to load model from {path}: {e}")
-    
-    # Validate checkpoint contents
-    required_keys = ["model_state_dict", "num_classes", "model_type"]
-    for key in required_keys:
-        if key not in checkpoint:
-            raise ValueError(f"Missing required key in checkpoint: {key}")
-    
-    # Rest of loading logic...
-```
-
-### 4. Comprehensive Metadata
-Include useful metadata for debugging and model management:
+### 3. Complete Metadata
+Include all constructor parameters in `get_model_info()`:
 
 ```python
 def get_model_info(self) -> dict:
     return {
-        "model_type": "MyModel",
+        "model_type": "my_model",  # Should match filename
         "num_classes": self.num_classes,
+        "dropout_rate": self.dropout_rate,  # All constructor params
+        "hidden_size": self.hidden_size,
+        "activation": self.activation,
         "num_parameters": sum(p.numel() for p in self.parameters()),
         "trainable_parameters": sum(p.numel() for p in self.parameters() if p.requires_grad),
-        "model_size_mb": sum(p.numel() * p.element_size() for p in self.parameters()) / (1024 * 1024),
-        "architecture_details": {
-            # Add architecture-specific details
-        }
     }
+```
+
+### 4. Efficient Activations
+Use functional activations for better performance:
+
+```python
+import torch.nn.functional as F
+
+# Preferred: Functional (stateless, memory efficient)
+x = F.relu(x)
+x = F.dropout(x, p=0.5, training=self.training)
+
+# Avoid: Module-based for simple activations
+# self.relu = nn.ReLU()  # Creates unnecessary parameters
 ```
 
 ## Testing Your Model
@@ -402,99 +323,168 @@ def get_model_info(self) -> dict:
 Create tests for your model:
 
 ```python
-import unittest
+import pytest
 import torch
 from audioloop.models.my_model import MyCustomModel
 
-class TestMyCustomModel(unittest.TestCase):
-    def setUp(self):
-        self.model = MyCustomModel(num_classes=2)
-        self.batch = {"data": torch.randn(4, 128, 100)}
-    
+class TestMyCustomModel:
+    def setup_method(self):
+        self.model = MyCustomModel(num_classes=2, dropout_rate=0.3)
+        
     def test_forward_pass(self):
-        model_inputs = self.model.prepare_input(self.batch)
-        outputs = self.model.forward(model_inputs)
-        self.assertEqual(outputs.shape, (4, 2))
+        # Test with standard PyTorch tensor input
+        x = torch.randn(4, 128, 100)  # Batch of spectrograms
+        outputs = self.model(x)  # Standard PyTorch calling
+        assert outputs.shape == (4, 2)
+        assert not torch.isnan(outputs).any()
     
-    def test_save_load(self):
-        import tempfile
-        with tempfile.NamedTemporaryFile(suffix='.pt') as f:
-            self.model.save_model(f.name)
-            loaded_model = MyCustomModel.load_model(f.name, torch.device('cpu'))
-            self.assertEqual(loaded_model.num_classes, 2)
+    def test_model_info_contains_constructor_params(self):
+        info = self.model.get_model_info()
+        assert info['num_classes'] == 2
+        assert info['dropout_rate'] == 0.3
+        assert 'num_parameters' in info
+        
+    def test_channel_dimension_handling(self):
+        # Test that model handles both 3D and 4D inputs
+        x_3d = torch.randn(2, 128, 100)  # No channel dim
+        x_4d = torch.randn(2, 1, 128, 100)  # With channel dim
+        
+        out_3d = self.model(x_3d)
+        out_4d = self.model(x_4d)
+        
+        assert out_3d.shape == (2, 2)
+        assert out_4d.shape == (2, 2)
 ```
 
 ### Integration Tests
-Test with the actual AudioLoop pipeline:
+Test automatic save/load with AudioLoop:
 
 ```python
-# Test with real training data
+# Test automatic save/load (AudioLoop handles this)
+from audioloop.config import AudioLoopConfig
 from audioloop.training_core import run_training
 
-model = MyCustomModel(num_classes=2)
-# Run a short training to verify integration
+config = AudioLoopConfig(
+    model_type="my_model",
+    model_kwargs={"dropout_rate": 0.2}
+)
+
+# AudioLoop automatically saves all constructor parameters
+# and can reload the exact same model configuration
 ```
 
-## Common Patterns
+## Advanced Patterns
 
-### Multiple Model Variants
-You can create multiple variants of the same model:
+### Model Variants with Parameters
+Create model variants using the **kwargs pattern:
 
 ```python
-class MyModelSmall(MyCustomModel):
-    def __init__(self, num_classes: int):
-        super().__init__(num_classes)
-        # Smaller architecture
+class FlexibleCNN(AudioLoopModel):
+    def __init__(self, num_classes: int, **kwargs):
+        super().__init__()
+        self.num_classes = num_classes
         
-class MyModelLarge(MyCustomModel):
-    def __init__(self, num_classes: int):
-        super().__init__(num_classes)
-        # Larger architecture
+        # Size variants via parameters
+        self.model_size = kwargs.get('model_size', 'medium')
+        
+        if self.model_size == 'small':
+            channels = [16, 32]
+        elif self.model_size == 'large':
+            channels = [64, 128, 256]
+        else:  # medium
+            channels = [32, 64]
+            
+        # Build architecture based on size
+        layers = []
+        in_channels = 1
+        for out_channels in channels:
+            layers.extend([
+                nn.Conv2d(in_channels, out_channels, 3, padding=1),
+                nn.ReLU(),
+                nn.MaxPool2d(2)
+            ])
+            in_channels = out_channels
+            
+        self.features = nn.Sequential(*layers)
+        self.classifier = nn.Linear(channels[-1], num_classes)
+        
+    def get_model_info(self) -> dict:
+        return {
+            "model_type": "flexible_cnn",
+            "num_classes": self.num_classes,
+            "model_size": self.model_size,  # Save parameter for reconstruction
+            "num_parameters": sum(p.numel() for p in self.parameters()),
+        }
 ```
 
-### Model Factories
-For complex model creation:
+Usage:
+```bash
+# Small variant
+python -m audioloop.train training.csv --config '{"model_kwargs": {"model_size": "small"}}'
 
-```python
-def create_my_model(variant: str, num_classes: int) -> MyCustomModel:
-    if variant == "small":
-        return MyModelSmall(num_classes)
-    elif variant == "large":
-        return MyModelLarge(num_classes)
-    else:
-        raise ValueError(f"Unknown variant: {variant}")
+# Large variant  
+python -m audioloop.train training.csv --config '{"model_kwargs": {"model_size": "large"}}'
 ```
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Shape Mismatches**: Ensure your model expects the right input shape
-2. **Device Issues**: Always move tensors to the model's device
-3. **Save/Load Failures**: Include all necessary information in checkpoints
-4. **Missing Dependencies**: Install all required packages for HuggingFace models
+1. **Shape Mismatches**: AudioLoop passes spectrograms as `(batch, height, width)` - add channel dim if needed
+2. **Missing Constructor Parameters**: If loading fails, ensure all parameters are in `get_model_info()`
+3. **Import Errors**: Check that your model file is in `audioloop/models/` and follows naming conventions
+4. **Parameter Reconstruction**: AudioLoop saves/loads all keys from `get_model_info()` except `num_parameters`
 
 ### Debugging Tips
 
-1. **Print Tensor Shapes**: Add debug prints to understand data flow
-2. **Test in Isolation**: Test your model separately before integration
-3. **Check Device Placement**: Verify all tensors are on the same device
-4. **Validate Outputs**: Ensure outputs have the expected shape and range
+1. **Test Model Creation**: Verify your model can be created with saved parameters
+   ```python
+   model = MyModel(num_classes=2, custom_param=42)
+   info = model.get_model_info()
+   # Remove num_parameters (not a constructor arg)
+   constructor_args = {k: v for k, v in info.items() if k != 'num_parameters'}
+   recreated = MyModel(**constructor_args)  # Should work
+   ```
+
+2. **Check Model Registry**: List available models to verify discovery
+   ```bash
+   python -m audioloop.train --list-models
+   ```
+
+3. **Test Forward Pass**: Ensure your model handles spectrogram inputs
+   ```python
+   model = MyModel(num_classes=2)
+   x = torch.randn(1, 128, 100)  # Single spectrogram
+   output = model(x)
+   print(f"Output shape: {output.shape}")  # Should be (1, 2)
+   ```
 
 ## Examples
 
-See the existing models in `audioloop/audioloop/models/` for reference:
-- `cnn5layer.py`: Complex CNN with batch normalization (class: `CNN5Layer`)
-- `simplecnn.py`: Lightweight CNN example (class: `SimpleCnn`)
+See the existing models in `audioloop/models/` for reference:
+- `cnn5layer.py`: Complex 5-layer CNN with adaptive BatchNorm (class: `CNN5Layer`)
+- `simplecnn.py`: Lightweight 2-layer CNN example (class: `SimpleCnn`)
 
-## Contributing
+Both models demonstrate:
+- Standard PyTorch `forward(x: torch.Tensor)` interface
+- **kwargs parameter pattern for flexibility  
+- Complete metadata in `get_model_info()`
+- Proper channel dimension handling for spectrograms
 
-When adding new models to the AudioLoop codebase:
+## Summary
 
-1. Follow the existing code style and patterns
-2. Add comprehensive docstrings
-3. Include unit tests
-4. Update this documentation if needed
-5. Consider adding examples or demos
+AudioLoop's pluggable model architecture is designed around standard PyTorch conventions:
 
-The pluggable model architecture makes AudioLoop extensible while maintaining consistency across all model types. Whether you're adding a simple CNN or a complex transformer, the interface remains the same, making it easy to experiment with different architectures in your active learning workflow.
+**Key Requirements:**
+- Inherit from `AudioLoopModel` (minimal abstract base class)
+- Use standard `forward(x: torch.Tensor)` signature
+- Include all constructor parameters in `get_model_info()`
+- Use **kwargs pattern for flexibility
+
+**Automatic Features:**
+- Model discovery (just create the file)
+- Parameter preservation (constructor args are saved/restored)
+- CLI integration (--model-type my_model)
+- Full PyTorch ecosystem compatibility
+
+Whether you're adding a simple CNN or a complex transformer, the interface is standard PyTorch with minimal AudioLoop-specific requirements. This makes it easy to experiment with different architectures while maintaining the benefits of the active learning framework.

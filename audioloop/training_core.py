@@ -34,12 +34,10 @@ def train_epoch(model, train_loader, optimizer, criterion, device):
 
     for batch in train_loader:
         labels = batch["label"].to(device)
+        features = batch["data"].to(device)
 
-        # Prepare inputs using model's method
-        model_inputs = model.prepare_input(batch)
-
-        # Forward pass through model's forward method
-        outputs = model.forward(model_inputs)
+        # Standard PyTorch forward pass
+        outputs = model(features)
         loss = criterion(outputs, labels)
 
         optimizer.zero_grad(set_to_none=True)
@@ -64,7 +62,9 @@ def create_model(model_type: str, num_classes: int, dataset_size: int, **kwargs)
         model_class = get_model_class(model_type)
     except ValueError:
         available = list_available_models()
-        raise ValueError(f"Unknown model type: {model_type}. Available: {', '.join(sorted(available))}") from None
+        raise ValueError(
+            f"Unknown model type: {model_type}. Available: {', '.join(sorted(available))}"
+        ) from None
 
     # Create model with flexible kwargs - let each model handle its own parameters
     return model_class(num_classes=num_classes, dataset_size=dataset_size, **kwargs)
@@ -118,10 +118,10 @@ def run_training(
 
     # Create model based on config
     model = create_model(
-        model_type=config.model_type, 
-        num_classes=num_classes, 
+        model_type=config.model_type,
+        num_classes=num_classes,
         dataset_size=len(train_dataset),
-        **config.model_kwargs
+        **config.model_kwargs,
     ).to(device)
 
     # Print model info
@@ -215,12 +215,27 @@ def run_training(
 
     best_model_state = stopping_criterion.get_best_model_state()
     if best_model_state is not None:
-        # For best model state, we need to load it into the model and save using the new method
+        # Save the best model state with complete metadata
         model.load_state_dict(best_model_state)
-        model.save_model(model_path)
+        model_info = model.get_model_info()
+        save_dict = {
+            "model_state_dict": best_model_state,
+            **{
+                k: v for k, v in model_info.items() if k != "num_parameters"
+            },  # Exclude runtime-only fields
+        }
+        torch.save(save_dict, model_path)
         print(f"✅ Best model saved to: {model_path}")
     else:
-        model.save_model(model_path)
+        # Save the final model state with complete metadata
+        model_info = model.get_model_info()
+        save_dict = {
+            "model_state_dict": model.state_dict(),
+            **{
+                k: v for k, v in model_info.items() if k != "num_parameters"
+            },  # Exclude runtime-only fields
+        }
+        torch.save(save_dict, model_path)
         print(f"📁 Final model saved to: {model_path}")
 
     # Clean up and return the best accuracy if available, otherwise final accuracy

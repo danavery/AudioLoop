@@ -32,8 +32,8 @@ def load_training_set_filenames(training_set_csv):
 
 
 def load_model(model_path, num_classes, device):
-    """Load a trained model from disk, detecting model type automatically."""
-    # Load checkpoint to detect model type
+    """Load a trained model from disk using all saved constructor args."""
+    # Load checkpoint with all metadata
     checkpoint = torch.load(model_path, map_location=device)
     model_type = checkpoint.get("model_type", "cnn5layer")  # Default to cnn5layer
 
@@ -45,7 +45,14 @@ def load_model(model_path, num_classes, device):
         raise ValueError(
             f"Unknown model type: {model_type}. Available: {', '.join(sorted(available))}"
         ) from None
-    model = model_class.load_model(model_path, device)
+
+    # Extract constructor args from checkpoint (everything except model_state_dict)
+    constructor_args = {k: v for k, v in checkpoint.items() if k != "model_state_dict"}
+
+    # Create model with all saved constructor arguments
+    model = model_class(**constructor_args)
+    model.load_state_dict(checkpoint["model_state_dict"])
+    model.to(device)
     model.eval()
     return model
 
@@ -167,11 +174,9 @@ def run_binary_inference(
         for batch in tqdm(data_loader):
             true_labels = batch["label"]
 
-            # Prepare inputs using model's method
-            model_inputs = model.prepare_input(batch)
-
-            # Forward pass through model's forward method
-            logits = model.forward(model_inputs)
+            # Standard PyTorch forward pass
+            features = batch["data"].to(device)
+            logits = model(features)
             probabilities = F.softmax(logits, dim=-1)
             predicted_classes = torch.argmax(probabilities, dim=-1)
 

@@ -1,9 +1,5 @@
 """Tests for the AudioLoop model system."""
 
-import tempfile
-from pathlib import Path
-from typing import Any
-
 import pytest
 import torch
 
@@ -36,26 +32,12 @@ class TestAudioLoopModel:
             def __init__(self):
                 super().__init__()
                 self.linear = torch.nn.Linear(10, 1)
-                self.device_type = torch.device("cpu")
 
-            def forward(self, batch: dict[str, Any]) -> torch.Tensor:
-                return self.linear(batch["input"])
-
-            def prepare_input(self, batch: dict[str, Any]) -> dict[str, Any]:
-                return batch
-
-            def save_model(self, path: str) -> None:
-                torch.save({"test": "data"}, path)
-
-            @classmethod
-            def load_model(cls, path: str, device: torch.device) -> "CompleteModel":
-                return cls()
+            def forward(self, x: torch.Tensor) -> torch.Tensor:
+                return self.linear(x)
 
             def get_model_info(self) -> dict:
-                return {"type": "test"}
-
-            def get_device(self) -> torch.device:
-                return self.device_type
+                return {"model_type": "test", "num_classes": 1, "num_parameters": 11}
 
         # Should not raise an exception
         model = CompleteModel()
@@ -143,8 +125,7 @@ class TestCNN5Layer:
 
         # Create a sample input (batch=1, channels=1, height=128, width=128)
         x = torch.randn(1, 1, 128, 128)
-        batch = {"data": x}
-        output = model(batch)
+        output = model(x)
 
         assert output.shape == (1, 2)
         assert not torch.isnan(output).any()
@@ -155,8 +136,7 @@ class TestCNN5Layer:
 
         # Create a sample input
         x = torch.randn(1, 1, 128, 128)
-        batch = {"data": x}
-        output = model(batch)
+        output = model(x)
 
         assert output.shape == (1, 2)
         assert not torch.isnan(output).any()
@@ -185,114 +165,9 @@ class TestCNN5Layer:
 
         assert params_with_bn > params_without_bn
 
-    def test_save_model(self):
-        """Test model saving functionality."""
-        model = CNN5Layer(num_classes=2, dataset_size=50, batchnorm_threshold=75)
 
-        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
-            temp_path = f.name
 
-        try:
-            model.save_model(temp_path)
 
-            # Verify file exists
-            assert Path(temp_path).exists()
-
-            # Verify file contains expected data
-            checkpoint = torch.load(temp_path, map_location="cpu")
-            assert checkpoint["model_type"] == "cnn5layer"
-            assert checkpoint["num_classes"] == 2
-            assert checkpoint["kernel_size"] == (3, 3)
-            assert checkpoint["use_batchnorm"] is False
-            assert checkpoint["batchnorm_threshold"] == 75
-            assert "model_state_dict" in checkpoint
-
-        finally:
-            Path(temp_path).unlink(missing_ok=True)
-
-    def test_load_model(self):
-        """Test model loading functionality."""
-        original_model = CNN5Layer(num_classes=3, dataset_size=25, batchnorm_threshold=50)
-
-        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
-            temp_path = f.name
-
-        try:
-            # Save the model
-            original_model.save_model(temp_path)
-
-            # Load it back
-            device = torch.device("cpu")
-            loaded_model = CNN5Layer.load_model(temp_path, device)
-
-            # Verify loaded model has same properties
-            assert loaded_model.num_classes == original_model.num_classes
-            assert loaded_model.kernel_size == original_model.kernel_size
-            assert loaded_model.use_batchnorm == original_model.use_batchnorm
-            assert loaded_model.batchnorm_threshold == original_model.batchnorm_threshold
-
-            # Verify model info matches
-            original_info = original_model.get_model_info()
-            loaded_info = loaded_model.get_model_info()
-            assert original_info == loaded_info
-
-        finally:
-            Path(temp_path).unlink(missing_ok=True)
-
-    def test_load_model_preserves_batchnorm_decision(self):
-        """Test that loading preserves the original BatchNorm decision."""
-        # Create a model where dataset_size < threshold but we want to load
-        # the exact same architecture that was saved
-        model = CNN5Layer(num_classes=2, dataset_size=50, batchnorm_threshold=75)
-        assert model.use_batchnorm is False
-
-        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
-            temp_path = f.name
-
-        try:
-            model.save_model(temp_path)
-
-            # Load model - should preserve the original BatchNorm decision
-            device = torch.device("cpu")
-            loaded_model = CNN5Layer.load_model(temp_path, device)
-
-            # Should preserve the original decision, not recalculate
-            assert loaded_model.use_batchnorm is False
-            assert loaded_model.batchnorm_threshold == 75
-
-        finally:
-            Path(temp_path).unlink(missing_ok=True)
-
-    def test_load_model_backward_compatibility(self):
-        """Test loading models saved without batchnorm_threshold."""
-        # Simulate an old saved model format
-        model = CNN5Layer(num_classes=2, dataset_size=150)
-
-        # Create a checkpoint without batchnorm_threshold
-        checkpoint = {
-            "model_state_dict": model.state_dict(),
-            "num_classes": 2,
-            "kernel_size": (3, 3),
-            "use_batchnorm": True,
-            "model_type": "cnn5layer",
-            # Note: no batchnorm_threshold
-        }
-
-        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
-            temp_path = f.name
-
-        try:
-            torch.save(checkpoint, temp_path)
-
-            # Should load successfully with default threshold
-            device = torch.device("cpu")
-            loaded_model = CNN5Layer.load_model(temp_path, device)
-
-            assert loaded_model.batchnorm_threshold == 100  # Default value
-            assert loaded_model.use_batchnorm is True
-
-        finally:
-            Path(temp_path).unlink(missing_ok=True)
 
     def test_model_training_mode_switching(self):
         """Test that model can switch between train and eval modes."""
@@ -315,21 +190,20 @@ class TestCNN5Layer:
 
         # Test forward pass still works
         x = torch.randn(1, 1, 128, 128)
-        batch = {"data": x}
-        output = model(batch)
+        output = model(x)
         assert output.shape == (1, 2)
 
-    def test_private_use_batchnorm_parameter(self):
-        """Test the private _use_batchnorm parameter for loading."""
+    def test_explicit_use_batchnorm_parameter(self):
+        """Test the explicit use_batchnorm parameter override."""
         # This parameter should override the automatic decision
-        model = CNN5Layer(num_classes=2, dataset_size=50, _use_batchnorm=True)
+        model = CNN5Layer(num_classes=2, dataset_size=50, use_batchnorm=True)
 
-        # Even though dataset_size=50 < 100, _use_batchnorm=True should override
+        # Even though dataset_size=50 < 100, use_batchnorm=True should override
         assert model.use_batchnorm is True
 
-        model2 = CNN5Layer(num_classes=2, dataset_size=150, _use_batchnorm=False)
+        model2 = CNN5Layer(num_classes=2, dataset_size=150, use_batchnorm=False)
 
-        # Even though dataset_size=150 >= 100, _use_batchnorm=False should override
+        # Even though dataset_size=150 >= 100, use_batchnorm=False should override
         assert model2.use_batchnorm is False
 
     def test_multiple_model_instances(self):
@@ -344,9 +218,8 @@ class TestCNN5Layer:
 
         # Test that they produce different outputs
         x = torch.randn(1, 1, 128, 128)
-        batch = {"data": x}
-        output1 = model1(batch)
-        output2 = model2(batch)
+        output1 = model1(x)
+        output2 = model2(x)
 
         assert output1.shape == (1, 2)
         assert output2.shape == (1, 3)
@@ -376,8 +249,7 @@ class TestSimpleCnn:
 
         # Create a sample input (batch=2, channels=1, height=64, width=64)
         x = torch.randn(2, 1, 64, 64)
-        batch = {"data": x}
-        output = model(batch)
+        output = model(x)
 
         assert output.shape == (2, 3)
         assert not torch.isnan(output).any()
@@ -393,53 +265,7 @@ class TestSimpleCnn:
         assert "num_parameters" in info
         assert info["num_parameters"] > 0
 
-    def test_save_model(self):
-        """Test SimpleCnn saving functionality."""
-        model = SimpleCnn(num_classes=3)
 
-        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
-            temp_path = f.name
-
-        try:
-            model.save_model(temp_path)
-
-            # Verify file exists
-            assert Path(temp_path).exists()
-
-            # Verify file contains expected data
-            checkpoint = torch.load(temp_path, map_location="cpu")
-            assert checkpoint["model_type"] == "simplecnn"
-            assert checkpoint["num_classes"] == 3
-            assert "model_state_dict" in checkpoint
-
-        finally:
-            Path(temp_path).unlink(missing_ok=True)
-
-    def test_load_model(self):
-        """Test SimpleCnn loading functionality."""
-        original_model = SimpleCnn(num_classes=5)
-
-        with tempfile.NamedTemporaryFile(suffix=".pt", delete=False) as f:
-            temp_path = f.name
-
-        try:
-            # Save the model
-            original_model.save_model(temp_path)
-
-            # Load it back
-            device = torch.device("cpu")
-            loaded_model = SimpleCnn.load_model(temp_path, device)
-
-            # Verify loaded model has same properties
-            assert loaded_model.num_classes == original_model.num_classes
-
-            # Verify model info matches
-            original_info = original_model.get_model_info()
-            loaded_info = loaded_model.get_model_info()
-            assert original_info == loaded_info
-
-        finally:
-            Path(temp_path).unlink(missing_ok=True)
 
     def test_simplecnn_vs_cnn5layer_parameters(self):
         """Test that SimpleCnn has fewer parameters than CNN5Layer."""
