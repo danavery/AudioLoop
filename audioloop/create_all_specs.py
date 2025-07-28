@@ -11,8 +11,6 @@ import torchaudio
 from tqdm import tqdm
 
 from .config import AudioLoopConfig
-from .datasets import UrbanSound8KConfig
-from .datasets.fsd50k_config import FSD50KConfig
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -294,13 +292,9 @@ Examples:
         logger.error(f"Dataset error: {e}")
         exit(1)
 
-    # Set up dataset config (processor functionality now merged into config)
-    if dataset_name == "fsd50k":
-        dataset_config = FSD50KConfig()
-        logger.info("Processing FSD50K dataset")
-    else:
-        dataset_config = UrbanSound8KConfig()
-        logger.info("Processing UrbanSound8K dataset")
+    # Get dataset config using registry approach
+    dataset_config = config.get_dataset_config()
+    logger.info(f"Processing {dataset_name} dataset")
 
     # Create spectrograms
     successful, failed = create_specs(config, dataset_config, clear_output=not args.no_clear)
