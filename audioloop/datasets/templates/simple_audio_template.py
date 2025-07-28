@@ -5,38 +5,48 @@ TEMPLATE: Simple audio dataset configuration for folder + CSV pattern.
 
 Instead:
 1. Copy this file to: audioloop/datasets/your_dataset_name_config.py
-2. Rename the class from TemplateAudioConfig to YourDatasetNameConfig
+2. Rename the class from TemplateAudioConfig to YourDatasetNameConfig  
 3. Customize the paths and settings for your dataset
 4. Use with: --dataset your_dataset_name
 
-This template supports the common pattern of:
-- Audio files in a directory (WAV, MP3, etc.)
-- Labels in a CSV file with columns: filename, label
+This template provides a complete DatasetConfig implementation with:
+- Audio file loading from directory structures
+- CSV metadata parsing with flexible column names
+- Spectrogram preprocessing pipeline
+- Binary classification support
+- Automatic file extension detection
 
-Example CSV format:
+Supported CSV formats:
     filename,label
     audio1.wav,speech
     audio2.wav,music
-    audio3.wav,noise
 
-Or with additional columns:
+Or with additional metadata:
     filename,label,speaker_id,duration
     audio1.wav,speech,speaker_001,2.5
     audio2.wav,music,speaker_002,3.1
 
-Copy example:
+Copy and customize example:
     cp audioloop/datasets/templates/simple_audio_template.py \\
-       audioloop/datasets/my_speech_config.py
+       audioloop/datasets/my_dataset_config.py
+    
+Then edit: class name, paths, vocabulary, and audio parameters.
 """
 
 import csv
+import logging
 from pathlib import Path
 from typing import Any, ClassVar
 
+import torch
 import torch.nn as nn
 import torchaudio
 
-from .dataset_config import DatasetConfig
+from audioloop.utils.log_normalize import LogNormalize
+
+from ..dataset_config import DatasetConfig
+
+logger = logging.getLogger(__name__)
 
 
 class TemplateAudioConfig(DatasetConfig):
@@ -46,7 +56,8 @@ class TemplateAudioConfig(DatasetConfig):
     ⚠️  RENAME THIS CLASS when you copy this file!
     Example: MyDatasetConfig, SpeechDatasetConfig, etc.
     
-    Then customize the paths and settings below for your specific dataset.
+    Then customize the paths, vocabulary, and audio parameters below.
+    This template provides all required DatasetConfig methods for full AudioLoop compatibility.
     """
     
     # =============================================================================
@@ -105,9 +116,6 @@ class TemplateAudioConfig(DatasetConfig):
         """Mapping from class IDs to class names."""
         return self._class_vocabulary.copy()
     
-    def get_metadata_entries(self) -> list[dict[str, Any]]:
-        """Get list of metadata entries for active learning."""
-        return self.load_metadata()
     
     def load_metadata(self, split: str = "dev") -> list[dict[str, Any]]:
         """
@@ -246,7 +254,7 @@ class TemplateAudioConfig(DatasetConfig):
                 hop_length=self._hop_length,
                 n_mels=self._n_mels,
             ),
-            torchaudio.transforms.AmplitudeToDB(top_db=self._top_db),
+            LogNormalize(top_db=self._top_db),
         )
     
     def parse_metadata_row(self, row: dict[str, str]) -> dict[str, Any]:
@@ -261,10 +269,66 @@ class TemplateAudioConfig(DatasetConfig):
             "fold": None,
         }
     
-    def get_binary_label(self, item: dict[str, Any], positive_class_id: int, positive_class_name: str) -> bool:
-        """Get binary label for an item based on positive class."""
+    def get_binary_label(self, item: dict[str, Any], positive_class_id: int, positive_class_name: str) -> int:
+        """Get binary label for an item based on positive class criteria."""
         # item["labels"] is a list of label names
         item_labels = item.get("labels", [])
         
         # Check if any of the item's labels match the positive class
-        return any(self.is_positive_class(label, positive_class_name) for label in item_labels)
+        return 1 if any(self.is_positive_class(label, positive_class_name) for label in item_labels) else 0
+    
+    def fix_spectrogram_length(self, spec: torch.Tensor) -> torch.Tensor:
+        """Fix spectrogram to target length by padding or cropping."""
+        current_length = spec.shape[-1]  # Time dimension is last
+        target_length = self._fixed_length
+        
+        if current_length < target_length:
+            # Pad with zeros on the right
+            pad_size = target_length - current_length
+            spec = torch.nn.functional.pad(spec, (0, pad_size), mode="constant", value=0)
+        elif current_length > target_length:
+            # Crop from the center
+            start_idx = (current_length - target_length) // 2
+            spec = spec[..., start_idx : start_idx + target_length]
+        
+        return spec
+    
+    def process_single_file(self, file_info: dict, output_dir: Path) -> tuple[bool, int | None]:
+        """Process a single audio file and save its spectrogram."""
+        try:
+            audio_path = file_info["audio_path"]
+            filename = file_info["filename"]
+            
+            # Check if audio file exists
+            if not audio_path.exists():
+                logger.warning(f"Audio file not found: {audio_path}")
+                return False, None
+            
+            # Load audio
+            waveform, sample_rate = torchaudio.load(audio_path)
+            
+            # Convert stereo to mono by averaging channels
+            if waveform.shape[0] > 1:
+                waveform = waveform.mean(dim=0, keepdim=True)
+            
+            # Create spectrogram
+            spec_transform = self.create_spectrogram_transform()
+            spec = spec_transform(waveform)
+            
+            # Store original length before fixing
+            original_length = spec.shape[-1]
+            
+            # Fix spectrogram length
+            spec = self.fix_spectrogram_length(spec)
+            
+            # Save spectrogram
+            base_filename = filename.split(".")[0]  # Remove extension
+            output_filename = f"{base_filename}.pt"
+            output_path = output_dir / output_filename
+            torch.save(spec, output_path)
+            
+            return True, original_length
+            
+        except Exception as e:
+            logger.error(f"Error processing {file_info['filename']}: {e}")
+            return False, None

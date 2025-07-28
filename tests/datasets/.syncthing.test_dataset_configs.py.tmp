@@ -157,9 +157,13 @@ class TestMetadataHandling:
         config = config_class()
 
         # Mock file operations to avoid actual file access
-        with patch("builtins.open", mock_open(read_data="")):
-            # Mock file existence check
-            with patch("pathlib.Path.exists", return_value=True):
+        if config_class == FSD50KConfig:
+            mock_csv_data = "fname,labels,mids\ntest.wav,test_label,test_mid\n"
+        else:  # UrbanSound8KConfig
+            mock_csv_data = "slice_file_name,class,classID,fold\ntest.wav,drilling,4,1\n"
+        
+        with patch("pathlib.Path.exists", return_value=True):
+            with patch("pathlib.Path.open", mock_open(read_data=mock_csv_data)):
                 # Mock vocabulary loading
                 if config_class == FSD50KConfig:
                     with patch(

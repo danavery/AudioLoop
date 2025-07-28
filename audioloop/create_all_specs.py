@@ -156,15 +156,9 @@ def create_specs(config, dataset_config, clear_output=True) -> tuple[int, int]:
     """
 
     # Validate inputs
-    # Check for metadata file - different datasets have different attribute names
-    metadata_file = None
-    if hasattr(dataset_config, "metadata_csv"):
-        metadata_file = dataset_config.metadata_csv
-    elif hasattr(dataset_config, "dev_csv"):
-        metadata_file = dataset_config.dev_csv
-
-    if metadata_file and not metadata_file.exists():
-        raise FileNotFoundError(f"Metadata file not found: {metadata_file}")
+    # Check if dataset CSV exists (using standardized interface)
+    if not dataset_config.dataset_csv.exists():
+        raise FileNotFoundError(f"Dataset CSV not found: {dataset_config.dataset_csv}")
 
     if not dataset_config.audio_root.exists():
         raise FileNotFoundError(f"Audio root directory not found: {dataset_config.audio_root}")
@@ -198,7 +192,8 @@ def create_specs(config, dataset_config, clear_output=True) -> tuple[int, int]:
             if i == 0:
                 try:
                     waveform, _ = torchaudio.load(file_info["audio_path"])
-                    sample_spec = dataset_config.spec_transform(waveform)
+                    spec_transform = dataset_config.create_spectrogram_transform()
+                    sample_spec = spec_transform(waveform)
                     fixed_spec = dataset_config.fix_spectrogram_length(sample_spec)
                     logger.info(f"Sample audio_path: {file_info['audio_path']}")
                     logger.info(f"Sample audio shape: {waveform.shape}")

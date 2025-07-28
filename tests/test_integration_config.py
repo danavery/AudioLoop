@@ -92,6 +92,8 @@ class TestDatasetIntegration:
         # Should have required interface
         assert hasattr(dataset_config, "get_audio_path")
         assert hasattr(dataset_config, "load_metadata")
+        assert hasattr(dataset_config, "fix_spectrogram_length")
+        assert hasattr(dataset_config, "process_single_file")
 
 
 class TestVersionedWorkflow:

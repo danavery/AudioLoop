@@ -9,6 +9,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
+import torch
 import torch.nn as nn
 
 
@@ -142,5 +143,31 @@ class DatasetConfig(ABC):
 
         Returns:
             1 if positive class, 0 otherwise
+        """
+        pass
+
+    # === Audio Processing Pipeline ===
+    @abstractmethod
+    def fix_spectrogram_length(self, spec: torch.Tensor) -> torch.Tensor:
+        """Fix spectrogram to target length by padding or cropping.
+
+        Args:
+            spec: Input spectrogram tensor
+
+        Returns:
+            Spectrogram tensor with fixed length matching dataset configuration
+        """
+        pass
+
+    @abstractmethod
+    def process_single_file(self, file_info: dict, output_dir: Path) -> tuple[bool, int | None]:
+        """Process a single audio file and save its spectrogram.
+
+        Args:
+            file_info: Metadata dict with 'filename', 'audio_path', etc.
+            output_dir: Directory to save the processed spectrogram
+
+        Returns:
+            Tuple of (success: bool, original_length: int | None)
         """
         pass
