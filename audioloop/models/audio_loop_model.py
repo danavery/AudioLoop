@@ -20,3 +20,15 @@ class AudioLoopModel(nn.Module, ABC):
             Dict with at minimum: model_type, num_classes, num_parameters
         """
         pass
+
+    @abstractmethod
+    def can_handle_shape(self, shape: tuple[int, ...]) -> bool:
+        """Check if this model can handle tensors with the given shape.
+
+        Args:
+            shape: Tensor shape (excluding batch dimension)
+
+        Returns:
+            True if the model can process tensors of this shape
+        """
+        pass

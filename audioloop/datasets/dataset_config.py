@@ -116,6 +116,15 @@ class DatasetConfig(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_output_shape(self) -> tuple[int, ...]:
+        """Get the shape of tensors produced by this dataset.
+
+        Returns:
+            Tuple representing tensor shape (excluding batch dimension)
+        """
+        pass
+
     # === Binary Classification ===
     @abstractmethod
     def is_positive_class(self, class_name: str, positive_class: str | int) -> bool:

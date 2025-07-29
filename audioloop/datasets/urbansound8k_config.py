@@ -220,20 +220,22 @@ class UrbanSound8KConfig(DatasetConfig):
             LogNormalize(top_db=self.top_db),
         )
 
+    def get_output_shape(self) -> tuple[int, ...]:
+        """Get the shape of tensors produced by this dataset."""
+        return (self.n_mels, -1)  # -1 indicates variable time dimension
+
     def fix_spectrogram_length(self, spec: torch.Tensor) -> torch.Tensor:
-        """Fix spectrogram to target length by padding or cropping."""
+        """Fix spectrogram length by cropping outliers but preserving natural variation."""
         current_length = spec.shape[-1]  # Time dimension is last
-        target_length = self.fixed_length
+        max_length = self.fixed_length  # Use as maximum, not target
 
-        if current_length < target_length:
-            # Pad with zeros on the right
-            pad_size = target_length - current_length
-            spec = torch.nn.functional.pad(spec, (0, pad_size), mode="constant", value=0)
-        elif current_length > target_length:
+        # Only crop if it exceeds reasonable maximum (handles outliers)
+        if current_length > max_length:
             # Crop from the center
-            start_idx = (current_length - target_length) // 2
-            spec = spec[..., start_idx : start_idx + target_length]
+            start_idx = (current_length - max_length) // 2
+            spec = spec[..., start_idx : start_idx + max_length]
 
+        # Don't pad short spectrograms - preserve natural length
         return spec
 
     def process_single_file(self, file_info: dict, output_dir: Path) -> tuple[bool, int | None]:

@@ -84,6 +84,9 @@ class TestDatasetConfigInterface:
                 import torch
                 return spec
 
+            def get_output_shape(self) -> tuple[int, ...]:
+                return (128, 993)  # Test shape
+
             def process_single_file(self, file_info, output_dir):
                 return True, None
 
@@ -100,10 +103,12 @@ class TestDatasetConfigInterface:
         assert hasattr(config, "get_audio_path")
         assert hasattr(config, "fix_spectrogram_length")
         assert hasattr(config, "process_single_file")
+        assert hasattr(config, "get_output_shape")
         assert callable(config.load_metadata)
         assert callable(config.get_audio_path)
         assert callable(config.fix_spectrogram_length)
         assert callable(config.process_single_file)
+        assert callable(config.get_output_shape)
 
 
 class TestDatasetConfigBehavior:
@@ -132,6 +137,11 @@ class TestDatasetConfigBehavior:
         fsd50k = FSD50KConfig()
         urbansound8k = UrbanSound8KConfig()
 
+        # Both return variable time dimension (-1) in output shape
+        assert fsd50k.get_output_shape()[1] == -1
+        assert urbansound8k.get_output_shape()[1] == -1
+
+        # But still have different max length limits for outlier handling
         assert fsd50k.fixed_length != urbansound8k.fixed_length
         assert fsd50k.fixed_length == 2048
         assert urbansound8k.fixed_length == 993
@@ -181,38 +191,60 @@ class TestNewAbstractMethods:
 
     @pytest.mark.parametrize("config_class", [FSD50KConfig, UrbanSound8KConfig])
     def test_fix_spectrogram_length(self, config_class):
-        """Test that fix_spectrogram_length works correctly."""
+        """Test that fix_spectrogram_length works correctly with new variable length behavior."""
         import torch
-        
+
         config = config_class()
-        
-        # Test with a spectrogram that needs padding
+
+        # Test with a short spectrogram (should be preserved, no padding)
         short_spec = torch.randn(1, 128, 100)
         fixed_spec = config.fix_spectrogram_length(short_spec)
-        
-        # Should be padded to fixed_length
-        expected_length = config.fixed_length
-        assert fixed_spec.shape[-1] == expected_length
-        
-        # Test with a spectrogram that needs cropping
-        long_spec = torch.randn(1, 128, expected_length * 2)
-        fixed_spec = config.fix_spectrogram_length(long_spec)
-        
-        # Should be cropped to fixed_length
-        assert fixed_spec.shape[-1] == expected_length
+
+        # Should preserve natural length (no padding)
+        assert fixed_spec.shape[-1] == 100
+
+        # Test with a spectrogram within reasonable limits (should be preserved)
+        medium_spec = torch.randn(1, 128, config.fixed_length // 2)
+        fixed_spec = config.fix_spectrogram_length(medium_spec)
+
+        # Should preserve natural length
+        assert fixed_spec.shape[-1] == config.fixed_length // 2
+
+        # Test with an outlier spectrogram (should be cropped)
+        outlier_spec = torch.randn(1, 128, config.fixed_length * 2)
+        fixed_spec = config.fix_spectrogram_length(outlier_spec)
+
+        # Should be cropped to max allowed length
+        assert fixed_spec.shape[-1] == config.fixed_length
 
     @pytest.mark.parametrize("config_class", [FSD50KConfig, UrbanSound8KConfig])
     def test_process_single_file_signature(self, config_class):
         """Test that process_single_file has correct signature."""
         config = config_class()
-        
+
         # Should have the method (don't actually call it - might need real files)
         assert hasattr(config, "process_single_file")
         assert callable(config.process_single_file)
-        
+
         # Test the method signature by checking __annotations__ if available
         method = getattr(config, "process_single_file")
         # Just verify it's callable - actual testing would need file mocking
+
+    @pytest.mark.parametrize("config_class", [FSD50KConfig, UrbanSound8KConfig])
+    def test_get_output_shape(self, config_class):
+        """Test that get_output_shape returns correct shape."""
+        config = config_class()
+
+        shape = config.get_output_shape()
+
+        # Should return a tuple of integers
+        assert isinstance(shape, tuple)
+        assert len(shape) == 2  # Should be 2D for spectrograms
+        assert all(isinstance(dim, int) for dim in shape)
+
+        # Should match expected dimensions
+        assert shape[0] == config.n_mels  # Frequency dimension
+        assert shape[1] == -1  # Time dimension is variable (-1 sentinel)
 
 
 class TestPathGeneration:

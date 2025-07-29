@@ -8,7 +8,7 @@ used throughout the AudioLoop active learning framework.
 import pytest
 import torch
 
-from audioloop.utils.data_utils import entropy, get_device, simple_collate_fn
+from audioloop.utils.data_utils import entropy, get_device, simple_collate_fn, variable_length_collate_fn
 
 
 # Test fixtures
@@ -145,3 +145,125 @@ def test_simple_collate_single_item():
     assert result["data"].shape == (1, 1, 64, 100)
     assert result["label"].shape == (1,)
     assert len(result["filename"]) == 1
+
+
+class TestVariableLengthCollate:
+    """Test variable_length_collate_fn functionality."""
+
+    @pytest.fixture
+    def variable_length_batch(self):
+        """Sample batch with different length spectrograms."""
+        return [
+            {
+                "data": torch.randn(1, 64, 100),  # Short spectrogram
+                "label": 1,
+                "filename": "short.pt",
+                "filepath": "path/short.pt",
+            },
+            {
+                "data": torch.randn(1, 64, 150),  # Longer spectrogram
+                "label": 0,
+                "filename": "long.pt",
+                "filepath": "path/long.pt",
+            },
+        ]
+
+    @pytest.fixture
+    def same_length_batch(self):
+        """Sample batch where all spectrograms are same length."""
+        return [
+            {
+                "data": torch.randn(1, 64, 100),
+                "label": 1,
+                "filename": "test1.pt",
+                "filepath": "path/test1.pt",
+            },
+            {
+                "data": torch.randn(1, 64, 100),
+                "label": 0,
+                "filename": "test2.pt",
+                "filepath": "path/test2.pt",
+            },
+        ]
+
+    def test_variable_length_collate_basic(self, variable_length_batch):
+        """Test collation of variable length spectrograms."""
+        result = variable_length_collate_fn(variable_length_batch)
+
+        # Should pad to max length (150)
+        assert result["data"].shape == (2, 1, 64, 150)
+        assert torch.equal(result["label"], torch.tensor([1, 0]))
+        assert result["filename"] == ["short.pt", "long.pt"]
+        assert result["filepath"] == ["path/short.pt", "path/long.pt"]
+
+        # Check that shorter spectrogram was padded with zeros
+        short_spec = result["data"][0]  # First item (originally 100 frames)
+        # Last 50 frames should be zero (padding)
+        assert torch.all(short_spec[..., 100:] == 0)
+        # First 100 frames should not be all zero (original data)
+        assert not torch.all(short_spec[..., :100] == 0)
+
+    def test_variable_length_collate_same_length(self, same_length_batch):
+        """Test that variable collate works with same-length spectrograms."""
+        result = variable_length_collate_fn(same_length_batch)
+
+        # Should work exactly like simple_collate_fn for same lengths
+        assert result["data"].shape == (2, 1, 64, 100)
+        assert torch.equal(result["label"], torch.tensor([1, 0]))
+        assert result["filename"] == ["test1.pt", "test2.pt"]
+        assert result["filepath"] == ["path/test1.pt", "path/test2.pt"]
+
+    def test_variable_length_collate_single_item(self):
+        """Test variable collate with single item batch."""
+        batch = [
+            {
+                "data": torch.randn(1, 64, 75),
+                "label": 1,
+                "filename": "single.pt",
+                "filepath": "path/single.pt",
+            }
+        ]
+
+        result = variable_length_collate_fn(batch)
+
+        assert result["data"].shape == (1, 1, 64, 75)  # No padding needed
+        assert result["label"].shape == (1,)
+        assert len(result["filename"]) == 1
+
+    def test_variable_length_collate_three_different_lengths(self):
+        """Test with three spectrograms of different lengths."""
+        batch = [
+            {
+                "data": torch.randn(1, 64, 50),   # Short
+                "label": 1,
+                "filename": "short.pt",
+                "filepath": "path/short.pt",
+            },
+            {
+                "data": torch.randn(1, 64, 200),  # Long
+                "label": 0,
+                "filename": "long.pt",
+                "filepath": "path/long.pt",
+            },
+            {
+                "data": torch.randn(1, 64, 125),  # Medium
+                "label": 1,
+                "filename": "medium.pt",
+                "filepath": "path/medium.pt",
+            },
+        ]
+
+        result = variable_length_collate_fn(batch)
+
+        # Should pad all to max length (200)
+        assert result["data"].shape == (3, 1, 64, 200)
+        assert torch.equal(result["label"], torch.tensor([1, 0, 1]))
+
+        # Check padding
+        short_spec = result["data"][0]   # Originally 50 frames
+        medium_spec = result["data"][2]  # Originally 125 frames
+
+        # Short should have padding from 50 to 200
+        assert torch.all(short_spec[..., 50:] == 0)
+        # Medium should have padding from 125 to 200
+        assert torch.all(medium_spec[..., 125:] == 0)

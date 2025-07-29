@@ -37,6 +37,50 @@ def simple_collate_fn(batch):
     }
 
 
+def variable_length_collate_fn(batch):
+    """
+    Collate function for variable-length spectrograms.
+
+    Pads spectrograms within each batch to the longest sequence in that batch.
+    This enables training with natural spectrogram lengths while maintaining
+    consistent batch tensor shapes for PyTorch.
+
+    Args:
+        batch: List of dataset items with keys: data, label, filename, filepath
+
+    Returns:
+        dict: Batched data with tensors padded to max length in batch
+    """
+    # Extract data and other fields
+    data_list = [item["data"] for item in batch]
+    labels = torch.tensor([item["label"] for item in batch])
+
+    # Find the maximum length in this batch
+    max_length = max(spec.shape[-1] for spec in data_list)
+
+    # Pad all spectrograms to the max length
+    padded_data = []
+    for spec in data_list:
+        current_length = spec.shape[-1]
+        if current_length < max_length:
+            # Pad with zeros on the right
+            pad_size = max_length - current_length
+            padded_spec = torch.nn.functional.pad(spec, (0, pad_size), mode="constant", value=0)
+        else:
+            padded_spec = spec
+        padded_data.append(padded_spec)
+
+    # Stack the padded spectrograms (now all same size)
+    data_tensor = torch.stack(padded_data)
+
+    return {
+        "data": data_tensor,
+        "label": labels,
+        "filename": [item["filename"] for item in batch],
+        "filepath": [item["filepath"] for item in batch],
+    }
+
+
 def get_device():
     """
     Get the best available device for PyTorch operations.

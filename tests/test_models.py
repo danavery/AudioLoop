@@ -39,6 +39,9 @@ class TestAudioLoopModel:
             def get_model_info(self) -> dict:
                 return {"model_type": "test", "num_classes": 1, "num_parameters": 11}
 
+            def can_handle_shape(self, shape: tuple[int, ...]) -> bool:
+                return True  # Test model accepts any shape
+
         # Should not raise an exception
         model = CompleteModel()
         assert isinstance(model, AudioLoopModel)
@@ -193,6 +196,19 @@ class TestCNN5Layer:
         output = model(x)
         assert output.shape == (1, 2)
 
+    def test_can_handle_shape(self):
+        """Test can_handle_shape method."""
+        model = CNN5Layer(num_classes=2, dataset_size=150)
+
+        # Should accept 2D tensors
+        assert model.can_handle_shape((128, 993)) is True
+        assert model.can_handle_shape((64, 1500)) is True
+        assert model.can_handle_shape((256, 500)) is True
+
+        # Should reject non-2D tensors
+        assert model.can_handle_shape((128,)) is False  # 1D
+        assert model.can_handle_shape((128, 993, 3)) is False  # 3D
+
     def test_explicit_use_batchnorm_parameter(self):
         """Test the explicit use_batchnorm parameter override."""
         # This parameter should override the automatic decision
@@ -266,6 +282,18 @@ class TestSimpleCnn:
         assert info["num_parameters"] > 0
 
 
+    def test_can_handle_shape(self):
+        """Test can_handle_shape method."""
+        model = SimpleCnn(num_classes=2)
+
+        # Should accept 2D tensors
+        assert model.can_handle_shape((128, 993)) is True
+        assert model.can_handle_shape((64, 1500)) is True
+        assert model.can_handle_shape((256, 500)) is True
+
+        # Should reject non-2D tensors
+        assert model.can_handle_shape((128,)) is False  # 1D
+        assert model.can_handle_shape((128, 993, 3)) is False  # 3D
 
     def test_simplecnn_vs_cnn5layer_parameters(self):
         """Test that SimpleCnn has fewer parameters than CNN5Layer."""

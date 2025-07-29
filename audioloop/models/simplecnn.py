@@ -51,3 +51,9 @@ class SimpleCnn(AudioLoopModel):
             "num_classes": self.num_classes,
             "num_parameters": sum(p.numel() for p in self.parameters()),
         }
+
+    def can_handle_shape(self, shape: tuple[int, ...]) -> bool:
+        """Check if this model can handle tensors with the given shape."""
+        # Can handle any 2D tensor via adaptive pooling
+        # -1 in shape indicates variable dimension, which is fine for CNNs
+        return len(shape) == 2

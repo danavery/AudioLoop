@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 
 from .config import AudioLoopConfig
 from .models.model_registry import get_model_class, list_available_models
-from .utils.data_utils import get_device, simple_collate_fn
+from .utils.data_utils import get_device, simple_collate_fn, variable_length_collate_fn
 from .utils.spectrogram_dataset import SpectrogramDataset
 from .utils.stopping_criteria import create_stopping_criterion
 
@@ -113,7 +113,7 @@ def run_training(
         num_workers=2,
         persistent_workers=True,  # Keep workers alive between epochs
         pin_memory=torch.cuda.is_available(),
-        collate_fn=simple_collate_fn,
+        collate_fn=variable_length_collate_fn,
     )
 
     # Create model based on config
@@ -123,6 +123,21 @@ def run_training(
         dataset_size=len(train_dataset),
         **config.model_kwargs,
     ).to(device)
+
+    # Check dataset/model compatibility
+    dataset_config = config.get_dataset_config()
+    dataset_shape = dataset_config.get_output_shape()
+
+    if not model.can_handle_shape(dataset_shape):
+        available_models = list_available_models()
+        raise ValueError(
+            f"Model '{config.model_type}' cannot handle tensors with shape {dataset_shape} "
+            f"from dataset '{config.dataset}'. "
+            f"Available models: {available_models}. "
+            f"Try a different model with --model-type or use a compatible dataset."
+        )
+
+    print(f"✅ Dataset shape {dataset_shape} is compatible with model '{config.model_type}'")
 
     # Print model info
     model_info = model.get_model_info()
