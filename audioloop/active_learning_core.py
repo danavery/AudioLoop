@@ -119,6 +119,10 @@ def run_binary_inference(
             filtered_count += 1
             continue
 
+        # Skip if spectrogram file doesn't exist
+        if not spec_path.exists():
+            continue
+
         # Use dataset config's binary classification method
         is_positive = dataset_config.get_binary_label(item, positive_class_id, positive_class_name)
 

@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 
 from .config import AudioLoopConfig
 from .models.model_registry import get_model_class, list_available_models
-from .utils.data_utils import get_device, simple_collate_fn, variable_length_collate_fn
+from .utils.data_utils import get_device, variable_length_collate_fn
 from .utils.spectrogram_dataset import SpectrogramDataset
 from .utils.stopping_criteria import create_stopping_criterion
 

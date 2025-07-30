@@ -42,9 +42,8 @@ import torch
 import torch.nn as nn
 import torchaudio
 
+from audioloop.datasets.dataset_config import DatasetConfig
 from audioloop.utils.log_normalize import LogNormalize
-
-from ..dataset_config import DatasetConfig
 
 logger = logging.getLogger(__name__)
 
@@ -115,7 +114,6 @@ class TemplateAudioConfig(DatasetConfig):
     def vocabulary(self) -> dict[int, str]:
         """Mapping from class IDs to class names."""
         return self._class_vocabulary.copy()
-
 
     def load_metadata(self, split: str = "dev") -> list[dict[str, Any]]:
         """
@@ -273,13 +271,19 @@ class TemplateAudioConfig(DatasetConfig):
             "fold": None,
         }
 
-    def get_binary_label(self, item: dict[str, Any], positive_class_id: int, positive_class_name: str) -> int:
+    def get_binary_label(
+        self, item: dict[str, Any], positive_class_id: int, positive_class_name: str
+    ) -> int:
         """Get binary label for an item based on positive class criteria."""
         # item["labels"] is a list of label names
         item_labels = item.get("labels", [])
 
         # Check if any of the item's labels match the positive class
-        return 1 if any(self.is_positive_class(label, positive_class_name) for label in item_labels) else 0
+        return (
+            1
+            if any(self.is_positive_class(label, positive_class_name) for label in item_labels)
+            else 0
+        )
 
     def fix_spectrogram_length(self, spec: torch.Tensor) -> torch.Tensor:
         """Fix spectrogram length by cropping outliers but preserving natural variation."""

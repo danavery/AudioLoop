@@ -59,7 +59,7 @@ class ProcessingStats:
 
         if self.spectrogram_lengths:
             summary.append("")
-            summary.append("Spectrogram length statistics (before fixing to 993):")
+            summary.append("Spectrogram length statistics:")
             summary.append(f"  Count: {len(self.spectrogram_lengths)}")
             summary.append(f"  Min: {min(self.spectrogram_lengths)}")
             summary.append(f"  Max: {max(self.spectrogram_lengths)}")
@@ -98,6 +98,10 @@ class ProcessingStats:
         # Create 20 bins up to 99th percentile
         num_bins = 20
         bin_width = (hist_max - min_len) / num_bins
+
+        # Handle edge case where all lengths are the same
+        if bin_width == 0:
+            return ["", f"All spectrograms have the same length: {min_len}"]
         bins = [0] * num_bins
 
         # Count items in each bin
@@ -140,7 +144,7 @@ class ProcessingStats:
         return histogram
 
 
-def create_specs(config, dataset_config, clear_output=True) -> tuple[int, int]:
+def create_specs(config, dataset_config, clear_output=True, limit=None) -> tuple[int, int]:
     """
     Create spectrograms for any dataset using the provided configurations.
 
@@ -148,6 +152,7 @@ def create_specs(config, dataset_config, clear_output=True) -> tuple[int, int]:
         config: Central AudioLoopConfig for output directory (specs_dir)
         dataset_config: Dataset configuration that handles dataset-specific operations
         clear_output: Whether to clear existing spectrograms before processing
+        limit: Optional limit on number of files to process (for testing)
 
     Returns:
         Tuple of (successful_count, failed_count)
@@ -171,36 +176,53 @@ def create_specs(config, dataset_config, clear_output=True) -> tuple[int, int]:
     # Load metadata
     logger.info(f"Loading {dataset_config.__class__.__name__} metadata...")
     audio_files = dataset_config.load_metadata(split="dev")
-    logger.info(f"Found {len(audio_files)} audio files in dataset")
+
+    # Apply limit if specified
+    if limit is not None:
+        audio_files = audio_files[:limit]
+        logger.info(f"Limited to first {len(audio_files)} audio files (--limit {limit})")
+    else:
+        logger.info(f"Found {len(audio_files)} audio files in dataset")
 
     # Process files
     stats = ProcessingStats()
 
-    for i, file_info in enumerate(tqdm(audio_files, desc="Creating spectrograms")):
-        start_time = time.time()
+    with tqdm(audio_files, desc="Creating spectrograms") as pbar:
+        for i, file_info in enumerate(pbar):
+            start_time = time.time()
 
-        success, spec_length = dataset_config.process_single_file(file_info, config.specs_dir)
+            success, spec_length = dataset_config.process_single_file(file_info, config.specs_dir)
 
-        processing_time = time.time() - start_time
+            processing_time = time.time() - start_time
 
-        if success:
-            stats.record_success(processing_time, spec_length)
+            if success:
+                stats.record_success(processing_time, spec_length)
 
-            # Log sample info for first file
-            if i == 0:
-                try:
-                    waveform, _ = torchaudio.load(file_info["audio_path"])
-                    spec_transform = dataset_config.create_spectrogram_transform()
-                    sample_spec = spec_transform(waveform)
-                    fixed_spec = dataset_config.fix_spectrogram_length(sample_spec)
-                    logger.info(f"Sample audio_path: {file_info['audio_path']}")
-                    logger.info(f"Sample audio shape: {waveform.shape}")
-                    logger.info(f"Sample spectrogram shape (before fixing): {sample_spec.shape}")
-                    logger.info(f"Sample spectrogram shape (after fixing): {fixed_spec.shape}")
-                except Exception as e:
-                    logger.warning(f"Could not log sample info: {e}")
-        else:
-            stats.record_failure()
+                # Log sample info for first file
+                if i == 0:
+                    try:
+                        waveform, _ = torchaudio.load(file_info["audio_path"])
+                        spec_transform = dataset_config.create_spectrogram_transform()
+                        sample_spec = spec_transform(waveform)
+                        fixed_spec = dataset_config.fix_spectrogram_length(sample_spec)
+                        logger.info(f"Sample audio_path: {file_info['audio_path']}")
+                        logger.info(f"Sample audio shape: {waveform.shape}")
+                        logger.info(
+                            f"Sample spectrogram shape (before fixing): {sample_spec.shape}"
+                        )
+                        logger.info(f"Sample spectrogram shape (after fixing): {fixed_spec.shape}")
+                    except Exception as e:
+                        logger.warning(f"Could not log sample info: {e}")
+            else:
+                stats.record_failure()
+
+            # Update progress bar with success/failure counts
+            pbar.set_postfix(
+                {
+                    "Success": stats.successful,
+                    "Failed": stats.failed,
+                }
+            )
 
     # Print summary
     logger.info("\n" + stats.summary())
@@ -262,13 +284,17 @@ Examples:
 
   # Process without clearing existing spectrograms
   python -m audioloop.create_all_specs --no-clear
+
+  # Process only first 100 files (for testing)
+  python -m audioloop.create_all_specs --limit 100
         """,
     )
 
     # Dynamic dataset discovery
     from audioloop.datasets.dataset_registry import list_available_datasets
+
     available_datasets = list_available_datasets()
-    
+
     parser.add_argument(
         "--dataset",
         choices=available_datasets,
@@ -280,6 +306,12 @@ Examples:
         "--no-clear",
         action="store_true",
         help="Do not clear existing spectrograms before processing",
+    )
+
+    parser.add_argument(
+        "--limit",
+        type=int,
+        help="Limit the number of files to process (useful for testing)",
     )
 
     args = parser.parse_args()
@@ -297,7 +329,9 @@ Examples:
     logger.info(f"Processing {dataset_name} dataset")
 
     # Create spectrograms
-    successful, failed = create_specs(config, dataset_config, clear_output=not args.no_clear)
+    successful, failed = create_specs(
+        config, dataset_config, clear_output=not args.no_clear, limit=args.limit
+    )
 
     # Create CSV for inference
     if successful > 0:

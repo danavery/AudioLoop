@@ -555,8 +555,9 @@ Dataset to use ('fsd50k' or 'urbansound8k'). Can also be set via AUDIOLOOP_DATAS
 
     # Dynamic dataset discovery
     from audioloop.datasets.dataset_registry import list_available_datasets
+
     available_datasets = list_available_datasets()
-    
+
     parser.add_argument(
         "--dataset",
         choices=available_datasets,

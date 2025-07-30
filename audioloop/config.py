@@ -103,7 +103,7 @@ class AudioLoopConfig:
     def _validate_dataset(self):
         """Validate that the dataset is supported."""
         from .datasets.dataset_registry import list_available_datasets
-        
+
         available = list_available_datasets()
         if self.dataset not in available:
             raise ValueError(
@@ -189,7 +189,7 @@ class AudioLoopConfig:
     def get_dataset_config(self) -> DatasetConfig:
         """Get the dataset configuration for the current dataset."""
         from .datasets.dataset_registry import get_dataset_config_class
-        
+
         config_class = get_dataset_config_class(self.dataset)
         return config_class()
 

@@ -1,22 +1,12 @@
-# Python-generated files
 __pycache__/
 *.py[oc]
 build/
 dist/
 wheels/
 *.egg-info
+.*/
 
-# Virtual environments
-.venv
-
-.ruff_cache
 data/
 outputs*/
 training_sets*/
-
-.claude/
-CLAUDE.md
 *png
-.ropeproject
-.coverage
-.pytest_cache

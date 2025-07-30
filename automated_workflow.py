@@ -29,6 +29,7 @@ import time
 
 from audioloop.active_learning import run_active_learning_for_class
 from audioloop.config import AudioLoopConfig
+from audioloop.datasets.dataset_registry import list_available_datasets
 from audioloop.label_audio import SimpleAudioLabeler
 from audioloop.merge_labels import merge_training_sets
 
@@ -318,7 +319,7 @@ Prerequisites:
     # Dataset parameters
     parser.add_argument(
         "--dataset",
-        choices=["urbansound8k", "fsd50k"],
+        choices=None,  # Will be validated dynamically using registry
         help="Dataset name (default from config: fsd50k)",
     )
     parser.add_argument(
@@ -418,6 +419,13 @@ Prerequisites:
     )
 
     args = parser.parse_args()
+
+    # Validate dataset choice using registry
+    if args.dataset is not None:
+        available_datasets = list_available_datasets()
+        if args.dataset not in available_datasets:
+            print(f"Error: Invalid dataset '{args.dataset}'. Available datasets: {', '.join(available_datasets)}")
+            sys.exit(1)
 
     # Create config with CLI overrides (config-first approach)
     config_overrides = {

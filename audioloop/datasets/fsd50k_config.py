@@ -156,8 +156,6 @@ class FSD50KConfig(DatasetConfig):
     top_db: int = 80
     fixed_length: int = 2048
 
-
-
     # Processing parameters
     batch_size: int = 32
     num_workers: int = 4

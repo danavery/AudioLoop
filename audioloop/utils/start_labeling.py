@@ -52,9 +52,12 @@ def get_matching_samples(
             match = not match
 
         if match:
-            # Use config's method to get spectrogram path
-            spec_path = dataset_config.get_spectrogram_path(item["filename"], config.specs_dir)
-            matching_filenames.append(spec_path.name)
+            # Check if the audio file actually exists before adding to candidates
+            audio_path = item.get("audio_path") or dataset_config.get_audio_path(item["filename"])
+            if audio_path.exists():
+                # Use config's method to get spectrogram path
+                spec_path = dataset_config.get_spectrogram_path(item["filename"], config.specs_dir)
+                matching_filenames.append(spec_path.name)
 
     return matching_filenames
 
@@ -174,11 +177,12 @@ def list_available_classes(dataset_name: str, **kwargs) -> None:
 
     # All datasets support list_classes()
     dataset_config.list_classes()
-    
+
     # FSD50K has additional semantic groups information
     if dataset_name == "fsd50k":
         try:
             from audioloop.datasets.fsd50k_config import list_semantic_groups
+
             print("\n")
             list_semantic_groups()
         except ImportError:
@@ -212,8 +216,9 @@ Examples:
 
     # Dataset selection - use dynamic discovery
     from audioloop.datasets.dataset_registry import list_available_datasets
+
     available_datasets = list_available_datasets()
-    
+
     parser.add_argument(
         "--dataset",
         choices=available_datasets,
