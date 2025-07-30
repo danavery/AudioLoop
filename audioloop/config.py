@@ -33,6 +33,7 @@ Configuration Precedence:
     3. Default values (lowest priority)
 
 Environment Variables:
+    AUDIOLOOP_EXPERIMENT: Default experiment name (default: None, uses base directories)
     AUDIOLOOP_DATASET: Default dataset ('fsd50k' or 'urbansound8k')
     AUDIOLOOP_DATA_ROOT: Root directory for data files (default: 'data')
     AUDIOLOOP_OUTPUT_ROOT: Root directory for outputs (default: '.')
@@ -59,8 +60,8 @@ from .utils.paths import (
 class AudioLoopConfig:
     """Unified configuration for AudioLoop experiments and workflows."""
 
-    # Experiment identification
-    experiment_name: str | None = None
+    # Experiment identification (environment variable support)
+    experiment_name: str | None = field(default_factory=lambda: os.getenv("AUDIOLOOP_EXPERIMENT"))
 
     # Dataset configuration (environment variable support)
     dataset: str = field(default_factory=lambda: os.getenv("AUDIOLOOP_DATASET", "fsd50k"))
