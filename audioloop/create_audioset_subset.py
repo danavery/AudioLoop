@@ -84,7 +84,9 @@ def create_subset(class_name: str, total_samples: int, positive_ratio: float = 0
     
     # Save subset CSV
     safe_name = class_name.replace(" ", "_").lower()
-    output_path = Path(f"audioset_subset_{safe_name}_{total_samples}.csv")
+    subsets_dir = Path("subsets")
+    subsets_dir.mkdir(exist_ok=True)
+    output_path = subsets_dir / f"audioset_subset_{safe_name}_{total_samples}.csv"
     
     with output_path.open("w") as f:
         f.write(f"# AudioSet subset: {class_name}, {len(subset)} samples (from unbalanced_train)\n")

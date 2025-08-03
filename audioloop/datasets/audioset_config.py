@@ -56,7 +56,7 @@ class AudiosetConfig(DatasetConfig):
     # Specific files
     ontology_json: Path = Path("/mnt/audioset/audioset/metadata/ontology.json")
     # AudioSet has multiple CSV files - we'll use the balanced train set by default
-    _dataset_csv: Path = Path("audioset_subset_brass_instrument_100000.csv")
+    _dataset_csv: Path = Path("subsets/audioset_subset_brass_instrument_100000.csv")
     eval_csv: Path = Path("/mnt/audioset/audioset/metadata/eval_segments.csv")
     unbalanced_csv: Path = Path("/mnt/audioset/audioset/metadata/unbalanced_train_segments.csv")
 
