@@ -297,6 +297,9 @@ Examples:
   # Use entropy-based selection
   python automated_workflow.py --class-name Speech --cycles 2 --selection-mode entropy
 
+  # Use stratified uncertainty sampling (good for extreme imbalance)
+  python automated_workflow.py --class-name Speech --cycles 3 --selection-mode stratified_uncertainty --auto-label
+
 Prerequisites:
   1. Run: python -m audioloop.create_all_specs  (one-time setup)
   2. Run: python -m audioloop.utils.start_labeling --class-name <CLASS_NAME> --n 50
@@ -379,8 +382,8 @@ Prerequisites:
     # Selection strategy parameters
     parser.add_argument(
         "--selection-mode",
-        choices=["confidence", "entropy", "basic_transition"],
-        help="Selection strategy: 'confidence', 'entropy', or 'basic_transition' (default from config: confidence)",
+        choices=["confidence", "entropy", "basic_transition", "stratified_uncertainty"],
+        help="Selection strategy: 'confidence', 'entropy', 'basic_transition', or 'stratified_uncertainty' (default from config: confidence)",
     )
     parser.add_argument(
         "--basic-transition-f1-threshold",

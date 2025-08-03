@@ -85,6 +85,21 @@ def write_starting_labels(
     positive_candidates = get_matching_samples(
         dataset_name, class_name=class_name, invert=False, **kwargs
     )
+    
+    # Get negative samples
+    negative_candidates = get_matching_samples(
+        dataset_name, class_name=class_name, invert=True, **kwargs
+    )
+    
+    # Report dataset distribution
+    total_available = len(positive_candidates) + len(negative_candidates)
+    positive_pct = len(positive_candidates) / total_available * 100 if total_available > 0 else 0
+    print(f"\nDataset distribution for class '{class_name}':")
+    print(f"  Total available samples: {total_available}")
+    print(f"  Positive ({class_name}): {len(positive_candidates)} ({positive_pct:.1f}%)")
+    print(f"  Negative (non-{class_name}): {len(negative_candidates)} ({100-positive_pct:.1f}%)")
+    
+    # Check availability and sample
     if len(positive_candidates) < n_positive:
         raise ValueError(
             f"Not enough positive samples for class '{class_name}'. "
@@ -92,10 +107,6 @@ def write_starting_labels(
         )
     positives = random.sample(positive_candidates, k=n_positive)
 
-    # Get negative samples
-    negative_candidates = get_matching_samples(
-        dataset_name, class_name=class_name, invert=True, **kwargs
-    )
     if len(negative_candidates) < n_negative:
         raise ValueError(
             f"Not enough negative samples for class '{class_name}'. "
@@ -165,6 +176,32 @@ def create_training_set(
     return positives, negatives
 
 
+def show_class_distribution(dataset_name: str, class_name: str, **kwargs) -> None:
+    """Show distribution of positive/negative samples for a specific class.
+
+    Args:
+        dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
+        class_name: Class name to analyze
+        **kwargs: Additional dataset-specific parameters
+    """
+    # Get positive and negative samples
+    positive_candidates = get_matching_samples(
+        dataset_name, class_name=class_name, invert=False, **kwargs
+    )
+    negative_candidates = get_matching_samples(
+        dataset_name, class_name=class_name, invert=True, **kwargs
+    )
+    
+    # Report distribution
+    total_available = len(positive_candidates) + len(negative_candidates)
+    positive_pct = len(positive_candidates) / total_available * 100 if total_available > 0 else 0
+    
+    print(f"Dataset distribution for class '{class_name}' ({dataset_name}):")
+    print(f"  Total available samples: {total_available}")
+    print(f"  Positive ({class_name}): {len(positive_candidates)} ({positive_pct:.1f}%)")
+    print(f"  Negative (non-{class_name}): {len(negative_candidates)} ({100-positive_pct:.1f}%)")
+
+
 def list_available_classes(dataset_name: str, **kwargs) -> None:
     """List all available classes for a dataset.
 
@@ -201,6 +238,9 @@ Examples:
 
   # Create UrbanSound8K training set
   python -m audioloop.utils.start_labeling --dataset urbansound8k --class-name siren --n 40
+
+  # Show class distribution without creating training set
+  python -m audioloop.utils.start_labeling --dataset urbansound8k --class-name siren --show-distribution
 
   # List available classes for FSD50K
   python -m audioloop.utils.start_labeling --list-classes
@@ -259,6 +299,9 @@ Examples:
     parser.add_argument(
         "--list-classes", action="store_true", help="List all available classes for the dataset"
     )
+    parser.add_argument(
+        "--show-distribution", action="store_true", help="Show positive/negative distribution for the specified class"
+    )
     parser.add_argument("--seed", type=int, help="Random seed for reproducibility")
 
     args = parser.parse_args()
@@ -290,6 +333,15 @@ Examples:
 
     if args.list_classes:
         list_available_classes(dataset_name, **dataset_kwargs)
+    elif args.show_distribution:
+        try:
+            show_class_distribution(dataset_name, args.class_name, **dataset_kwargs)
+        except ValueError as e:
+            print(f"Error: {e}")
+            exit(1)
+        except Exception as e:
+            print(f"Unexpected error: {e}")
+            exit(1)
     else:
         try:
             positive_files, negative_files = create_training_set(

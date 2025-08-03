@@ -8,5 +8,6 @@ wheels/
 
 data/
 outputs*/
+subsets/
 training_sets*/
 *png

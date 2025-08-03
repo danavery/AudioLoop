@@ -63,6 +63,8 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None, config=No
 
     # Read new labels from candidates CSV format
     new_count = 0
+    new_positive = 0
+    new_negative = 0
     with open(new_labels_csv) as f:
         reader = csv.DictReader(f)
 
@@ -89,11 +91,15 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None, config=No
 
                 all_data.append({"filename": filename, "label": label_int})
                 new_count += 1
+                if label_int == 1:
+                    new_positive += 1
+                else:
+                    new_negative += 1
             except ValueError:
                 print(f"Warning: Invalid label '{label}' for {filename}, skipping")
                 continue
 
-    print(f"Added {new_count} new labeled samples")
+    print(f"Added {new_count} new labeled samples ({new_positive} positive, {new_negative} negative)")
 
     # Ensure output directory exists
     os.makedirs(os.path.dirname(output_csv) if os.path.dirname(output_csv) else ".", exist_ok=True)

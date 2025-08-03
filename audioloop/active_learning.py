@@ -41,7 +41,7 @@ def run_active_learning_for_class(
         total_candidates: Total number of candidates to select
         positive_percentage: Percentage of candidates that should be positive predictions (0.0-1.0)
         min_confidence: Minimum confidence threshold for candidate selection
-        selection_mode: Selection method ('confidence' for high-confidence samples, 'entropy' for high-uncertainty samples, 'basic_transition' for basic transition strategy)
+        selection_mode: Selection method ('confidence' for high-confidence samples, 'entropy' for high-uncertainty samples, 'basic_transition' for basic transition strategy, 'stratified_uncertainty' for stratified uncertainty sampling)
         basic_transition_f1_threshold: F1 threshold for basic transition (default: 0.2)
         basic_transition_confidence_threshold: Mean confidence threshold for basic transition (default: 0.9)
         basic_transition_variance_threshold: Std confidence threshold for basic transition (default: 0.12)
