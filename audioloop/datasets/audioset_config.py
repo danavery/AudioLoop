@@ -61,8 +61,8 @@ class AudiosetConfig(DatasetConfig):
     unbalanced_csv: Path = Path("/mnt/audioset/audioset/metadata/unbalanced_train_segments.csv")
 
     # Cached ontology to avoid repeated loading
-    _ontology: dict[str, str] | None = None
-    _name_to_mid: dict[str, str] | None = None
+    _ontology: dict[int, str] | None = None
+    _name_to_mid: dict[str, int] | None = None
     _current_split: str = "bal_train"  # Track current split for path construction
 
     # === Core Dataset Properties ===

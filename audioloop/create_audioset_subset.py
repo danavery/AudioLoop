@@ -20,8 +20,14 @@ def create_subset(class_name: str, total_samples: int, positive_ratio: float = 0
     
     # Load AudioSet paths
     from .config import AudioLoopConfig
+    from .datasets.audioset_config import AudiosetConfig
+    
     config = AudioLoopConfig(dataset="audioset")
     audioset_config = config.get_dataset_config()
+    
+    # Type check - ensure we have the right config type
+    if not isinstance(audioset_config, AudiosetConfig):
+        raise TypeError(f"Expected AudiosetConfig, got {type(audioset_config)}")
     
     metadata_csv = audioset_config.unbalanced_csv
     ontology_json = audioset_config.ontology_json
