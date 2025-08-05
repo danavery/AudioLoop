@@ -74,6 +74,7 @@ class AudioLoopConfig:
     model_type: str = "cnn5layer"
     model_kwargs: dict[str, Any] = field(default_factory=dict)
     use_batchnorm: bool | None = None  # None = auto-detect based on dataset size
+    use_class_weighting: bool = False  # Apply inverse frequency class weighting
 
     # Stopping criteria configuration
     stopping_criterion_type: str = "plateau"

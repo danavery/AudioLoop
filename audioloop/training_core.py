@@ -156,7 +156,23 @@ def run_training(
     print(f"Sample spectrogram shape: {sample_shape}")
     print(f"Model created with {sum(p.numel() for p in model.parameters())} parameters")
 
-    criterion = nn.CrossEntropyLoss()
+    # Create loss criterion with optional class weighting
+    if config.use_class_weighting:
+        # Calculate class weights from training dataset
+        labels = [train_dataset[i]["label"] for i in range(len(train_dataset))]
+        class_counts = torch.bincount(torch.tensor(labels))
+        total_samples = len(train_dataset)
+        class_weights = total_samples / (len(class_counts) * class_counts.float())
+        
+        print(f"Class weighting enabled:")
+        print(f"  Class counts: {class_counts.tolist()}")
+        print(f"  Class weights: {class_weights.tolist()}")
+        print(f"  Weight ratio (neg/pos): {class_weights[0]/class_weights[1]:.2f}")
+        
+        criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
+    else:
+        criterion = nn.CrossEntropyLoss()
+    
     optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=1e-5)
 
     # Create stopping criterion from config
@@ -188,7 +204,9 @@ def run_training(
             )
 
         # Check stopping criterion (this updates internal state)
-        should_stop = stopping_criterion.should_stop(epoch, accuracy, avg_loss)
+        should_stop = stopping_criterion.should_stop(
+            epoch, accuracy, avg_loss, train_dataset=train_dataset
+        )
 
         # Update best model state if criterion indicates we should
         if stopping_criterion.should_update_best_model():

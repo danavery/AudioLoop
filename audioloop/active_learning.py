@@ -202,8 +202,8 @@ Examples:
     )
     parser.add_argument(
         "--selection-mode",
-        choices=["confidence", "entropy", "basic_transition"],
-        help="Selection method: 'confidence', 'entropy', or 'basic_transition' (default from config: confidence)",
+        choices=["confidence", "entropy", "basic_transition", "stratified_uncertainty"],
+        help="Selection method: 'confidence', 'entropy', 'basic_transition', or 'stratified_uncertainty' (default from config: confidence)",
     )
 
     # Basic transition configuration arguments

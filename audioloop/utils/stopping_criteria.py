@@ -20,6 +20,7 @@ class TrainingStoppingCriterion(ABC):
         train_loss: float,
         val_accuracy: float | None = None,
         val_loss: float | None = None,
+        **kwargs,
     ) -> bool:
         """
         Determine if training should stop.
@@ -30,6 +31,7 @@ class TrainingStoppingCriterion(ABC):
             train_loss: Training loss for current epoch
             val_accuracy: Validation accuracy (if available)
             val_loss: Validation loss (if available)
+            **kwargs: Strategy-specific parameters (e.g., train_dataset for PlateauCriterion)
 
         Returns:
             True if training should stop, False otherwise
@@ -93,6 +95,7 @@ class AccuracyCriterion(TrainingStoppingCriterion):
         train_loss: float,
         val_accuracy: float | None = None,
         val_loss: float | None = None,
+        **kwargs,
     ) -> bool:
         # Mark that we should save this model if we hit 100% accuracy
         if train_accuracy >= 1.0:
@@ -142,11 +145,13 @@ class PlateauCriterion(TrainingStoppingCriterion):
             min_delta: Minimum change to qualify as improvement
             max_epochs: Maximum epochs (fallback safety)
             accuracy_floor: Only count patience when accuracy >= this threshold (optional)
+                          If None, will be auto-calculated from training data when set_training_context() is called
         """
         self.patience = patience
         self.min_delta = min_delta
         self.max_epochs = max_epochs
         self.accuracy_floor = accuracy_floor
+        self._auto_accuracy_floor = accuracy_floor is None  # Track if we need to auto-calculate
         self.best_train_loss = float("inf")
         self.epochs_without_improvement = 0
         self.best_model_state = None
@@ -158,7 +163,16 @@ class PlateauCriterion(TrainingStoppingCriterion):
         train_loss: float,
         val_accuracy: float | None = None,
         val_loss: float | None = None,
+        **kwargs,
     ) -> bool:
+        # Auto-calculate accuracy floor on first call if dataset provided
+        if self._auto_accuracy_floor and 'train_dataset' in kwargs:
+            positive_ratio = self._calculate_positive_ratio(kwargs['train_dataset'])
+            trivial_accuracy = max(positive_ratio, 1 - positive_ratio)
+            self.accuracy_floor = min(trivial_accuracy + 0.15, 0.99)
+            self._auto_accuracy_floor = False
+            print(f"Auto-calculated accuracy floor: {self.accuracy_floor:.2f} (trivial accuracy: {trivial_accuracy:.2f})")
+
         # Stop immediately if we hit 100% accuracy (best case scenario)
         if train_accuracy >= 1.0:
             # Mark that we should save this model as the best (perfect accuracy)
@@ -197,12 +211,30 @@ class PlateauCriterion(TrainingStoppingCriterion):
         """Get the best model state seen so far."""
         return self.best_model_state
 
+    def _calculate_positive_ratio(self, training_dataset) -> float:
+        """Calculate the ratio of positive samples in the training dataset.
+        
+        Args:
+            training_dataset: Training dataset with label information
+            
+        Returns:
+            Ratio of positive samples (label=1) to total samples
+        """
+        if len(training_dataset) == 0:
+            return 0.5  # Default to balanced if no data
+        
+        positive_count = sum(1 for i in range(len(training_dataset)) if training_dataset[i]["label"] == 1)
+        return positive_count / len(training_dataset)
+
     def reset(self) -> None:
         """Reset internal state for a new training run."""
         self.best_train_loss = float("inf")
         self.epochs_without_improvement = 0
         self.best_model_state = None
         self._should_update_best_model = False
+        # Reset auto-calculation flag but preserve the accuracy_floor value if set
+        if hasattr(self, '_auto_accuracy_floor'):
+            self._auto_accuracy_floor = self.accuracy_floor is None
 
 
 def create_stopping_criterion(config) -> TrainingStoppingCriterion:

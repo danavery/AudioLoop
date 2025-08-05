@@ -91,6 +91,11 @@ def main():
         type=str,
         help="Experiment name to customize output directory (default: outputs, with experiment: outputs_experiment)",
     )
+    parser.add_argument(
+        "--use-class-weighting",
+        action="store_true",
+        help="Apply inverse frequency class weighting to handle imbalanced datasets",
+    )
 
     args = parser.parse_args()
 
@@ -132,6 +137,10 @@ def main():
         }.items()
         if value is not None
     }
+    
+    # Handle boolean flags separately (they're always provided by argparse)
+    if args.use_class_weighting:
+        config_overrides["use_class_weighting"] = True
 
     config = AudioLoopConfig(**config_overrides)
 
