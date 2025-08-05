@@ -24,16 +24,16 @@ from .utils import (
 
 # Public API
 __all__ = [
+    "BasicTransitionStrategy",
     # Base class
     "CandidateSelectionStrategy",
     # Strategy implementations
     "ConfidenceStrategy",
     "EntropyStrategy",
-    "BasicTransitionStrategy",
     "StratifiedUncertaintyStrategy",
     # Utility functions
     "create_strategy",
     "load_predictions",
-    "save_candidates",
     "print_selection_statistics",
+    "save_candidates",
 ]

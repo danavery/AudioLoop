@@ -8,7 +8,12 @@ used throughout the AudioLoop active learning framework.
 import pytest
 import torch
 
-from audioloop.utils.data_utils import entropy, get_device, simple_collate_fn, variable_length_collate_fn
+from audioloop.utils.data_utils import (
+    entropy,
+    get_device,
+    simple_collate_fn,
+    variable_length_collate_fn,
+)
 
 
 # Test fixtures

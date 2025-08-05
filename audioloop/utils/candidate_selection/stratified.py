@@ -56,7 +56,7 @@ class StratifiedUncertaintyStrategy(CandidateSelectionStrategy):
         
         if available_positives == 0:
             # No predicted positives - fall back to pure entropy sampling
-            print(f"  No predicted positives available, using pure entropy sampling")
+            print("  No predicted positives available, using pure entropy sampling")
             all_preds = predictions.copy()
             all_preds.sort(key=lambda x: x["entropy"], reverse=True)
             selected = all_preds[:num_candidates]

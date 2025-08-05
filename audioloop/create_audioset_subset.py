@@ -8,10 +8,7 @@ Usage:
 """
 
 import argparse
-import csv
-import json
 import random
-import sys
 from pathlib import Path
 
 
@@ -29,13 +26,7 @@ def create_subset(class_name: str, total_samples: int, positive_ratio: float = 0
     if not isinstance(audioset_config, AudiosetConfig):
         raise TypeError(f"Expected AudiosetConfig, got {type(audioset_config)}")
     
-    metadata_csv = audioset_config.unbalanced_csv
-    ontology_json = audioset_config.ontology_json
-    
-    # Load ontology for MID->name conversion
-    with ontology_json.open() as f:
-        ontology = json.load(f)
-        mid_to_name = {entry["id"]: entry["name"] for entry in ontology}
+    # Note: ontology loading removed as MID->name conversion is handled by dataset config
     
     print(f"Creating subset for '{class_name}' ({positive_ratio:.1%} positive, {total_samples:,} total)")
     
@@ -96,7 +87,7 @@ def create_subset(class_name: str, total_samples: int, positive_ratio: float = 0
     
     with output_path.open("w") as f:
         f.write(f"# AudioSet subset: {class_name}, {len(subset)} samples (from unbalanced_train)\n")
-        f.write(f"# SPLIT: unbalanced_train\n")
+        f.write("# SPLIT: unbalanced_train\n")
         for sample in subset:
             f.write(f'{sample["ytid"]}, {sample["start"]}, {sample["end"]}, "{sample["labels"]}"\n')
     
@@ -117,6 +108,7 @@ def main():
         return 1
     
     create_subset(args.class_name, args.total_samples, args.positive_ratio)
+    return None
 
 
 if __name__ == "__main__":

@@ -151,6 +151,7 @@ class PlateauCriterion(TrainingStoppingCriterion):
         self.min_delta = min_delta
         self.max_epochs = max_epochs
         self.accuracy_floor = accuracy_floor
+        self._original_accuracy_floor = accuracy_floor  # Store original value for reset
         self._auto_accuracy_floor = accuracy_floor is None  # Track if we need to auto-calculate
         self.best_train_loss = float("inf")
         self.epochs_without_improvement = 0
@@ -232,9 +233,9 @@ class PlateauCriterion(TrainingStoppingCriterion):
         self.epochs_without_improvement = 0
         self.best_model_state = None
         self._should_update_best_model = False
-        # Reset auto-calculation flag but preserve the accuracy_floor value if set
-        if hasattr(self, '_auto_accuracy_floor'):
-            self._auto_accuracy_floor = self.accuracy_floor is None
+        # Reset to original accuracy floor value
+        self.accuracy_floor = self._original_accuracy_floor
+        self._auto_accuracy_floor = self._original_accuracy_floor is None
 
 
 def create_stopping_criterion(config) -> TrainingStoppingCriterion:

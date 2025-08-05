@@ -81,7 +81,6 @@ class TestDatasetConfigInterface:
                 return 1
 
             def fix_spectrogram_length(self, spec):
-                import torch
                 return spec
 
             def get_output_shape(self) -> tuple[int, ...]:
@@ -226,8 +225,6 @@ class TestNewAbstractMethods:
         assert hasattr(config, "process_single_file")
         assert callable(config.process_single_file)
 
-        # Test the method signature by checking __annotations__ if available
-        method = getattr(config, "process_single_file")
         # Just verify it's callable - actual testing would need file mocking
 
     @pytest.mark.parametrize("config_class", [FSD50KConfig, UrbanSound8KConfig])

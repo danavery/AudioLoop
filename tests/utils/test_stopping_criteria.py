@@ -80,7 +80,7 @@ class TestTrainingStoppingCriterion:
 
         class ConcreteTestCriterion(TrainingStoppingCriterion):
             def should_stop(
-                self, epoch, train_accuracy, train_loss, val_accuracy=None, val_loss=None
+                self, epoch, train_accuracy, train_loss, val_accuracy=None, val_loss=None, **kwargs
             ):
                 return False
 
@@ -1115,7 +1115,7 @@ class TestStoppingCriterionFactory:
     def test_create_plateau_criterion(self):
         """Test factory creates PlateauCriterion with correct parameters."""
         from audioloop.config import AudioLoopConfig
-        from audioloop.utils.stopping_criteria import create_stopping_criterion, PlateauCriterion
+        from audioloop.utils.stopping_criteria import PlateauCriterion, create_stopping_criterion
         
         config = AudioLoopConfig(
             stopping_criterion_type="plateau",
@@ -1136,7 +1136,7 @@ class TestStoppingCriterionFactory:
     def test_create_accuracy_criterion(self):
         """Test factory creates AccuracyCriterion with correct parameters."""
         from audioloop.config import AudioLoopConfig
-        from audioloop.utils.stopping_criteria import create_stopping_criterion, AccuracyCriterion
+        from audioloop.utils.stopping_criteria import AccuracyCriterion, create_stopping_criterion
         
         config = AudioLoopConfig(
             stopping_criterion_type="accuracy",
@@ -1162,7 +1162,7 @@ class TestStoppingCriterionFactory:
     def test_create_criterion_uses_config_defaults(self):
         """Test factory uses config defaults when not explicitly set."""
         from audioloop.config import AudioLoopConfig
-        from audioloop.utils.stopping_criteria import create_stopping_criterion, PlateauCriterion
+        from audioloop.utils.stopping_criteria import PlateauCriterion, create_stopping_criterion
         
         config = AudioLoopConfig()  # Use all defaults
         criterion = create_stopping_criterion(config)
@@ -1172,3 +1172,199 @@ class TestStoppingCriterionFactory:
         assert criterion.patience == 20  # Config default
         assert criterion.min_delta == 0.01  # Config default
         assert criterion.accuracy_floor is None  # Config default
+
+
+class MockTrainingDataset:
+    """Mock training dataset for testing auto-accuracy floor calculation."""
+    
+    def __init__(self, labels):
+        self.labels = labels
+    
+    def __len__(self):
+        return len(self.labels)
+    
+    def __getitem__(self, idx):
+        return {"label": self.labels[idx]}
+
+
+class TestPlateauCriterionAutoAccuracyFloor:
+    """Test auto-calculation of accuracy floor in PlateauCriterion."""
+    
+    def test_auto_accuracy_floor_balanced_dataset(self):
+        """Test auto-calculation with balanced dataset (50/50)."""
+        criterion = PlateauCriterion(patience=2, accuracy_floor=None)
+        
+        # Balanced dataset: 50% positive, 50% negative
+        balanced_dataset = MockTrainingDataset([0] * 50 + [1] * 50)
+        
+        # First call should trigger auto-calculation
+        should_stop = criterion.should_stop(
+            0, 0.6, 0.5, train_dataset=balanced_dataset
+        )
+        
+        # Auto-calculated floor should be max(0.5, 0.5) + 0.15 = 0.65
+        assert criterion.accuracy_floor == 0.65
+        assert should_stop is False
+    
+    def test_auto_accuracy_floor_imbalanced_dataset_majority_negative(self):
+        """Test auto-calculation with imbalanced dataset (10% positive)."""
+        criterion = PlateauCriterion(patience=2, accuracy_floor=None)
+        
+        # Imbalanced dataset: 10% positive, 90% negative
+        imbalanced_dataset = MockTrainingDataset([0] * 90 + [1] * 10)
+        
+        # First call should trigger auto-calculation
+        criterion.should_stop(0, 0.8, 0.5, train_dataset=imbalanced_dataset)
+        
+        # Auto-calculated floor should be max(0.1, 0.9) + 0.15 = 0.9 + 0.15 = 0.99 (capped)
+        assert criterion.accuracy_floor == 0.99
+    
+    def test_auto_accuracy_floor_imbalanced_dataset_majority_positive(self):
+        """Test auto-calculation with imbalanced dataset (90% positive)."""
+        criterion = PlateauCriterion(patience=2, accuracy_floor=None)
+        
+        # Imbalanced dataset: 90% positive, 10% negative
+        imbalanced_dataset = MockTrainingDataset([1] * 90 + [0] * 10)
+        
+        # First call should trigger auto-calculation
+        criterion.should_stop(0, 0.8, 0.5, train_dataset=imbalanced_dataset)
+        
+        # Auto-calculated floor should be max(0.9, 0.1) + 0.15 = 0.9 + 0.15 = 0.99 (capped)
+        assert criterion.accuracy_floor == 0.99
+    
+    def test_auto_accuracy_floor_extreme_imbalance(self):
+        """Test auto-calculation with extreme imbalance (1% positive)."""
+        criterion = PlateauCriterion(patience=2, accuracy_floor=None)
+        
+        # Extremely imbalanced: 1% positive, 99% negative
+        extreme_dataset = MockTrainingDataset([0] * 99 + [1] * 1)
+        
+        criterion.should_stop(0, 0.8, 0.5, train_dataset=extreme_dataset)
+        
+        # Auto-calculated floor should be max(0.01, 0.99) + 0.15 = 0.99 + 0.15 = 0.99 (capped)
+        assert criterion.accuracy_floor == 0.99
+    
+    def test_auto_accuracy_floor_moderate_imbalance(self):
+        """Test auto-calculation with moderate imbalance (25% positive)."""
+        criterion = PlateauCriterion(patience=2, accuracy_floor=None)
+        
+        # Moderately imbalanced: 25% positive, 75% negative
+        moderate_dataset = MockTrainingDataset([0] * 75 + [1] * 25)
+        
+        criterion.should_stop(0, 0.8, 0.5, train_dataset=moderate_dataset)
+        
+        # Auto-calculated floor should be max(0.25, 0.75) + 0.15 = 0.75 + 0.15 = 0.90
+        assert criterion.accuracy_floor == 0.90
+    
+    def test_auto_accuracy_floor_only_calculated_once(self):
+        """Test that auto-calculation only happens once."""
+        criterion = PlateauCriterion(patience=2, accuracy_floor=None)
+        
+        # First dataset
+        dataset1 = MockTrainingDataset([0] * 75 + [1] * 25)  # 25% positive
+        criterion.should_stop(0, 0.8, 0.5, train_dataset=dataset1)
+        first_floor = criterion.accuracy_floor
+        
+        # Second call with different dataset should not recalculate
+        dataset2 = MockTrainingDataset([0] * 50 + [1] * 50)  # 50% positive
+        criterion.should_stop(1, 0.8, 0.5, train_dataset=dataset2)
+        
+        # Floor should remain the same (from first calculation)
+        assert criterion.accuracy_floor == first_floor
+        assert criterion.accuracy_floor == 0.90  # From first dataset
+    
+    def test_auto_accuracy_floor_no_dataset_provided(self):
+        """Test behavior when no train_dataset is provided in kwargs."""
+        criterion = PlateauCriterion(patience=2, accuracy_floor=None)
+        
+        # Call without train_dataset - should not crash and floor should remain None
+        should_stop = criterion.should_stop(0, 0.8, 0.5)
+        
+        assert criterion.accuracy_floor is None
+        assert should_stop is False
+    
+    def test_auto_accuracy_floor_empty_dataset(self):
+        """Test auto-calculation with empty dataset (edge case)."""
+        criterion = PlateauCriterion(patience=2, accuracy_floor=None)
+        
+        empty_dataset = MockTrainingDataset([])
+        criterion.should_stop(0, 0.8, 0.5, train_dataset=empty_dataset)
+        
+        # Empty dataset should default to balanced (0.5), so floor = 0.5 + 0.15 = 0.65
+        assert criterion.accuracy_floor == 0.65
+    
+    def test_auto_accuracy_floor_single_class_all_positive(self):
+        """Test auto-calculation with single class (all positive)."""
+        criterion = PlateauCriterion(patience=2, accuracy_floor=None)
+        
+        all_positive_dataset = MockTrainingDataset([1] * 100)
+        criterion.should_stop(0, 0.8, 0.5, train_dataset=all_positive_dataset)
+        
+        # All positive: trivial accuracy = max(1.0, 0.0) = 1.0, floor = min(1.0 + 0.15, 0.99) = 0.99
+        assert criterion.accuracy_floor == 0.99
+    
+    def test_auto_accuracy_floor_single_class_all_negative(self):
+        """Test auto-calculation with single class (all negative)."""
+        criterion = PlateauCriterion(patience=2, accuracy_floor=None)
+        
+        all_negative_dataset = MockTrainingDataset([0] * 100)
+        criterion.should_stop(0, 0.8, 0.5, train_dataset=all_negative_dataset)
+        
+        # All negative: trivial accuracy = max(0.0, 1.0) = 1.0, floor = min(1.0 + 0.15, 0.99) = 0.99
+        assert criterion.accuracy_floor == 0.99
+    
+    def test_auto_accuracy_floor_manual_override_preserved(self):
+        """Test that manually set accuracy_floor is not overridden."""
+        criterion = PlateauCriterion(patience=2, accuracy_floor=0.8)  # Manual value
+        
+        dataset = MockTrainingDataset([0] * 90 + [1] * 10)  # Would auto-calc to 0.99
+        criterion.should_stop(0, 0.8, 0.5, train_dataset=dataset)
+        
+        # Manual value should be preserved
+        assert criterion.accuracy_floor == 0.8
+    
+    def test_auto_accuracy_floor_reset_behavior(self):
+        """Test that reset preserves auto-calculation behavior."""
+        criterion = PlateauCriterion(patience=2, accuracy_floor=None)
+        
+        # First calculation
+        dataset1 = MockTrainingDataset([0] * 75 + [1] * 25)
+        criterion.should_stop(0, 0.8, 0.5, train_dataset=dataset1)
+        assert criterion.accuracy_floor == 0.90
+        
+        # Reset should restore auto-calculation capability
+        criterion.reset()
+        assert criterion.accuracy_floor is None
+        assert hasattr(criterion, '_auto_accuracy_floor')
+        assert criterion._auto_accuracy_floor is True
+        
+        # Should auto-calculate again with new dataset
+        dataset2 = MockTrainingDataset([0] * 50 + [1] * 50)
+        criterion.should_stop(0, 0.8, 0.5, train_dataset=dataset2)
+        assert criterion.accuracy_floor == 0.65  # New calculation
+    
+    def test_auto_accuracy_floor_prevents_early_stopping(self):
+        """Test that auto-calculated floor prevents stopping at pathological accuracy."""
+        criterion = PlateauCriterion(patience=2, accuracy_floor=None)
+        
+        # Dataset with 75% negative examples (like the brass instrument case)
+        dataset = MockTrainingDataset([0] * 75 + [1] * 25)
+        
+        # First call auto-calculates floor to 0.90
+        should_stop = criterion.should_stop(0, 0.75, 0.5, train_dataset=dataset)
+        assert criterion.accuracy_floor == 0.90
+        assert should_stop is False  # Accuracy 0.75 < floor 0.90, should continue
+        
+        # Subsequent calls at pathological accuracy should not increment patience
+        should_stop = criterion.should_stop(1, 0.75, 0.6)  # Worse loss, below floor
+        assert should_stop is False  # Should not count toward patience
+        assert criterion.epochs_without_improvement == 0  # Patience not incremented
+        
+        # Once above floor, patience should start counting
+        should_stop = criterion.should_stop(2, 0.91, 0.6)  # Above floor, worse loss
+        assert should_stop is False  # Not stopped yet
+        assert criterion.epochs_without_improvement == 1  # Now counting patience
+        
+        # Second epoch above floor with no improvement should trigger stopping
+        should_stop = criterion.should_stop(3, 0.91, 0.6)  # Still above floor, no improvement
+        assert should_stop is True  # Should stop (patience=2, this is epoch 2 without improvement)

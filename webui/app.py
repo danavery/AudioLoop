@@ -8,8 +8,9 @@ logic but presents it through a modern web interface instead of terminal command
 
 import os
 import sys
-from flask import Flask, render_template, request, jsonify, send_file
 from pathlib import Path
+
+from flask import Flask, jsonify, render_template, request, send_file
 
 # Add the parent directory to Python path so we can import audioloop
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -32,6 +33,8 @@ def load_candidates():
     global current_labeler
     
     data = request.json
+    if data is None:
+        return jsonify({'error': 'No JSON data provided'}), 400
     candidates_csv = data.get('candidates_csv')
     dataset = data.get('dataset', 'fsd50k')  # Default to fsd50k
     audio_dir = data.get('audio_dir')
@@ -112,6 +115,8 @@ def label_candidate():
         return jsonify({'error': 'No candidates loaded'}), 400
     
     data = request.json
+    if data is None:
+        return jsonify({'error': 'No JSON data provided'}), 400
     index = data.get('index')
     label = data.get('label')  # "1" for positive, "0" for negative
     

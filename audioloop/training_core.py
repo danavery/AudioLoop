@@ -164,7 +164,7 @@ def run_training(
         total_samples = len(train_dataset)
         class_weights = total_samples / (len(class_counts) * class_counts.float())
         
-        print(f"Class weighting enabled:")
+        print("Class weighting enabled:")
         print(f"  Class counts: {class_counts.tolist()}")
         print(f"  Class weights: {class_weights.tolist()}")
         print(f"  Weight ratio (neg/pos): {class_weights[0]/class_weights[1]:.2f}")

@@ -7,10 +7,11 @@ based on model performance metrics (F1, confidence, variance thresholds).
 
 from typing import Any
 
+from audioloop.utils.metrics_utils import calculate_binary_metrics
+
 from .base import CandidateSelectionStrategy
 from .confidence import ConfidenceStrategy
 from .entropy import EntropyStrategy
-from ..metrics_utils import calculate_binary_metrics
 
 
 class BasicTransitionStrategy(CandidateSelectionStrategy):
@@ -43,7 +44,7 @@ class BasicTransitionStrategy(CandidateSelectionStrategy):
         # Apply validated threshold configuration
         if auto_thresholds:
             # Auto-calculate all thresholds
-            from ..adaptive_thresholds import threshold_calculator
+            from audioloop.utils.adaptive_thresholds import threshold_calculator
 
             self.f1_threshold, self.confidence_threshold, self.variance_threshold = (
                 threshold_calculator.calculate_thresholds(estimated_positive_pct, training_set_size)

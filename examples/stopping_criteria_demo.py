@@ -256,7 +256,7 @@ def demo_custom_criterion():
             self.max_epochs = max_epochs
             self.best_model_state = None
 
-        def should_stop(self, epoch, train_accuracy, train_loss, val_accuracy=None, val_loss=None):
+        def should_stop(self, epoch, train_accuracy, train_loss, val_accuracy=None, val_loss=None, **kwargs):
             return train_accuracy >= self.target_accuracy or epoch >= self.max_epochs - 1
 
         def should_update_best_model(self) -> bool:
@@ -290,7 +290,7 @@ def demo_combined_criteria():
         def __init__(self, criteria: list[TrainingStoppingCriterion]):
             self.criteria = criteria
 
-        def should_stop(self, epoch, train_accuracy, train_loss, val_accuracy=None, val_loss=None):
+        def should_stop(self, epoch, train_accuracy, train_loss, val_accuracy=None, val_loss=None, **kwargs):
             # Stop if ANY criterion says to stop
             for criterion in self.criteria:
                 if criterion.should_stop(epoch, train_accuracy, train_loss, val_accuracy, val_loss):
@@ -299,10 +299,7 @@ def demo_combined_criteria():
 
         def should_update_best_model(self) -> bool:
             # Update if any criterion says to update
-            for criterion in self.criteria:
-                if criterion.should_update_best_model():
-                    return True
-            return False
+            return any(criterion.should_update_best_model() for criterion in self.criteria)
 
         def update_best_model(self, model_state) -> None:
             # Update all criteria
