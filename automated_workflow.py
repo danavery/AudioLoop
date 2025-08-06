@@ -420,6 +420,11 @@ Prerequisites:
         type=int,
         help="Random seed for reproducibility (default from config: 42)",
     )
+    parser.add_argument(
+        "--use-class-weighting",
+        action="store_true",
+        help="Apply inverse frequency class weighting to handle imbalanced datasets",
+    )
 
     args = parser.parse_args()
 
@@ -459,6 +464,8 @@ Prerequisites:
     # Handle boolean flags separately (they're always provided by argparse)
     if args.auto_thresholds:
         config_overrides["auto_thresholds"] = True
+    if args.use_class_weighting:
+        config_overrides["use_class_weighting"] = True
 
     config = AudioLoopConfig(**config_overrides)
 
