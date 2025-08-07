@@ -19,8 +19,6 @@ class TestAutoLabelingUtility:
 
     def create_test_candidates_csv(self, candidates_data, include_ground_truth=True):
         """Create a temporary candidates CSV file for testing."""
-        temp_file = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False)
-
         # Standard fieldnames for candidates CSV
         if include_ground_truth:
             fieldnames = [
@@ -54,17 +52,17 @@ class TestAutoLabelingUtility:
                 "filepath",
             ]
 
-        writer = csv.DictWriter(temp_file, fieldnames=fieldnames)
-        writer.writeheader()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as temp_file:
+            writer = csv.DictWriter(temp_file, fieldnames=fieldnames)
+            writer.writeheader()
 
-        for data in candidates_data:
-            # Fill in defaults for missing fields
-            row = dict.fromkeys(fieldnames, "")
-            row.update(data)
-            writer.writerow(row)
+            for data in candidates_data:
+                # Fill in defaults for missing fields
+                row = dict.fromkeys(fieldnames, "")
+                row.update(data)
+                writer.writerow(row)
 
-        temp_file.close()
-        return temp_file.name
+            return temp_file.name
 
     def test_auto_label_basic_functionality(self):
         """Test basic auto-labeling with ground truth data."""
@@ -134,14 +132,14 @@ class TestAutoLabelingUtility:
 
     def test_auto_label_empty_file(self):
         """Test error handling for empty CSV files."""
-        temp_file = tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False)
-        temp_file.close()
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as temp_file:
+            temp_file_name = temp_file.name
 
         try:
             with pytest.raises(ValueError, match="No candidates found"):
-                auto_label_from_ground_truth(temp_file.name)
+                auto_label_from_ground_truth(temp_file_name)
         finally:
-            Path(temp_file.name).unlink()
+            Path(temp_file_name).unlink()
 
     def test_auto_label_mixed_boolean_formats(self):
         """Test handling of different boolean string formats."""
