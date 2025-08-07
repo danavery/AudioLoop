@@ -133,6 +133,9 @@ Examples:
 
   # Use custom experiment name (outputs go to outputs_myexp/)
   python -m audioloop.active_learning --class-name siren --run-number 1 --experiment myexp
+
+  # Include ground truth evaluation columns (for datasets with known labels)
+  python -m audioloop.active_learning --class-name Drill --run-number 1 --with-ground-truth
         """,
     )
 
@@ -242,6 +245,11 @@ Examples:
         type=int,
         help="Random seed for reproducibility (default: None)",
     )
+    parser.add_argument(
+        "--with-ground-truth",
+        action="store_true",
+        help="Include ground truth evaluation columns (true_is_positive, correct) in predictions CSV. Use for evaluation with labeled datasets.",
+    )
 
     args = parser.parse_args()
 
@@ -267,6 +275,8 @@ Examples:
         # Handle boolean flags separately (they're always provided by argparse)
         if args.auto_thresholds:
             config_overrides["auto_thresholds"] = True
+        if args.with_ground_truth:
+            config_overrides["with_ground_truth"] = True
 
         config = AudioLoopConfig(**config_overrides)
         dataset_config = config.get_dataset_config()
@@ -327,6 +337,7 @@ Examples:
         f"Candidates: {num_positive} positive, {num_negative} negative ({args.positive_pct:.0%} positive)"
     )
     print(f"Min confidence: {args.min_confidence}")
+    print(f"Ground truth evaluation: {'enabled' if config.with_ground_truth else 'disabled'}")
 
     # Run the active learning cycle with clean signature (reuse existing config)
     predictions_file, candidates_file = run_active_learning_cycle(

@@ -85,20 +85,20 @@ def write_starting_labels(
     positive_candidates = get_matching_samples(
         dataset_name, class_name=class_name, invert=False, **kwargs
     )
-    
+
     # Get negative samples
     negative_candidates = get_matching_samples(
         dataset_name, class_name=class_name, invert=True, **kwargs
     )
-    
+
     # Report dataset distribution
     total_available = len(positive_candidates) + len(negative_candidates)
     positive_pct = len(positive_candidates) / total_available * 100 if total_available > 0 else 0
     print(f"\nDataset distribution for class '{class_name}':")
     print(f"  Total available samples: {total_available}")
     print(f"  Positive ({class_name}): {len(positive_candidates)} ({positive_pct:.1f}%)")
-    print(f"  Negative (non-{class_name}): {len(negative_candidates)} ({100-positive_pct:.1f}%)")
-    
+    print(f"  Negative (non-{class_name}): {len(negative_candidates)} ({100 - positive_pct:.1f}%)")
+
     # Check availability and sample
     if len(positive_candidates) < n_positive:
         raise ValueError(
@@ -191,15 +191,15 @@ def show_class_distribution(dataset_name: str, class_name: str, **kwargs) -> Non
     negative_candidates = get_matching_samples(
         dataset_name, class_name=class_name, invert=True, **kwargs
     )
-    
+
     # Report distribution
     total_available = len(positive_candidates) + len(negative_candidates)
     positive_pct = len(positive_candidates) / total_available * 100 if total_available > 0 else 0
-    
+
     print(f"Dataset distribution for class '{class_name}' ({dataset_name}):")
     print(f"  Total available samples: {total_available}")
     print(f"  Positive ({class_name}): {len(positive_candidates)} ({positive_pct:.1f}%)")
-    print(f"  Negative (non-{class_name}): {len(negative_candidates)} ({100-positive_pct:.1f}%)")
+    print(f"  Negative (non-{class_name}): {len(negative_candidates)} ({100 - positive_pct:.1f}%)")
 
 
 def list_available_classes(dataset_name: str, **kwargs) -> None:
@@ -300,7 +300,9 @@ Examples:
         "--list-classes", action="store_true", help="List all available classes for the dataset"
     )
     parser.add_argument(
-        "--show-distribution", action="store_true", help="Show positive/negative distribution for the specified class"
+        "--show-distribution",
+        action="store_true",
+        help="Show positive/negative distribution for the specified class",
     )
     parser.add_argument("--seed", type=int, help="Random seed for reproducibility")
 

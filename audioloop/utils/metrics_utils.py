@@ -17,82 +17,99 @@ def calculate_binary_metrics(predictions: list[dict[str, Any]]) -> dict[str, flo
 
     Args:
         predictions: List of prediction dictionaries with keys:
-            - true_is_positive: bool or str
-            - predicted_is_positive: bool or str
-            - confidence: float
+            - predicted_is_positive: bool or str (required)
+            - confidence: float (required) 
+            - true_is_positive: bool or str (optional, required for evaluation metrics)
 
     Returns:
         Dict containing calculated metrics:
-            - f1_score: F1 score
-            - precision: Precision
-            - recall: Recall
-            - accuracy: Overall accuracy
-            - negative_class_accuracy: Negative class accuracy (specificity)
-            - mean_confidence: Mean prediction confidence
-            - std_confidence: Standard deviation of confidence
-            - median_confidence: Median confidence
-            - min_confidence: Minimum confidence
-            - max_confidence: Maximum confidence
+            - mean_confidence, std_confidence, etc.: Always available
+            - f1_score, precision, recall, accuracy: Only when ground truth available
+            - predicted_positive_ratio: Always available
     """
     if not predictions:
         return {}
 
-    # Convert predictions to numeric values
-    true_labels = []
+    # Check if ground truth is available
+    has_ground_truth = all("true_is_positive" in p and p["true_is_positive"] is not None 
+                          for p in predictions if p)
+    
+    # Always calculate prediction and confidence metrics
     pred_labels = []
     confidences = []
 
     for p in predictions:
-        # Handle string/boolean conversion for labels
-        true_pos = p["true_is_positive"]
         pred_pos = p["predicted_is_positive"]
-
-        if isinstance(true_pos, str):
-            true_pos = true_pos.lower() == "true"
         if isinstance(pred_pos, str):
             pred_pos = pred_pos.lower() == "true"
-
-        true_labels.append(int(true_pos))
         pred_labels.append(int(pred_pos))
         confidences.append(float(p["confidence"]))
 
-    # Calculate confusion matrix components
-    tp = sum(1 for t, p in zip(true_labels, pred_labels, strict=False) if t == 1 and p == 1)
-    fp = sum(1 for t, p in zip(true_labels, pred_labels, strict=False) if t == 0 and p == 1)
-    fn = sum(1 for t, p in zip(true_labels, pred_labels, strict=False) if t == 1 and p == 0)
-    tn = sum(1 for t, p in zip(true_labels, pred_labels, strict=False) if t == 0 and p == 0)
-
-    # Calculate performance metrics
-    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-    f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
-    accuracy = (tp + tn) / (tp + tn + fp + fn) if (tp + tn + fp + fn) > 0 else 0.0
-    negative_class_accuracy = tn / (tn + fp) if (tn + fp) > 0 else 0.0
-
-    # Calculate confidence statistics
+    # Calculate confidence statistics (always available)
     mean_confidence = statistics.mean(confidences)
     std_confidence = statistics.stdev(confidences) if len(confidences) > 1 else 0.0
     median_confidence = statistics.median(confidences)
     min_confidence = min(confidences)
     max_confidence = max(confidences)
+    
+    # Calculate prediction distribution (always available)
+    predicted_positives = sum(pred_labels)
+    predicted_positive_ratio = predicted_positives / len(predictions)
 
-    return {
-        "f1_score": f1_score,
-        "precision": precision,
-        "recall": recall,
-        "accuracy": accuracy,
-        "negative_class_accuracy": negative_class_accuracy,
+    # Base metrics (always available)
+    result = {
         "mean_confidence": mean_confidence,
         "std_confidence": std_confidence,
         "median_confidence": median_confidence,
         "min_confidence": min_confidence,
         "max_confidence": max_confidence,
-        "true_positives": tp,
-        "false_positives": fp,
-        "false_negatives": fn,
-        "true_negatives": tn,
+        "predicted_positive_ratio": predicted_positive_ratio,
+        "predicted_positives": predicted_positives,
         "total_samples": len(predictions),
+        "has_ground_truth": has_ground_truth,
     }
+
+    # Add evaluation metrics only if ground truth is available
+    if has_ground_truth:
+        true_labels = []
+        for p in predictions:
+            true_pos = p["true_is_positive"]
+            if isinstance(true_pos, str):
+                true_pos = true_pos.lower() == "true"
+            true_labels.append(int(true_pos))
+
+        # Calculate confusion matrix components
+        tp = sum(1 for t, p in zip(true_labels, pred_labels, strict=False) if t == 1 and p == 1)
+        fp = sum(1 for t, p in zip(true_labels, pred_labels, strict=False) if t == 0 and p == 1)
+        fn = sum(1 for t, p in zip(true_labels, pred_labels, strict=False) if t == 1 and p == 0)
+        tn = sum(1 for t, p in zip(true_labels, pred_labels, strict=False) if t == 0 and p == 0)
+
+        # Calculate evaluation metrics
+        precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
+        accuracy = (tp + tn) / (tp + tn + fp + fn) if (tp + tn + fp + fn) > 0 else 0.0
+        negative_class_accuracy = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+        
+        actual_positives = sum(true_labels)
+        actual_positive_ratio = actual_positives / len(predictions)
+
+        # Add evaluation metrics to result
+        result.update({
+            "f1_score": f1_score,
+            "precision": precision,
+            "recall": recall,
+            "accuracy": accuracy,
+            "negative_class_accuracy": negative_class_accuracy,
+            "true_positives": tp,
+            "false_positives": fp,
+            "false_negatives": fn,
+            "true_negatives": tn,
+            "actual_positive_ratio": actual_positive_ratio,
+            "actual_positives": actual_positives,
+        })
+
+    return result
 
 
 def calculate_entropy_metrics(predictions: list[dict[str, Any]]) -> dict[str, float]:
@@ -139,40 +156,48 @@ def calculate_class_balance_metrics(predictions: list[dict[str, Any]]) -> dict[s
 
     Returns:
         Dict containing class balance metrics:
-            - actual_positive_ratio: Ratio of actual positive samples
-            - predicted_positive_ratio: Ratio of predicted positive samples
-            - balance_difference: Absolute difference between actual and predicted ratios
+            - predicted_positive_ratio: Ratio of predicted positive samples (always available)
+            - actual_positive_ratio: Ratio of actual positive samples (only with ground truth)
+            - balance_difference: Absolute difference between actual and predicted ratios (only with ground truth)
     """
     if not predictions:
         return {}
 
-    true_positives = 0
+    # Check if ground truth is available
+    has_ground_truth = all("true_is_positive" in p and p["true_is_positive"] is not None 
+                          for p in predictions if p)
+
     predicted_positives = 0
     total = len(predictions)
 
+    # Always calculate predicted positive ratio
     for p in predictions:
-        # Handle string/boolean conversion
-        true_pos = p["true_is_positive"]
         pred_pos = p["predicted_is_positive"]
-
-        if isinstance(true_pos, str):
-            true_pos = true_pos.lower() == "true"
         if isinstance(pred_pos, str):
             pred_pos = pred_pos.lower() == "true"
-
-        if true_pos:
-            true_positives += 1
         if pred_pos:
             predicted_positives += 1
 
-    actual_ratio = true_positives / total
     predicted_ratio = predicted_positives / total
+    result = {"predicted_positive_ratio": predicted_ratio}
 
-    return {
-        "actual_positive_ratio": actual_ratio,
-        "predicted_positive_ratio": predicted_ratio,
-        "balance_difference": abs(actual_ratio - predicted_ratio),
-    }
+    # Add ground truth metrics if available
+    if has_ground_truth:
+        true_positives = 0
+        for p in predictions:
+            true_pos = p["true_is_positive"]
+            if isinstance(true_pos, str):
+                true_pos = true_pos.lower() == "true"
+            if true_pos:
+                true_positives += 1
+
+        actual_ratio = true_positives / total
+        result.update({
+            "actual_positive_ratio": actual_ratio,
+            "balance_difference": abs(actual_ratio - predicted_ratio),
+        })
+
+    return result
 
 
 def calculate_confidence_percentiles(

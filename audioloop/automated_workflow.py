@@ -10,14 +10,14 @@ This script automates the complete active learning cycle:
 5. Repeat for specified number of cycles
 
 Usage:
-    # Automated workflow with auto-labeling (for testing/development)
-    python automated_workflow.py --class-name siren --cycles 3 --auto-label
+    # Production workflow (manual labeling, no ground truth)
+    python -m audioloop.automated_workflow --class-name siren --cycles 3
 
-    # Semi-automated workflow (pause for human labeling)
-    python automated_workflow.py --class-name dog_bark --cycles 2
+    # Evaluation workflow with manual labeling (ground truth available)
+    python -m audioloop.automated_workflow --class-name dog_bark --cycles 2 --evaluation-mode
 
-    # Custom parameters
-    python automated_workflow.py --class-name gun_shot --cycles 5 --epochs 500 --candidates 100 --auto-label
+    # Evaluation workflow with auto-labeling (for testing/development)
+    python -m audioloop.automated_workflow --class-name gun_shot --cycles 5 --evaluation-mode --auto-label
 """
 
 import argparse
@@ -30,7 +30,6 @@ import time
 from audioloop.active_learning import run_active_learning_for_class
 from audioloop.config import AudioLoopConfig
 from audioloop.datasets.dataset_registry import list_available_datasets
-from audioloop.label_audio import SimpleAudioLabeler
 from audioloop.merge_labels import merge_training_sets
 
 # Import the APIs from the existing modules
@@ -39,12 +38,12 @@ from audioloop.training_core import run_training
 
 def auto_label_candidates(candidates_file, dataset_name="fsd50k", audio_dir=None):
     """
-    Automatically label candidates using the auto-label functionality.
+    Automatically label candidates using ground truth data.
 
     Args:
         candidates_file: Path to candidates CSV file
-        dataset_name: Dataset name for proper auto-labeling
-        audio_dir: Audio directory (optional, uses default if None)
+        dataset_name: Dataset name (unused, kept for compatibility)
+        audio_dir: Audio directory (unused, kept for compatibility)
 
     Returns:
         int: Number of samples that were labeled
@@ -52,24 +51,15 @@ def auto_label_candidates(candidates_file, dataset_name="fsd50k", audio_dir=None
     print(f"📝 Auto-labeling candidates: {candidates_file}")
 
     try:
-        # Create the labeler instance
-        labeler = SimpleAudioLabeler(
-            candidates_csv=candidates_file, dataset_name=dataset_name, audio_dir=audio_dir
-        )
+        from audioloop.utils.auto_labeling import auto_label_from_ground_truth
 
-        # Run auto-labeling
-        labeler.auto_label()
+        results = auto_label_from_ground_truth(candidates_file)
 
-        # Count labeled samples by reading the file back
-        labeled_count = 0
-        with open(candidates_file) as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                if row.get("needs_human_label", "").strip():
-                    labeled_count += 1
+        print(f"   ✅ Auto-labeled {results['total']} samples")
+        print(f"      Positive: {results['positive_count']}")
+        print(f"      Negative: {results['negative_count']}")
 
-        print(f"   ✅ Auto-labeled {labeled_count} samples")
-        return labeled_count
+        return results["total"]
 
     except Exception as e:
         print(f"   ❌ Error in auto-labeling: {e}")
@@ -114,6 +104,7 @@ def run_automated_workflow(
     class_name,
     num_cycles=3,
     auto_label=True,
+    evaluation_mode=False,
     audio_dir=None,
     seed=None,
 ):
@@ -125,6 +116,7 @@ def run_automated_workflow(
         class_name: Target class name (e.g., "siren", "dog_bark")
         num_cycles: Number of active learning cycles
         auto_label: Whether to auto-label (True) or prompt for manual labeling (False)
+        evaluation_mode: Whether to enable evaluation mode with ground truth access (False)
         audio_dir: Custom audio directory (optional)
         seed: Random seed for reproducibility (default: None)
 
@@ -137,6 +129,7 @@ def run_automated_workflow(
     print(f"Target class: {class_name}")
     print(f"Dataset: {config.dataset}")
     print(f"Cycles: {num_cycles}")
+    print(f"Evaluation mode: {evaluation_mode}")
     print(f"Auto-label: {auto_label}")
     print(f"Training epochs: {config.max_epochs}")
     print(f"Candidates per cycle: {config.total_candidates}")
@@ -219,7 +212,7 @@ def run_automated_workflow(
         # Step 3: Label candidates
         print("\n🏷️  STEP 3: LABELING CANDIDATES")
         print("▼" * 50)
-        if auto_label:
+        if evaluation_mode and auto_label:
             labeled_count = auto_label_candidates(
                 candidates_file=candidates_file, dataset_name=config.dataset, audio_dir=audio_dir
             )
@@ -272,33 +265,29 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Fully automated workflow (auto-labeling for testing)
-  # Fully automated (auto-labeling for testing/development)
-  python automated_workflow.py --class-name Drill --cycles 3 --auto-label
+  # Production workflow (manual labeling, no ground truth)
+  python -m audioloop.automated_workflow --class-name Drill --cycles 3
 
-  # Semi-automated (pause for manual labeling)
-  python automated_workflow.py --class-name Speech --cycles 2
+  # Evaluation workflow with manual labeling (ground truth available)
+  python -m audioloop.automated_workflow --class-name Speech --cycles 2 --evaluation-mode
 
-  # Custom training parameters
-  python automated_workflow.py --class-name Music --cycles 3 --epochs 500 --batch-size 64
+  # Evaluation workflow with auto-labeling (for testing/development)
+  python -m audioloop.automated_workflow --class-name Music --cycles 3 --evaluation-mode --auto-label
 
-  # Custom stopping criteria
-  python automated_workflow.py --class-name Drill --cycles 2 --accuracy-floor 0.95 --patience 30
+  # Custom training parameters with evaluation mode
+  python -m audioloop.automated_workflow --class-name Drill --cycles 2 --evaluation-mode --epochs 500 --batch-size 64
 
-  # Custom active learning parameters
-  python automated_workflow.py --class-name Explosion --cycles 2 --candidates 100 --positive-pct 0.8
+  # Custom stopping criteria (production)
+  python -m audioloop.automated_workflow --class-name Explosion --cycles 2 --accuracy-floor 0.95 --patience 30
 
-  # UrbanSound8K dataset
-  python automated_workflow.py --class-name siren --cycles 2 --dataset urbansound8k --auto-label
+  # UrbanSound8K dataset with evaluation mode
+  python -m audioloop.automated_workflow --class-name siren --cycles 2 --dataset urbansound8k --evaluation-mode --auto-label
 
-  # Use basic transition strategy
-  python automated_workflow.py --class-name Drill --cycles 3 --selection-mode basic_transition --auto-label
+  # Use basic transition strategy with evaluation
+  python -m audioloop.automated_workflow --class-name Drill --cycles 3 --evaluation-mode --selection-mode basic_transition --auto-label
 
-  # Use entropy-based selection
-  python automated_workflow.py --class-name Speech --cycles 2 --selection-mode entropy
-
-  # Use stratified uncertainty sampling (good for extreme imbalance)
-  python automated_workflow.py --class-name Speech --cycles 3 --selection-mode stratified_uncertainty --auto-label
+  # Use entropy-based selection (production)
+  python -m audioloop.automated_workflow --class-name Speech --cycles 2 --selection-mode entropy
 
 Prerequisites:
   1. Run: python -m audioloop.create_all_specs  (one-time setup)
@@ -314,9 +303,14 @@ Prerequisites:
     # Workflow parameters
     parser.add_argument("--cycles", type=int, help="Number of active learning cycles (default: 3)")
     parser.add_argument(
+        "--evaluation-mode",
+        action="store_true",
+        help="Enable evaluation mode with ground truth access (for research/tuning)",
+    )
+    parser.add_argument(
         "--auto-label",
         action="store_true",
-        help="Automatically label using ground truth (for testing)",
+        help="Automatically label using ground truth (requires --evaluation-mode)",
     )
 
     # Dataset parameters
@@ -428,11 +422,17 @@ Prerequisites:
 
     args = parser.parse_args()
 
+    # Validate flag combinations
+    if args.auto_label and not args.evaluation_mode:
+        parser.error("--auto-label requires --evaluation-mode")
+
     # Validate dataset choice using registry
     if args.dataset is not None:
         available_datasets = list_available_datasets()
         if args.dataset not in available_datasets:
-            print(f"Error: Invalid dataset '{args.dataset}'. Available datasets: {', '.join(available_datasets)}")
+            print(
+                f"Error: Invalid dataset '{args.dataset}'. Available datasets: {', '.join(available_datasets)}"
+            )
             sys.exit(1)
 
     # Create config with CLI overrides (config-first approach)
@@ -514,6 +514,7 @@ Prerequisites:
             class_name=args.class_name,
             num_cycles=args.cycles if args.cycles is not None else 3,
             auto_label=args.auto_label,
+            evaluation_mode=args.evaluation_mode,
             audio_dir=args.audio_dir,
             seed=args.seed,
         )

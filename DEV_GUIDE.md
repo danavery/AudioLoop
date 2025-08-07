@@ -13,6 +13,28 @@ That includes both CLI and web interfaces for the training loop and the human la
 
 This is a project in rapid development and has no production users. Maintaining backwards compatibility during code changes is not required and will only complicate the codebase unnecessarily. Do not be concerned about backwards compatibility.
 
+## Workflow Modes
+
+AudioLoop supports two primary workflow modes designed for different use cases:
+
+### Production Mode (Default)
+**Use case**: Real-world deployment with truly unlabeled datasets
+- **Ground truth**: Not available - you don't know the true labels
+- **Active learning**: Generates predictions without ground truth columns
+- **Metrics tracking**: Shows prediction and confidence metrics only
+- **Human labeling**: Manual review using web UI or terminal interface
+- **Goal**: Build models for actual unknown audio classification tasks
+
+### Evaluation Mode (Research/Testing)
+**Use case**: Research, development, and algorithm testing with known datasets
+- **Ground truth**: Available - you have the true labels for comparison
+- **Active learning**: Use `--with-ground-truth` flag to include evaluation columns
+- **Metrics tracking**: Shows full evaluation metrics (F1, precision, recall, accuracy)
+- **Auto-labeling**: Can use `auto_label_candidates.py` for rapid testing
+- **Goal**: Test candidate selection strategies, tune hyperparameters, compare methods
+
+**Key Distinction**: Production mode is for real deployment where ground truth is unknown. Evaluation mode is for research and testing where ground truth is available for validation.
+
 ## Common Commands
 
 ### Data Preparation (One-time Setup)
@@ -107,6 +129,12 @@ python -m audioloop.active_learning --list-classes
 
 # List UrbanSound8K classes
 python -m audioloop.active_learning --dataset urbansound8k --list-classes
+
+# Include ground truth evaluation columns (for research/evaluation with labeled datasets)
+python -m audioloop.active_learning --class-name Drill --run-number 1 --with-ground-truth
+
+# Production workflow (default - no ground truth columns, for real unlabeled datasets)
+python -m audioloop.active_learning --class-name Drill --run-number 1
 ```
 
 ### Human Labeling
@@ -146,6 +174,8 @@ python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --auto-label 
 ```
 
 ### Label Management
+
+#### Production Workflow (Manual Labeling)
 ```bash
 # Merge human labels back into training set (default experiment)
 python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv
@@ -157,12 +187,27 @@ python -m audioloop.merge_labels training_sets_myexp/training_set_v1.csv outputs
 python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv --experiment myexp
 ```
 
+#### Evaluation Workflow (Auto-Labeling for Research)
+```bash
+# Auto-label candidates using ground truth (requires --with-ground-truth mode)
+python -m audioloop.auto_label_candidates outputs/labeling_candidates_v1.csv
+
+# Auto-label with verbose progress output
+python -m audioloop.auto_label_candidates outputs/labeling_candidates_v1.csv --verbose
+
+# Auto-label candidates from experiment
+python -m audioloop.auto_label_candidates outputs_myexp/labeling_candidates_v2.csv
+
+# Note: Auto-labeling requires ground truth data in CSV (generated with --with-ground-truth)
+# For production workflows without ground truth, use manual labeling tools instead
+```
+
 ### Comprehensive Metrics Tracking
 ```bash
-# Track comprehensive metrics across all prediction versions
+# Track metrics (automatically detects evaluation vs production mode)
 python -m audioloop.track_metrics
 
-# Generate comprehensive metrics plots (accuracy, F1, precision, recall, confidence, entropy)
+# Generate metrics plots - shows different visualizations based on available data
 python -m audioloop.track_metrics --plot
 
 # Save metrics plots to file
@@ -170,6 +215,10 @@ python -m audioloop.track_metrics --save-plot comprehensive_metrics.png
 
 # Track metrics from experiment directory
 python -m audioloop.track_metrics --experiment myexp --plot
+
+# Evaluation mode: Shows F1, precision, recall, accuracy (when ground truth available)
+# Production mode: Shows prediction and confidence metrics only (no ground truth)
+# Mixed mode: Handles files with and without ground truth gracefully
 ```
 
 ### Outputs Management
@@ -227,7 +276,11 @@ python automated_workflow.py --class-name Speech --cycles 4 --selection-mode con
 python automated_workflow.py --class-name siren --cycles 3 --auto-label --experiment myexp
 ```
 
-### Complete Experiment Workflow Example
+### Complete Workflow Examples
+
+#### Production Workflow (Real Deployment)
+**Use case**: Deploy on unknown audio data for actual classification tasks
+
 ```bash
 # 1. Create initial training set for experiment
 python -m audioloop.utils.start_labeling --class-name siren --n 40 --experiment myexp
@@ -235,20 +288,51 @@ python -m audioloop.utils.start_labeling --class-name siren --n 40 --experiment 
 # 2. Train initial model
 python -m audioloop.train training_sets_myexp/training_set_v1.csv --experiment myexp
 
-# 3. Run active learning cycle
+# 3. Run active learning cycle (production mode - no ground truth)
 python -m audioloop.active_learning --class-name siren --run-number 1 --experiment myexp
 
-# 4. Label candidates (uses experiment-specific candidates file)
+# 4. Label candidates manually using web UI (recommended)
+cd webui && python app.py
+# Load: outputs_myexp/labeling_candidates_v1.csv
+
+# Alternative: Terminal interface
 python -m audioloop.label_audio outputs_myexp/labeling_candidates_v1.csv
 
-# 5. Merge labels (creates training_sets_myexp/training_set_v2.csv)
+# 5. Merge human labels (creates training_sets_myexp/training_set_v2.csv)
 python -m audioloop.merge_labels training_sets_myexp/training_set_v1.csv outputs_myexp/labeling_candidates_v1.csv
 
-# 6. Track metrics for experiment
+# 6. Track metrics (production mode - confidence and prediction metrics only)
 python -m audioloop.track_metrics --experiment myexp --plot
 ```
 
-**Use automated workflow for**: Convenience, testing multiple cycles quickly, parameter sweeping
+#### Evaluation Workflow (Research/Testing)
+**Use case**: Test algorithms, compare strategies, tune parameters with known datasets
+
+```bash
+# 1. Create initial training set for experiment
+python -m audioloop.utils.start_labeling --class-name siren --n 40 --experiment eval_test
+
+# 2. Train initial model
+python -m audioloop.train training_sets_eval_test/training_set_v1.csv --experiment eval_test
+
+# 3. Run active learning cycle WITH ground truth evaluation
+python -m audioloop.active_learning --class-name siren --run-number 1 --experiment eval_test --with-ground-truth
+
+# 4. Auto-label candidates using ground truth (for rapid testing)
+python -m audioloop.auto_label_candidates outputs_eval_test/labeling_candidates_v1.csv
+
+# 5. Merge labels (creates training_sets_eval_test/training_set_v2.csv)
+python -m audioloop.merge_labels training_sets_eval_test/training_set_v1.csv outputs_eval_test/labeling_candidates_v1.csv --experiment eval_test
+
+# 6. Track comprehensive metrics (evaluation mode - F1, precision, recall, accuracy)
+python -m audioloop.track_metrics --experiment eval_test --plot
+```
+
+**Key Differences**:
+- **Production**: No `--with-ground-truth`, manual labeling, confidence metrics only
+- **Evaluation**: Uses `--with-ground-truth`, auto-labeling possible, full evaluation metrics
+
+**Use automated workflow for**: Convenience, testing multiple cycles quickly, parameter sweeping  
 **Use manual workflow for**: Learning the system, debugging issues, fine-grained control
 
 ## Selection Strategies
@@ -469,14 +553,27 @@ Customize paths and behavior via environment variables:
 
 ## Data Flow
 
+### Production Mode (Default)
 1. **Preprocessing**: Raw audio → spectrograms via `create_all_specs.py`
 2. **Initial Training Set**: Dataset-agnostic training set creation via `utils/start_labeling.py`
 3. **Model Training**: Small labeled set → CNN model via `train.py`
 4. **Active Learning**: Model predictions on ALL files → candidate selection via `active_learning.py`
-5. **Human Labeling**: Audio playback + labeling via `label_audio.py`
+5. **Human Labeling**: Audio playback + labeling via `label_audio.py` or web UI
 6. **Label Integration**: Human labels → expanded training set via `merge_labels.py`
-7. **Performance Evaluation**: Full ground truth → metrics tracking via `track_metrics.py` (separate from active learning)
+7. **Performance Monitoring**: Prediction and confidence metrics via `track_metrics.py`
 8. **Iteration**: Repeat training with expanded data
+
+### Evaluation Mode (Research/Testing)
+1. **Preprocessing**: Raw audio → spectrograms via `create_all_specs.py` 
+2. **Initial Training Set**: Dataset-agnostic training set creation via `utils/start_labeling.py`
+3. **Model Training**: Small labeled set → CNN model via `train.py`
+4. **Active Learning**: Model predictions with ground truth → candidate selection via `active_learning.py --with-ground-truth`
+5. **Auto-Labeling**: Ground truth extraction via `auto_label_candidates.py` (optional)
+6. **Label Integration**: Labels → expanded training set via `merge_labels.py`
+7. **Performance Evaluation**: Full ground truth metrics (F1, precision, recall) via `track_metrics.py`
+8. **Iteration**: Repeat training with expanded data
+
+**Key Difference**: Evaluation mode includes ground truth data for comprehensive performance analysis, while production mode works with truly unknown data.
 
 ### Clean Architecture
 - **Active Learning**: Focused inference engine that produces predictions and candidate selections
@@ -494,6 +591,12 @@ data/all_specs/100263-2-0-117.pt,0,1
 ```
 
 ### Predictions CSV (Generated)
+Default format (production mode):
+```csv
+filename,predicted_is_positive,prediction,confidence,entropy,prob_negative,prob_positive,original_class,fold,filepath
+```
+
+With ground truth evaluation (--with-ground-truth flag):
 ```csv
 filename,true_is_positive,predicted_is_positive,prediction,confidence,entropy,prob_negative,prob_positive,correct,original_class,fold,filepath
 ```

@@ -33,8 +33,11 @@ python -m audioloop.create_all_specs
 # Train initial model
 python -m audioloop.train training_sets/training_set_v1.csv
 
-# Run active learning cycle (with auto-calculated thresholds for imbalanced datasets)
+# Run active learning cycle (production mode - default)
 python -m audioloop.active_learning --class-name Drill --run-number 1 --selection-mode basic_transition --auto-thresholds
+
+# For evaluation/research with ground truth, add --with-ground-truth flag
+# python -m audioloop.active_learning --class-name Drill --run-number 1 --with-ground-truth
 
 # Label audio samples interactively
 python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --audio-dir data/FSD50K/FSD50K.dev_audio
@@ -78,14 +81,23 @@ export AUDIOLOOP_OUTPUT_ROOT=/custom/outputs
 
 ## Core Concept
 
-Traditional supervised learning requires large labeled datasets. AudioLoop reduces this burden through active learning:
+Traditional supervised learning requires large labeled datasets. AudioLoop reduces this burden through active learning, supporting both production deployment and research workflows:
 
+### Production Mode (Default)
 1. **Start small**: Begin with minimal labeled training set (20 samples)
-2. **Train iteratively**: Train model, run inference on all available data
-3. **Smart selection**: Choose most informative samples using model confidence and entropy
-4. **Human feedback**: Get labels for carefully selected samples
+2. **Train iteratively**: Train model, run inference on unlabeled data
+3. **Smart selection**: Choose most informative samples using model confidence
+4. **Human feedback**: Get labels for carefully selected samples via manual review
 5. **Repeat**: Add new labels to training set and iterate
-6. **Evaluate**: Track performance trends across iterations using comprehensive metrics
+6. **Monitor**: Track prediction confidence and distribution trends
+
+### Evaluation Mode (Research/Testing)
+1. **Start small**: Begin with minimal labeled training set from known dataset
+2. **Train iteratively**: Train model, run inference with ground truth comparison
+3. **Smart selection**: Choose samples using confidence or uncertainty strategies
+4. **Auto-labeling**: Automatically apply ground truth labels for rapid testing
+5. **Repeat**: Add new labels to training set and iterate
+6. **Evaluate**: Track comprehensive metrics (F1, precision, recall, accuracy)
 
 ## Project Structure
 
@@ -194,6 +206,12 @@ data/all_specs/100263-2-0-117.pt,0,1
 ```
 
 ### Predictions CSV (Generated)
+Production Mode (default):
+```csv
+filename,predicted_is_positive,prediction,confidence,entropy,prob_negative,prob_positive,original_class,fold,filepath
+```
+
+Evaluation Mode (with --with-ground-truth):
 ```csv
 filename,true_is_positive,predicted_is_positive,prediction,confidence,entropy,prob_negative,prob_positive,correct,original_class,fold,filepath
 ```

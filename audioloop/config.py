@@ -95,6 +95,9 @@ class AudioLoopConfig:
     auto_thresholds: bool = False
     estimated_positive_pct: float | None = None
 
+    # Ground truth evaluation configuration
+    with_ground_truth: bool = False  # Include ground truth columns in predictions CSV
+
     def __post_init__(self):
         """Post-initialization validation and setup."""
         self._validate_dataset()
@@ -133,7 +136,12 @@ class AudioLoopConfig:
             raise ValueError("positive_percentage must be between 0.0 and 1.0")
         if not (0.0 <= self.min_confidence <= 1.0):
             raise ValueError("min_confidence must be between 0.0 and 1.0")
-        if self.selection_mode not in ["confidence", "entropy", "basic_transition", "stratified_uncertainty"]:
+        if self.selection_mode not in [
+            "confidence",
+            "entropy",
+            "basic_transition",
+            "stratified_uncertainty",
+        ]:
             raise ValueError(f"Unknown selection mode: {self.selection_mode}")
 
     def _validate_selection_strategy_params(self):

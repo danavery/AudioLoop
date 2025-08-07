@@ -99,7 +99,9 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None, config=No
                 print(f"Warning: Invalid label '{label}' for {filename}, skipping")
                 continue
 
-    print(f"Added {new_count} new labeled samples ({new_positive} positive, {new_negative} negative)")
+    print(
+        f"Added {new_count} new labeled samples ({new_positive} positive, {new_negative} negative)"
+    )
 
     # Ensure output directory exists
     os.makedirs(os.path.dirname(output_csv) if os.path.dirname(output_csv) else ".", exist_ok=True)

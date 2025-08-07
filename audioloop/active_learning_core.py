@@ -213,42 +213,49 @@ def run_binary_inference(
                     positive_class_name if predicted_class == 1 else negative_class_name
                 )
 
+                # Build result dictionary - always include core prediction fields
                 result = {
                     "filename": audio_filename,
-                    "true_is_positive": (true_label == 1),
                     "predicted_is_positive": (predicted_class == 1),
                     "prediction": prediction_name,
                     "confidence": confidences[i].item(),
                     "entropy": entropies[i].item(),
                     "prob_negative": prob_negative,
                     "prob_positive": prob_positive,
-                    "correct": (true_label == predicted_class),
                     "original_class": original_class if original_class is not None else -1,
                     "fold": getattr(
                         batch.get("fold", [None] * len(true_labels))[i], "item", lambda: -1
                     )(),
                     "filepath": batch["filepath"][i],
                 }
+
+                # Add ground truth fields only if requested
+                if config.with_ground_truth:
+                    result["true_is_positive"] = true_label == 1
+                    result["correct"] = true_label == predicted_class
                 results.append(result)
 
     # Ensure outputs directory exists
     config.create_directories()
 
-    # Save results to CSV
+    # Save results to CSV - conditionally include ground truth columns
     fieldnames = [
         "filename",
-        "true_is_positive",
         "predicted_is_positive",
         "prediction",
         "confidence",
         "entropy",
         "prob_negative",
         "prob_positive",
-        "correct",
         "original_class",
         "fold",
         "filepath",
     ]
+
+    # Add ground truth columns if requested
+    if config.with_ground_truth:
+        fieldnames.insert(1, "true_is_positive")  # Insert after filename
+        fieldnames.insert(-2, "correct")  # Insert before filepath
     with open(predictions_csv, "w", newline="") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
         writer.writeheader()
