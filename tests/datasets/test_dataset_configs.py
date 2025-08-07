@@ -5,7 +5,7 @@ Focused on interface compliance and key behavioral differences.
 """
 
 from pathlib import Path
-from unittest.mock import mock_open, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -162,27 +162,33 @@ class TestMetadataHandling:
 
     @pytest.mark.parametrize("config_class", [FSD50KConfig, UrbanSound8KConfig])
     def test_load_metadata_returns_list(self, config_class):
-        """Test that load_metadata returns a list."""
-        config = config_class()
+        """Test that load_metadata returns a list using test fixtures."""
+        # Get the test fixtures directory
+        test_dir = Path(__file__).parent.parent / "fixtures"
 
-        # Mock file operations to avoid actual file access
-        with patch("builtins.open", mock_open(read_data="")):
-            # Mock file existence check
-            with patch("pathlib.Path.exists", return_value=True):
-                # Mock vocabulary loading
-                if config_class == FSD50KConfig:
-                    with patch(
-                        "audioloop.datasets.fsd50k_config.load_fsd50k_vocabulary", return_value={}
-                    ):
-                        entries = config.load_metadata()
-                else:
-                    with patch(
-                        "audioloop.datasets.urbansound8k_config.load_urbansound8k_vocabulary",
-                        return_value={},
-                    ):
-                        entries = config.load_metadata()
+        if config_class == FSD50KConfig:
+            # Use test fixtures for FSD50K
+            config = config_class()
+            # Override the CSV paths to point to test fixtures
+            config.dev_csv = test_dir / "fsd50k" / "dev.csv"
+            config.eval_csv = test_dir / "fsd50k" / "eval.csv"
 
-            assert isinstance(entries, list)
+            with patch("audioloop.datasets.fsd50k_config.load_fsd50k_vocabulary", return_value={}):
+                entries = config.load_metadata()
+        else:
+            # Use test fixtures for UrbanSound8K
+            config = config_class()
+            # Override the CSV path to point to test fixtures
+            config.metadata_csv = test_dir / "urbansound8k" / "UrbanSound8K.csv"
+
+            with patch(
+                "audioloop.datasets.urbansound8k_config.load_urbansound8k_vocabulary",
+                return_value={},
+            ):
+                entries = config.load_metadata()
+
+        assert isinstance(entries, list)
+        assert len(entries) > 0  # Should have some test data
 
 
 class TestNewAbstractMethods:

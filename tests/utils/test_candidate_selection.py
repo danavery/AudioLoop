@@ -517,7 +517,9 @@ def test_basic_transition_strategy_delegation(sample_predictions):
     strategy.entropy_strategy.select_candidates.return_value = ["entropy_result"]
 
     # Mock metrics calculation to control transition decision
-    with patch("audioloop.utils.candidate_selection.calculate_binary_metrics") as mock_metrics:
+    with patch(
+        "audioloop.utils.candidate_selection.basic_transition.calculate_binary_metrics"
+    ) as mock_metrics:
         # Test no transition (use confidence)
         mock_metrics.return_value = {
             "f1_score": 0.1,
@@ -786,7 +788,9 @@ def test_basic_transition_edge_cases():
     strategy = BasicTransitionStrategy()
 
     # Mock the metrics calculation to avoid needing ground truth
-    with patch("audioloop.utils.candidate_selection.calculate_binary_metrics") as mock_metrics:
+    with patch(
+        "audioloop.utils.candidate_selection.basic_transition.calculate_binary_metrics"
+    ) as mock_metrics:
         mock_metrics.return_value = {}  # Empty metrics
 
         # Test the _should_transition method directly with empty metrics

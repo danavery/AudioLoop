@@ -1,0 +1,6 @@
+fname,labels,mids,split
+64760,"Electric_guitar,Guitar,Plucked_string_instrument,Musical_instrument,Music","/m/02sgy,/m/0342h,/m/0fx80y,/m/04szw,/m/04rlf",train
+16399,"Electric_guitar,Guitar,Plucked_string_instrument,Musical_instrument,Music","/m/02sgy,/m/0342h,/m/0fx80y,/m/04szw,/m/04rlf",train
+45678,"Speech,Human_voice","/m/09x0r,/m/02zsn",dev
+12345,"Dog,Animal","/m/0bt9lr,/m/0jbk",eval
+98765,"Car,Vehicle","/m/0k4j,/m/07yv9",train
