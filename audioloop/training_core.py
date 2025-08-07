@@ -163,16 +163,16 @@ def run_training(
         class_counts = torch.bincount(torch.tensor(labels))
         total_samples = len(train_dataset)
         class_weights = total_samples / (len(class_counts) * class_counts.float())
-        
+
         print("Class weighting enabled:")
         print(f"  Class counts: {class_counts.tolist()}")
         print(f"  Class weights: {class_weights.tolist()}")
-        print(f"  Weight ratio (neg/pos): {class_weights[0]/class_weights[1]:.2f}")
-        
+        print(f"  Weight ratio (neg/pos): {class_weights[0] / class_weights[1]:.2f}")
+
         criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
     else:
         criterion = nn.CrossEntropyLoss()
-    
+
     optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=1e-5)
 
     # Create stopping criterion from config

@@ -137,7 +137,7 @@ def main():
         }.items()
         if value is not None
     }
-    
+
     # Handle boolean flags separately (they're always provided by argparse)
     if args.use_class_weighting:
         config_overrides["use_class_weighting"] = True

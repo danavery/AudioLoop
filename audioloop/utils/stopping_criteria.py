@@ -167,12 +167,14 @@ class PlateauCriterion(TrainingStoppingCriterion):
         **kwargs,
     ) -> bool:
         # Auto-calculate accuracy floor on first call if dataset provided
-        if self._auto_accuracy_floor and 'train_dataset' in kwargs:
-            positive_ratio = self._calculate_positive_ratio(kwargs['train_dataset'])
+        if self._auto_accuracy_floor and "train_dataset" in kwargs:
+            positive_ratio = self._calculate_positive_ratio(kwargs["train_dataset"])
             trivial_accuracy = max(positive_ratio, 1 - positive_ratio)
             self.accuracy_floor = min(trivial_accuracy + 0.15, 0.99)
             self._auto_accuracy_floor = False
-            print(f"Auto-calculated accuracy floor: {self.accuracy_floor:.2f} (trivial accuracy: {trivial_accuracy:.2f})")
+            print(
+                f"Auto-calculated accuracy floor: {self.accuracy_floor:.2f} (trivial accuracy: {trivial_accuracy:.2f})"
+            )
 
         # Stop immediately if we hit 100% accuracy (best case scenario)
         if train_accuracy >= 1.0:
@@ -214,17 +216,19 @@ class PlateauCriterion(TrainingStoppingCriterion):
 
     def _calculate_positive_ratio(self, training_dataset) -> float:
         """Calculate the ratio of positive samples in the training dataset.
-        
+
         Args:
             training_dataset: Training dataset with label information
-            
+
         Returns:
             Ratio of positive samples (label=1) to total samples
         """
         if len(training_dataset) == 0:
             return 0.5  # Default to balanced if no data
-        
-        positive_count = sum(1 for i in range(len(training_dataset)) if training_dataset[i]["label"] == 1)
+
+        positive_count = sum(
+            1 for i in range(len(training_dataset)) if training_dataset[i]["label"] == 1
+        )
         return positive_count / len(training_dataset)
 
     def reset(self) -> None:
