@@ -3,7 +3,7 @@
 Auto-labeling utility for candidates with ground truth data.
 
 This module provides functionality to automatically label candidates using
-ground truth data from the 'true_is_positive' column in candidates CSV files.
+ground truth data from the 'ground_truth' column in candidates CSV files.
 
 This is intended for evaluation/research workflows where ground truth is available,
 not for production workflows with unlabeled data.
@@ -17,11 +17,11 @@ def auto_label_from_ground_truth(candidates_csv: str) -> dict[str, int]:
     """
     Automatically label candidates using ground truth data.
 
-    Reads candidates CSV file, uses the 'true_is_positive' column to set
+    Reads candidates CSV file, uses the 'ground_truth' column to set
     'needs_human_label' field, and saves the results back to the same file.
 
     Args:
-        candidates_csv: Path to candidates CSV with 'true_is_positive' column
+        candidates_csv: Path to candidates CSV with 'ground_truth' column
 
     Returns:
         dict: Statistics with keys 'positive_count', 'negative_count', 'total'
@@ -54,10 +54,10 @@ def auto_label_from_ground_truth(candidates_csv: str) -> dict[str, int]:
         raise ValueError("No fieldnames found in CSV file")
 
     # Validate ground truth column exists
-    has_ground_truth = any("true_is_positive" in candidate for candidate in candidates)
+    has_ground_truth = any("ground_truth" in candidate for candidate in candidates)
     if not has_ground_truth:
         raise ValueError(
-            "No ground truth data found. The 'true_is_positive' column is required "
+            "No ground truth data found. The 'ground_truth' column is required "
             "for auto-labeling. This suggests the CSV was generated in production mode "
             "rather than evaluation mode."
         )
@@ -69,10 +69,10 @@ def auto_label_from_ground_truth(candidates_csv: str) -> dict[str, int]:
     print(f"Auto-labeling {len(candidates)} candidates using ground truth...")
 
     for i, candidate in enumerate(candidates):
-        true_is_positive = candidate.get("true_is_positive", "")
+        ground_truth = candidate.get("ground_truth", "")
 
         # Convert ground truth to label
-        if str(true_is_positive).lower() == "true":
+        if str(ground_truth).lower() == "true":
             candidate["needs_human_label"] = "1"
             positive_count += 1
         else:

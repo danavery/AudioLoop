@@ -50,34 +50,34 @@ def calculate_core_metrics(predictions_file: str) -> dict:
     # Load predictions and detect available columns
     predictions = []
     fieldnames = []
-    
+
     with open(predictions_file, newline="") as csvfile:
         reader = csv.DictReader(csvfile)
         fieldnames = reader.fieldnames or []
-        
+
         for row in reader:
             # Always load required fields
             pred_data = {
                 "predicted_is_positive": row["predicted_is_positive"],
                 "confidence": float(row["confidence"]),
             }
-            
+
             # Add optional fields if available
-            if "true_is_positive" in row and row["true_is_positive"] is not None:
-                pred_data["true_is_positive"] = row["true_is_positive"]
-            
+            if "ground_truth" in row and row["ground_truth"] is not None:
+                pred_data["ground_truth"] = row["ground_truth"]
+
             if "entropy" in row and row.get("entropy"):
                 pred_data["entropy"] = float(row["entropy"])
-            
+
             predictions.append(pred_data)
 
     if not predictions:
         raise ValueError(f"No samples found in {predictions_file}")
 
     # Check what metrics we can calculate
-    has_ground_truth = "true_is_positive" in fieldnames
+    has_ground_truth = "ground_truth" in fieldnames
     has_entropy = "entropy" in fieldnames
-    
+
     print(f"Ground truth available: {'Yes' if has_ground_truth else 'No'}")
     if not has_ground_truth:
         print("  → Limited to prediction and confidence metrics")
@@ -88,7 +88,7 @@ def calculate_core_metrics(predictions_file: str) -> dict:
     binary_metrics = calculate_binary_metrics(predictions)
     balance_metrics = calculate_class_balance_metrics(predictions)
     percentile_metrics = calculate_confidence_percentiles(predictions, percentiles=[5, 95])
-    
+
     # Only calculate entropy metrics if entropy data is available
     entropy_metrics = {}
     if has_entropy:
@@ -122,7 +122,7 @@ def track_metrics_across_versions(output_dir: str) -> dict[int, dict]:
         try:
             with open(f, newline="") as csvfile:
                 reader = csv.DictReader(csvfile)
-                if "true_is_positive" in (reader.fieldnames or []):
+                if "ground_truth" in (reader.fieldnames or []):
                     has_any_ground_truth = True
                     break
         except Exception:
@@ -139,7 +139,7 @@ def track_metrics_across_versions(output_dir: str) -> dict[int, dict]:
         output_lines.append("Mode: Production (no ground truth - prediction metrics only)")
         output_lines.append("-" * 80)
         header = f"{'Version':<10} {'Mean Conf':<12} {'Std Conf':<11} {'p05-p95 Conf':<15} {'Pred+':<10} {'Total':<10}"
-    
+
     output_lines.append(header)
     output_lines.append("-" * (120 if has_any_ground_truth else 80))
 
@@ -153,10 +153,10 @@ def track_metrics_across_versions(output_dir: str) -> dict[int, dict]:
             version = extract_version_number(f)
             metrics = calculate_core_metrics(f)
             all_metrics[version] = metrics
-            
+
             p05_p95_str = f"{metrics['p05_confidence']:.2f}-{metrics['p95_confidence']:.2f}"
-            
-            if has_any_ground_truth and metrics.get('has_ground_truth', False):
+
+            if has_any_ground_truth and metrics.get("has_ground_truth", False):
                 # Full evaluation metrics format
                 metrics_line = (
                     f"v{version:<8} {metrics['f1_score']:<12.3f} "
@@ -166,7 +166,7 @@ def track_metrics_across_versions(output_dir: str) -> dict[int, dict]:
                     f"{p05_p95_str:<15} "
                     f"{metrics['predicted_positive_ratio']:.1%}/{metrics['actual_positive_ratio']:.1%}"
                 )
-            elif has_any_ground_truth and not metrics.get('has_ground_truth', False):
+            elif has_any_ground_truth and not metrics.get("has_ground_truth", False):
                 # Mixed mode: some files have ground truth, this one doesn't
                 metrics_line = (
                     f"v{version:<8} {'N/A':<12} {'N/A':<12} {'N/A':<10} {'N/A':<10} "
@@ -182,7 +182,7 @@ def track_metrics_across_versions(output_dir: str) -> dict[int, dict]:
                     f"{metrics['predicted_positive_ratio']:.1%} "
                     f"{metrics['total_samples']:<10}"
                 )
-            
+
             print(metrics_line)
             output_lines.append(metrics_line)
         except Exception as e:
@@ -214,7 +214,9 @@ def analyze_trends(results: dict[int, dict], output_dir: str):
     start_m, end_m = results[start_v], results[end_v]
 
     # Check if we have ground truth data
-    has_ground_truth = start_m.get("has_ground_truth", False) and end_m.get("has_ground_truth", False)
+    has_ground_truth = start_m.get("has_ground_truth", False) and end_m.get(
+        "has_ground_truth", False
+    )
 
     # Prepare output lines for both console and file
     trend_lines = []
@@ -307,7 +309,7 @@ def plot_core_trends(results: dict[int, dict], save_path: str | None = None):
 
     # Check if we have ground truth data
     has_ground_truth = any(results[v].get("has_ground_truth", False) for v in versions)
-    
+
     if has_ground_truth:
         fig, axes = plt.subplots(2, 2, figsize=(16, 10))
         fig.suptitle("Core Active Learning Metrics (Evaluation Mode)", fontsize=16)
@@ -333,7 +335,12 @@ def plot_core_trends(results: dict[int, dict], save_path: str | None = None):
         axes[0, 0].set_ylim(0, 1.05)
     else:
         # Production mode: show prediction distribution
-        axes[0, 0].plot(versions, metrics_by_name["predicted_positive_ratio"], "o-", label="Predicted Positive %")
+        axes[0, 0].plot(
+            versions,
+            metrics_by_name["predicted_positive_ratio"],
+            "o-",
+            label="Predicted Positive %",
+        )
         axes[0, 0].set_title("Prediction Distribution")
         axes[0, 0].set_ylabel("Predicted Positive Ratio")
         axes[0, 0].yaxis.set_major_formatter(FuncFormatter(lambda y, _: f"{y:.1%}"))
@@ -347,7 +354,7 @@ def plot_core_trends(results: dict[int, dict], save_path: str | None = None):
     axes[0, 1].fill_between(
         versions, p05_conf, p95_conf, color="tab:blue", alpha=0.2, label="5th-95th Percentile"
     )
-    
+
     # Only add entropy if available
     if metrics_by_name.get("mean_entropy"):
         ax2_entropy = axes[0, 1].twinx()
@@ -355,7 +362,7 @@ def plot_core_trends(results: dict[int, dict], save_path: str | None = None):
             versions, metrics_by_name["mean_entropy"], "o--", color="tab:red", label="Mean Entropy"
         )
         ax2_entropy.set_ylabel("Entropy (Uncertainty)", color="tab:red")
-    
+
     axes[0, 1].set_title("Model Confidence and Uncertainty")
     axes[0, 1].set_ylabel("Confidence", color="tab:blue")
     axes[0, 1].set_ylim(0, 1.05)
@@ -368,7 +375,7 @@ def plot_core_trends(results: dict[int, dict], save_path: str | None = None):
         "o--",
         label="Predicted Positive Ratio",
     )
-    
+
     if has_ground_truth and "actual_positive_ratio" in metrics_by_name:
         axes[1, 0].plot(
             versions,
@@ -379,14 +386,16 @@ def plot_core_trends(results: dict[int, dict], save_path: str | None = None):
         axes[1, 0].set_title("Diagnostic: Actual vs. Predicted Class Balance")
     else:
         axes[1, 0].set_title("Predicted Class Balance")
-    
+
     axes[1, 0].set_ylabel("Positive Class Ratio")
     axes[1, 0].yaxis.set_major_formatter(FuncFormatter(lambda y, _: f"{y:.1%}"))
     axes[1, 0].legend()
 
     # Plot 4: Confusion Matrix Components or Sample Counts
     if has_ground_truth and "true_positives" in metrics_by_name:
-        axes[1, 1].plot(versions, metrics_by_name["true_positives"], "o-", label="True Positives (TP)")
+        axes[1, 1].plot(
+            versions, metrics_by_name["true_positives"], "o-", label="True Positives (TP)"
+        )
         axes[1, 1].plot(
             versions, metrics_by_name["false_positives"], "o-", label="False Positives (FP)"
         )
@@ -399,7 +408,9 @@ def plot_core_trends(results: dict[int, dict], save_path: str | None = None):
     else:
         # Production mode: show total samples and predicted positives
         axes[1, 1].plot(versions, metrics_by_name["total_samples"], "o-", label="Total Samples")
-        axes[1, 1].plot(versions, metrics_by_name["predicted_positives"], "o-", label="Predicted Positives")
+        axes[1, 1].plot(
+            versions, metrics_by_name["predicted_positives"], "o-", label="Predicted Positives"
+        )
         axes[1, 1].set_title("Sample Counts")
         axes[1, 1].set_ylabel("Number of Samples")
         axes[1, 1].legend()

@@ -248,7 +248,7 @@ Examples:
     parser.add_argument(
         "--with-ground-truth",
         action="store_true",
-        help="Include ground truth evaluation columns (true_is_positive, correct) in predictions CSV. Use for evaluation with labeled datasets.",
+        help="Include ground truth evaluation columns (ground_truth, correct) in predictions CSV. Use for evaluation with labeled datasets.",
     )
 
     args = parser.parse_args()

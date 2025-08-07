@@ -87,16 +87,16 @@ def print_selection_statistics(
     true_negative_samples = []
 
     for p in all_predictions:
-        true_is_positive = p["true_is_positive"]
+        ground_truth = p["ground_truth"]
         # Handle string/boolean values with robust conversion
-        if isinstance(true_is_positive, str):
-            true_is_positive = true_is_positive.lower() in ("true", "1")
-        elif isinstance(true_is_positive, int | float):
-            true_is_positive = bool(true_is_positive)
+        if isinstance(ground_truth, str):
+            ground_truth = ground_truth.lower() in ("true", "1")
+        elif isinstance(ground_truth, int | float):
+            ground_truth = bool(ground_truth)
         else:
-            true_is_positive = bool(true_is_positive)
+            ground_truth = bool(ground_truth)
 
-        if true_is_positive:
+        if ground_truth:
             true_positive_samples.append(p)
         else:
             true_negative_samples.append(p)

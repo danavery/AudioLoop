@@ -3,7 +3,7 @@
 Standalone auto-labeling tool for candidates with ground truth.
 
 This tool automatically labels candidate files using ground truth data from
-the 'true_is_positive' column. It's intended for evaluation/research workflows
+the 'ground_truth' column. It's intended for evaluation/research workflows
 where ground truth is available.
 
 Usage:
@@ -14,13 +14,13 @@ Usage:
   python -m audioloop.auto_label_candidates outputs/labeling_candidates_v1.csv --verbose
 
 Requirements:
-  - Candidates CSV must have 'true_is_positive' column (from evaluation mode)
+  - Candidates CSV must have 'ground_truth' column (from evaluation mode)
   - This suggests the CSV was generated with --evaluation-mode flag
   - For production workflows without ground truth, use label_audio.py instead
 
 The tool will:
   1. Read candidates CSV file
-  2. Use 'true_is_positive' column to set 'needs_human_label' field
+  2. Use 'ground_truth' column to set 'needs_human_label' field
   3. Save results back to the same file
   4. Print summary statistics
 
@@ -42,14 +42,14 @@ def main():
 Examples:
   # Auto-label candidates from active learning
   python -m audioloop.auto_label_candidates outputs/labeling_candidates_v1.csv
-  
+
   # Auto-label with verbose output
   python -m audioloop.auto_label_candidates outputs/labeling_candidates_v1.csv --verbose
-  
+
   # Auto-label candidates from specific experiment
   python -m audioloop.auto_label_candidates outputs_myexp/labeling_candidates_v2.csv
 
-Note: This tool requires ground truth data (true_is_positive column) in the CSV.
+Note: This tool requires ground truth data (ground_truth column) in the CSV.
 For production workflows without ground truth, use 'python -m audioloop.label_audio' instead.
         """,
     )

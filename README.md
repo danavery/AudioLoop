@@ -213,7 +213,7 @@ filename,predicted_is_positive,prediction,confidence,entropy,prob_negative,prob_
 
 Evaluation Mode (with --with-ground-truth):
 ```csv
-filename,true_is_positive,predicted_is_positive,prediction,confidence,entropy,prob_negative,prob_positive,correct,original_class,fold,filepath
+filename,ground_truth,predicted_is_positive,prediction,confidence,entropy,prob_negative,prob_positive,correct,original_class,fold,filepath
 ```
 
 ### Candidates CSV (For Human Labeling)

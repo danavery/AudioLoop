@@ -231,7 +231,7 @@ def run_binary_inference(
 
                 # Add ground truth fields only if requested
                 if config.with_ground_truth:
-                    result["true_is_positive"] = true_label == 1
+                    result["ground_truth"] = true_label == 1
                     result["correct"] = true_label == predicted_class
                 results.append(result)
 
@@ -254,7 +254,7 @@ def run_binary_inference(
 
     # Add ground truth columns if requested
     if config.with_ground_truth:
-        fieldnames.insert(1, "true_is_positive")  # Insert after filename
+        fieldnames.insert(1, "ground_truth")  # Insert after filename
         fieldnames.insert(-2, "correct")  # Insert before filepath
     with open(predictions_csv, "w", newline="") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
