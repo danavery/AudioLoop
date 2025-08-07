@@ -40,7 +40,7 @@ def create_subset(class_name: str, total_samples: int, positive_ratio: float = 0
     
     print(f"Loaded {len(audio_files)} samples from AudioSet unbalanced")
     
-    for file_info in audio_files[:total_samples*2]:  # Process more than needed to find positives
+    for file_info in audio_files:  # Process all available files to find positives
         label_names = file_info.get("labels", [])
         
         if debug_count < 3:
