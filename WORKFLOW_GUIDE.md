@@ -10,7 +10,7 @@ The `automated_workflow.py` script automates the complete active learning cycle,
 ```bash
 # Prerequisites (one-time setup)
 python -m audioloop.create_all_specs
-python -m audioloop.utils.start_labeling --class-name siren --n 40
+python -m audioloop.utils.create_bootstrap_set --class-name siren --n 40
 
 # Production workflow (pause for human labeling)
 python -m audioloop.automated_workflow --class-name dog_bark --cycles 2

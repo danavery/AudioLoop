@@ -13,7 +13,7 @@ uv sync
 python -m audioloop.create_all_specs
 
 # Create initial training set
-python -m audioloop.utils.start_labeling --class-name Drill --n 50
+python -m audioloop.utils.create_bootstrap_set --class-name Drill --n 50
 
 # Run fully automated workflow (auto-labeling for testing)
 python automated_workflow.py --class-name Drill --cycles 3 --auto-label
@@ -301,7 +301,7 @@ AudioLoop is designed to be easily extensible with custom datasets and models:
 cp audioloop/datasets/templates/simple_audio_template.py audioloop/datasets/my_dataset_config.py
 
 # Edit the file and use immediately
-python -m audioloop.utils.start_labeling --dataset my_dataset --list-classes
+python -m audioloop.utils.create_bootstrap_set --dataset my_dataset --list-classes
 ```
 
 ### Adding Custom Models

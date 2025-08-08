@@ -10,7 +10,7 @@ The `automated_workflow.py` script provides a simple way to run complete active 
 ```bash
 # Prerequisites (one-time setup)
 python -m audioloop.create_all_specs
-python -m audioloop.utils.start_labeling --class-name siren --n 40
+python -m audioloop.utils.create_bootstrap_set --class-name siren --n 40
 
 # Production workflow (pause for human labeling)
 python -m audioloop.automated_workflow --class-name dog_bark --cycles 2
@@ -85,28 +85,28 @@ python -m audioloop.create_all_specs --dataset fsd50k  # Uses fsd50k despite env
 ### Creating Initial Training Sets
 ```bash
 # Create FSD50K training set (default)
-python -m audioloop.utils.start_labeling --class-name Drill --n 50
+python -m audioloop.utils.create_bootstrap_set --class-name Drill --n 50
 
 # Create UrbanSound8K training set
-python -m audioloop.utils.start_labeling --dataset urbansound8k --class-name siren --n 40
+python -m audioloop.utils.create_bootstrap_set --dataset urbansound8k --class-name siren --n 40
 
 # Environment variable provides fallback when no explicit --dataset
 export AUDIOLOOP_DATASET=urbansound8k
-python -m audioloop.utils.start_labeling --class-name siren --n 40  # Uses urbansound8k
-python -m audioloop.utils.start_labeling --list-classes              # Lists urbansound8k classes
+python -m audioloop.utils.create_bootstrap_set --class-name siren --n 40  # Uses urbansound8k
+python -m audioloop.utils.create_bootstrap_set --list-classes              # Lists urbansound8k classes
 
 # Explicit parameter takes precedence over environment variable
 export AUDIOLOOP_DATASET=urbansound8k
-python -m audioloop.utils.start_labeling --dataset fsd50k --class-name Drill  # Uses fsd50k
+python -m audioloop.utils.create_bootstrap_set --dataset fsd50k --class-name Drill  # Uses fsd50k
 
 # Create with custom parameters
-python -m audioloop.utils.start_labeling --class-name Speech --n 60 --positive-pct 0.8 --output training_sets/training_set_v2.csv
+python -m audioloop.utils.create_bootstrap_set --class-name Speech --n 60 --positive-pct 0.8 --output training_sets/training_set_v2.csv
 
 # List available classes for FSD50K
-python -m audioloop.utils.start_labeling --list-classes
+python -m audioloop.utils.create_bootstrap_set --list-classes
 
 # List available classes for UrbanSound8K  
-python -m audioloop.utils.start_labeling --dataset urbansound8k --list-classes
+python -m audioloop.utils.create_bootstrap_set --dataset urbansound8k --list-classes
 
 ### Experiment Organization
 
@@ -145,7 +145,7 @@ print(config.specs_dir)         # data/all_specs/
 model_path = config.get_model_path(1)        # outputs_test/model_v1.pt
 pred_path = config.get_predictions_path(1)   # outputs_test/predictions_v1.csv
 ```
-python -m audioloop.utils.start_labeling --class-name siren --metadata-csv /path/to/UrbanSound8K.csv --audio-root /path/to/audio
+python -m audioloop.utils.create_bootstrap_set --class-name siren --metadata-csv /path/to/UrbanSound8K.csv --audio-root /path/to/audio
 ```
 
 ### Training Models
@@ -269,7 +269,7 @@ python -m audioloop.active_learning --class-id 6  # gun_shot
 #### FSD50K Classes
 FSD50K has 200 classes. Use `--list-classes` to see all available classes:
 ```bash
-python -m audioloop.utils.start_labeling --dataset fsd50k --list-classes
+python -m audioloop.utils.create_bootstrap_set --dataset fsd50k --list-classes
 ```
 
 Common FSD50K classes include: Drill, Gunshot_and_gunfire, Siren, Dog, Cat, Music, Speech, etc.
@@ -282,7 +282,7 @@ Common FSD50K classes include: Drill, Gunshot_and_gunfire, Siren, Dog, Cat, Musi
 export AUDIOLOOP_DATASET=urbansound8k  # or fsd50k
 
 # Step 0: Create initial training set
-python -m audioloop.utils.start_labeling --class-name siren --n 40 --output training_sets/training_set_v1.csv
+python -m audioloop.utils.create_bootstrap_set --class-name siren --n 40 --output training_sets/training_set_v1.csv
 
 # Cycle 1: Initial training
 python -m audioloop.train training_sets/training_set_v1.csv
@@ -304,7 +304,7 @@ python -m audioloop.active_learning --class-name siren --model outputs/model_v3.
 ### Starting from Scratch (New Class)
 ```bash
 # Create initial training set with balanced samples
-python -m audioloop.utils.start_labeling --class-name gun_shot --n 50 --positive-pct 0.7
+python -m audioloop.utils.create_bootstrap_set --class-name gun_shot --n 50 --positive-pct 0.7
 
 # Train initial model
 python -m audioloop.train training_sets/training_set_v1.csv
@@ -316,16 +316,16 @@ python -m audioloop.active_learning --class-name gun_shot --model outputs/model_
 ### Multi-Dataset Workflow
 ```bash
 # Create training sets for different datasets (explicit approach)
-python -m audioloop.utils.start_labeling --dataset urbansound8k --class-name siren --n 40
-python -m audioloop.utils.start_labeling --dataset fsd50k --class-name Siren --n 60
+python -m audioloop.utils.create_bootstrap_set --dataset urbansound8k --class-name siren --n 40
+python -m audioloop.utils.create_bootstrap_set --dataset fsd50k --class-name Siren --n 60
 
 # Simplified with environment variable
 export AUDIOLOOP_DATASET=urbansound8k
-python -m audioloop.utils.start_labeling --class-name siren --n 40
+python -m audioloop.utils.create_bootstrap_set --class-name siren --n 40
 python -m audioloop.create_all_specs
 
 export AUDIOLOOP_DATASET=fsd50k  
-python -m audioloop.utils.start_labeling --class-name Siren --n 60
+python -m audioloop.utils.create_bootstrap_set --class-name Siren --n 60
 python -m audioloop.create_all_specs
 
 # Compare performance across datasets
@@ -524,13 +524,13 @@ After human labeling and merging:
 python -m audioloop.create_all_specs  # Regenerate spectrograms
 
 # No training set exists
-python -m audioloop.utils.start_labeling --class-name siren --n 40  # Create initial set
+python -m audioloop.utils.create_bootstrap_set --class-name siren --n 40  # Create initial set
 
 # Invalid class name
-python -m audioloop.utils.start_labeling --list-classes  # See available classes
+python -m audioloop.utils.create_bootstrap_set --list-classes  # See available classes
 
 # Not enough samples for class
-python -m audioloop.utils.start_labeling --class-name rare_class --n 10  # Reduce sample count
+python -m audioloop.utils.create_bootstrap_set --class-name rare_class --n 10  # Reduce sample count
 
 # Model not found
 python -m audioloop.train training_sets/training_set_v1.csv  # Train first
@@ -542,7 +542,7 @@ python -m audioloop.label_audio file.csv --audio-dir /full/path/to/audio
 python -m audioloop.active_learning --run-number 2 --model outputs/model_v2.pt
 
 # Wrong dataset format
-python -m audioloop.utils.start_labeling --dataset fsd50k --class-name Drill  # Use correct dataset
+python -m audioloop.utils.create_bootstrap_set --dataset fsd50k --class-name Drill  # Use correct dataset
 
 # Environment variable issues
 export AUDIOLOOP_DATASET=fsd50k        # Set valid dataset

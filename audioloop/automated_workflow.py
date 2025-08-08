@@ -143,10 +143,10 @@ def run_automated_workflow(
         print("💡 Create it first with:")
         if config.experiment_name:
             print(
-                f"   python -m audioloop.utils.start_labeling --class-name {class_name} --n 40 --experiment {config.experiment_name}"
+                f"   python -m audioloop.utils.create_bootstrap_set --class-name {class_name} --n 40 --experiment {config.experiment_name}"
             )
         else:
-            print(f"   python -m audioloop.utils.start_labeling --class-name {class_name} --n 40")
+            print(f"   python -m audioloop.utils.create_bootstrap_set --class-name {class_name} --n 40")
         return []
 
     training_sets = [initial_training_set]
@@ -292,7 +292,7 @@ Examples:
 
 Prerequisites:
   1. Run: python -m audioloop.create_all_specs  (one-time setup)
-  2. Run: python -m audioloop.utils.start_labeling --class-name <CLASS_NAME> --n 50
+  2. Run: python -m audioloop.utils.create_bootstrap_set --class-name <CLASS_NAME> --n 50
         """,
     )
 

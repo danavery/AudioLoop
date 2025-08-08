@@ -46,22 +46,22 @@ python -m audioloop.create_all_specs
 ### Creating Initial Training Sets
 ```bash
 # Create FSD50K training set (default)
-python -m audioloop.utils.start_labeling --class-name Drill --n 50
+python -m audioloop.utils.create_bootstrap_set --class-name Drill --n 50
 
 # Create UrbanSound8K training set
-python -m audioloop.utils.start_labeling --dataset urbansound8k --class-name siren --n 40
+python -m audioloop.utils.create_bootstrap_set --dataset urbansound8k --class-name siren --n 40
 
 # Create with custom parameters
-python -m audioloop.utils.start_labeling --class-name Speech --n 60 --positive-pct 0.8 --output training_sets/training_set_v2.csv
+python -m audioloop.utils.create_bootstrap_set --class-name Speech --n 60 --positive-pct 0.8 --output training_sets/training_set_v2.csv
 
 # Create with custom seed for reproducible sampling
-python -m audioloop.utils.start_labeling --class-name Drill --n 50 --seed 123
+python -m audioloop.utils.create_bootstrap_set --class-name Drill --n 50 --seed 123
 
 # List available classes for FSD50K
-python -m audioloop.utils.start_labeling --list-classes
+python -m audioloop.utils.create_bootstrap_set --list-classes
 
 # List available classes for UrbanSound8K
-python -m audioloop.utils.start_labeling --dataset urbansound8k --list-classes
+python -m audioloop.utils.create_bootstrap_set --dataset urbansound8k --list-classes
 ```
 
 ### Training Models
@@ -283,7 +283,7 @@ python automated_workflow.py --class-name siren --cycles 3 --auto-label --experi
 
 ```bash
 # 1. Create initial training set for experiment
-python -m audioloop.utils.start_labeling --class-name siren --n 40 --experiment myexp
+python -m audioloop.utils.create_bootstrap_set --class-name siren --n 40 --experiment myexp
 
 # 2. Train initial model
 python -m audioloop.train training_sets_myexp/training_set_v1.csv --experiment myexp
@@ -310,7 +310,7 @@ python -m audioloop.track_metrics --experiment myexp --plot
 
 ```bash
 # 1. Create initial training set for experiment
-python -m audioloop.utils.start_labeling --class-name siren --n 40 --experiment eval_test
+python -m audioloop.utils.create_bootstrap_set --class-name siren --n 40 --experiment eval_test
 
 # 2. Train initial model
 python -m audioloop.train training_sets_eval_test/training_set_v1.csv --experiment eval_test
@@ -417,7 +417,7 @@ python -m audioloop.active_learning --class-name Drill --run-number 1 --selectio
 - **`create_all_specs.py`**: Preprocesses audio into spectrograms
 - **`track_metrics.py`**: Comprehensive metrics tracking and visualization (accuracy, F1, precision, recall, confidence, entropy) across active learning cycles
 - **`config.py`**: Unified configuration system coordinating paths, datasets, and experiments
-- **`utils/start_labeling.py`**: Dataset-agnostic initial training set creation
+- **`utils/create_bootstrap_set.py`**: Bootstrap training set creation from ground truth (evaluation mode only)
 - **`utils/paths.py`**: Path utilities eliminating hardcoded path duplication
 - **`utils/stopping_criteria.py`**: Pluggable training stopping criteria using Strategy pattern
 - **`utils/candidate_selection.py`**: Pluggable candidate selection strategies using Strategy pattern
@@ -555,7 +555,7 @@ Customize paths and behavior via environment variables:
 
 ### Production Mode (Default)
 1. **Preprocessing**: Raw audio → spectrograms via `create_all_specs.py`
-2. **Initial Training Set**: Dataset-agnostic training set creation via `utils/start_labeling.py`
+2. **Initial Training Set**: User-provided labeled dataset
 3. **Model Training**: Small labeled set → CNN model via `train.py`
 4. **Active Learning**: Model predictions on ALL files → candidate selection via `active_learning.py`
 5. **Human Labeling**: Audio playback + labeling via `label_audio.py` or web UI
@@ -565,7 +565,7 @@ Customize paths and behavior via environment variables:
 
 ### Evaluation Mode (Research/Testing)
 1. **Preprocessing**: Raw audio → spectrograms via `create_all_specs.py` 
-2. **Initial Training Set**: Dataset-agnostic training set creation via `utils/start_labeling.py`
+2. **Bootstrap Training Set**: Sample from ground truth via `utils/create_bootstrap_set.py`
 3. **Model Training**: Small labeled set → CNN model via `train.py`
 4. **Active Learning**: Model predictions with ground truth → candidate selection via `active_learning.py --with-ground-truth`
 5. **Auto-Labeling**: Ground truth extraction via `auto_label_candidates.py` (optional)
@@ -667,7 +667,7 @@ cp audioloop/datasets/templates/simple_audio_template.py audioloop/datasets/my_d
 #    - Customize class vocabulary for your classes
 
 # 3. Use immediately
-python -m audioloop.utils.start_labeling --dataset my_dataset --list-classes
+python -m audioloop.utils.create_bootstrap_set --dataset my_dataset --list-classes
 ```
 
 Your CSV format:
@@ -687,7 +687,7 @@ audio3.wav,noise
 List currently available datasets:
 ```bash
 # Method 1: Check help message (shows available datasets)
-python -m audioloop.utils.start_labeling --help
+python -m audioloop.utils.create_bootstrap_set --help
 
 # Method 2: Check via Python
 python -c "from audioloop.datasets.registry import list_available_datasets; print(list_available_datasets())"
