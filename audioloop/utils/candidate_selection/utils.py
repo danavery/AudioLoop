@@ -159,8 +159,12 @@ def print_selection_statistics(
             print("   Using entropy-based selection should help find challenging cases")
 
     # Selection statistics
-    positive_candidates = [c for c in selected_candidates if c["predicted_class"] == positive_class_name]
-    negative_candidates = [c for c in selected_candidates if c["predicted_class"] == negative_class_name]
+    positive_candidates = [
+        c for c in selected_candidates if c["predicted_class"] == positive_class_name
+    ]
+    negative_candidates = [
+        c for c in selected_candidates if c["predicted_class"] == negative_class_name
+    ]
 
     positive_preds = [p for p in all_predictions if p["predicted_class"] == positive_class_name]
     negative_preds = [p for p in all_predictions if p["predicted_class"] == negative_class_name]

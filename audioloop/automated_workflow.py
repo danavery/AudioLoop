@@ -146,7 +146,9 @@ def run_automated_workflow(
                 f"   python -m audioloop.utils.create_bootstrap_set --class-name {class_name} --n 40 --experiment {config.experiment_name}"
             )
         else:
-            print(f"   python -m audioloop.utils.create_bootstrap_set --class-name {class_name} --n 40")
+            print(
+                f"   python -m audioloop.utils.create_bootstrap_set --class-name {class_name} --n 40"
+            )
         return []
 
     training_sets = [initial_training_set]

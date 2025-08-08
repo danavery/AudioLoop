@@ -814,7 +814,14 @@ def test_basic_transition_edge_cases():
         assert len(candidates) == 0
 
         # Zero candidates requested
-        sample_preds = [{"filename": "test.pt", "prediction": 1, "predicted_class": "positive", "confidence": 0.9}]
+        sample_preds = [
+            {
+                "filename": "test.pt",
+                "prediction": 1,
+                "predicted_class": "positive",
+                "confidence": 0.9,
+            }
+        ]
         candidates = strategy.select_candidates(sample_preds, num_candidates=0, random_seed=42)
         assert len(candidates) == 0
 
@@ -871,7 +878,10 @@ def test_save_candidates(tmp_path):
     # Verify file was created and contains expected content
     assert output_file.exists()
     content = output_file.read_text()
-    assert "filename,prediction,predicted_class,confidence,needs_human_label,human_confidence" in content
+    assert (
+        "filename,prediction,predicted_class,confidence,needs_human_label,human_confidence"
+        in content
+    )
     assert "file1.pt,1,positive,0.95,," in content
     assert "file2.pt,0,negative,0.85,," in content
 
@@ -889,7 +899,9 @@ def test_save_candidates_empty_list(tmp_path, capsys):
 
 def test_save_candidates_creates_directory(tmp_path):
     """Test that save_candidates creates output directory if it doesn't exist."""
-    candidates = [{"filename": "test.pt", "prediction": 1, "predicted_class": "positive", "confidence": 0.9}]
+    candidates = [
+        {"filename": "test.pt", "prediction": 1, "predicted_class": "positive", "confidence": 0.9}
+    ]
 
     # Use a nested directory that doesn't exist
     output_file = tmp_path / "nested" / "dir" / "candidates.csv"

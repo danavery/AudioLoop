@@ -100,10 +100,10 @@ def run_training_simulation(
         Tuple of (stop_epoch, metrics_history)
     """
     if verbose:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"Training Simulation: {criterion.__class__.__name__}")
         print(f"Pattern: {pattern}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
     # Reset criterion state
     criterion.reset()
@@ -201,13 +201,17 @@ def demo_plateau_with_accuracy_floor():
 
     # Default plateau criterion
     criterion = PlateauCriterion()
-    print(f"Default PlateauCriterion: patience={criterion.patience}, accuracy_floor={criterion.accuracy_floor}")
+    print(
+        f"Default PlateauCriterion: patience={criterion.patience}, accuracy_floor={criterion.accuracy_floor}"
+    )
 
     # Test with accuracy floor
     print("\n" + "-" * 40)
     print("Enhanced PlateauCriterion with accuracy floor (0.9)")
     enhanced_criterion = PlateauCriterion(patience=10, accuracy_floor=0.9)
-    print(f"Parameters: patience={enhanced_criterion.patience}, accuracy_floor={enhanced_criterion.accuracy_floor}")
+    print(
+        f"Parameters: patience={enhanced_criterion.patience}, accuracy_floor={enhanced_criterion.accuracy_floor}"
+    )
     stop_epoch, _ = run_training_simulation(enhanced_criterion, "plateau", max_epochs=100)
     print(f"Stopped at epoch {stop_epoch}")
 
@@ -222,13 +226,15 @@ def demo_plateau_with_accuracy_floor():
     print("\n" + "-" * 40)
     print("Step-by-step accuracy floor demonstration")
     demo_criterion = PlateauCriterion(patience=3, accuracy_floor=0.85)
-    print(f"Criterion: patience={demo_criterion.patience}, accuracy_floor={demo_criterion.accuracy_floor}")
+    print(
+        f"Criterion: patience={demo_criterion.patience}, accuracy_floor={demo_criterion.accuracy_floor}"
+    )
 
     # Simulate training sequence
     training_steps = [
-        (0, 0.7, 1.0),   # Below floor
-        (1, 0.8, 1.1),   # Below floor, loss worse
-        (2, 0.9, 0.9),   # Above floor, loss better
+        (0, 0.7, 1.0),  # Below floor
+        (1, 0.8, 1.1),  # Below floor, loss worse
+        (2, 0.9, 0.9),  # Above floor, loss better
         (3, 0.91, 1.0),  # Above floor, loss worse (patience=1)
         (4, 0.92, 1.1),  # Above floor, loss worse (patience=2)
         (5, 0.93, 1.2),  # Above floor, loss worse (patience=3, should stop)
@@ -236,8 +242,10 @@ def demo_plateau_with_accuracy_floor():
 
     for epoch, accuracy, loss in training_steps:
         should_stop = demo_criterion.should_stop(epoch, accuracy, loss)
-        print(f"  Epoch {epoch}: accuracy={accuracy:.2f}, loss={loss:.2f}, "
-              f"patience={demo_criterion.epochs_without_improvement}, stop={should_stop}")
+        print(
+            f"  Epoch {epoch}: accuracy={accuracy:.2f}, loss={loss:.2f}, "
+            f"patience={demo_criterion.epochs_without_improvement}, stop={should_stop}"
+        )
         if should_stop:
             break
 
@@ -256,7 +264,9 @@ def demo_custom_criterion():
             self.max_epochs = max_epochs
             self.best_model_state = None
 
-        def should_stop(self, epoch, train_accuracy, train_loss, val_accuracy=None, val_loss=None, **kwargs):
+        def should_stop(
+            self, epoch, train_accuracy, train_loss, val_accuracy=None, val_loss=None, **kwargs
+        ):
             return train_accuracy >= self.target_accuracy or epoch >= self.max_epochs - 1
 
         def should_update_best_model(self) -> bool:
@@ -290,7 +300,9 @@ def demo_combined_criteria():
         def __init__(self, criteria: list[TrainingStoppingCriterion]):
             self.criteria = criteria
 
-        def should_stop(self, epoch, train_accuracy, train_loss, val_accuracy=None, val_loss=None, **kwargs):
+        def should_stop(
+            self, epoch, train_accuracy, train_loss, val_accuracy=None, val_loss=None, **kwargs
+        ):
             # Stop if ANY criterion says to stop
             for criterion in self.criteria:
                 if criterion.should_stop(epoch, train_accuracy, train_loss, val_accuracy, val_loss):
@@ -344,7 +356,10 @@ def demo_performance_comparison():
             "PlateauCriterion (sensitive)",
             PlateauCriterion(patience=5, min_delta=0.001, max_epochs=100),
         ),
-        ("PlateauCriterion (accuracy floor)", PlateauCriterion(patience=15, accuracy_floor=0.9, max_epochs=100)),
+        (
+            "PlateauCriterion (accuracy floor)",
+            PlateauCriterion(patience=15, accuracy_floor=0.9, max_epochs=100),
+        ),
     ]
 
     patterns = ["improving", "plateau", "oscillating"]

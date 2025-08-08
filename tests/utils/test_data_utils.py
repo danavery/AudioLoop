@@ -239,7 +239,7 @@ class TestVariableLengthCollate:
         """Test with three spectrograms of different lengths."""
         batch = [
             {
-                "data": torch.randn(1, 64, 50),   # Short
+                "data": torch.randn(1, 64, 50),  # Short
                 "label": 1,
                 "filename": "short.pt",
                 "filepath": "path/short.pt",
@@ -265,7 +265,7 @@ class TestVariableLengthCollate:
         assert torch.equal(result["label"], torch.tensor([1, 0, 1]))
 
         # Check padding
-        short_spec = result["data"][0]   # Originally 50 frames
+        short_spec = result["data"][0]  # Originally 50 frames
         medium_spec = result["data"][2]  # Originally 125 frames
 
         # Short should have padding from 50 to 200

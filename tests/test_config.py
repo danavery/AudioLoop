@@ -76,7 +76,7 @@ class TestConfigPaths:
             # For experiments, check the nested structure: outputs/experiment/
             assert config.output_dir.parent.name == "outputs"
             assert config.output_dir.name == expected_output
-            assert config.training_sets_dir.parent.name == "training_sets" 
+            assert config.training_sets_dir.parent.name == "training_sets"
             assert config.training_sets_dir.name == expected_training
 
     @pytest.mark.parametrize(

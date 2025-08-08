@@ -168,10 +168,6 @@ class TestCNN5Layer:
 
         assert params_with_bn > params_without_bn
 
-
-
-
-
     def test_model_training_mode_switching(self):
         """Test that model can switch between train and eval modes."""
         model = CNN5Layer(num_classes=2, dataset_size=150)
@@ -280,7 +276,6 @@ class TestSimpleCnn:
         assert info["num_classes"] == 4
         assert "num_parameters" in info
         assert info["num_parameters"] > 0
-
 
     def test_can_handle_shape(self):
         """Test can_handle_shape method."""

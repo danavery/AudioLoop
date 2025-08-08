@@ -78,8 +78,6 @@ def calculate_core_metrics(predictions_file: str) -> dict:
     has_ground_truth = "ground_truth" in fieldnames
     has_entropy = "entropy" in fieldnames
 
-
-
     # Calculate available metrics using imported functions
     binary_metrics = calculate_binary_metrics(predictions)
     balance_metrics = calculate_class_balance_metrics(predictions)
