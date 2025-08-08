@@ -72,7 +72,7 @@ python -m audioloop.train training_sets/training_set_v1.csv
 # Train with explicit version and parameters
 python -m audioloop.train training_sets/training_set_v1.csv -v 1 --epochs 500 --batch-size 64
 
-# Train with experiment name (outputs to outputs_myexp/)
+# Train with experiment name (outputs to outputs/myexp/)
 python -m audioloop.train training_sets/training_set_v1.csv --experiment myexp
 
 # Train with custom seed for reproducibility
@@ -105,7 +105,7 @@ python -m audioloop.active_learning --class-name Drill --run-number 1 --seed 123
 # Run with explicit parameters
 python -m audioloop.active_learning --class-name Speech --run-number 2 --total-candidates 20 --positive-pct 0.75 --min-confidence 0.85
 
-# Run with experiment name (uses outputs_myexp/ instead of outputs/)
+# Run with experiment name (uses outputs/myexp/ instead of outputs/)
 python -m audioloop.active_learning --class-name Drill --run-number 1 --experiment myexp
 
 # Run with entropy-based selection (uncertainty sampling)
@@ -181,7 +181,7 @@ python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --auto-label 
 python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv
 
 # Merge labels with explicit experiment name
-python -m audioloop.merge_labels training_sets_myexp/training_set_v1.csv outputs_myexp/labeling_candidates_v1.csv --experiment myexp
+python -m audioloop.merge_labels training_sets/myexp/training_set_v1.csv outputs/myexp/labeling_candidates_v1.csv --experiment myexp
 
 # Merge with auto-generated output path
 python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv --experiment myexp
@@ -196,7 +196,7 @@ python -m audioloop.auto_label_candidates outputs/labeling_candidates_v1.csv
 python -m audioloop.auto_label_candidates outputs/labeling_candidates_v1.csv --verbose
 
 # Auto-label candidates from experiment
-python -m audioloop.auto_label_candidates outputs_myexp/labeling_candidates_v2.csv
+python -m audioloop.auto_label_candidates outputs/myexp/labeling_candidates_v2.csv
 
 # Note: Auto-labeling requires ground truth data in CSV (generated with --with-ground-truth)
 # For production workflows without ground truth, use manual labeling tools instead
@@ -293,13 +293,13 @@ python -m audioloop.active_learning --class-name siren --run-number 1 --experime
 
 # 4. Label candidates manually using web UI (recommended)
 cd webui && python app.py
-# Load: outputs_myexp/labeling_candidates_v1.csv
+# Load: outputs/myexp/labeling_candidates_v1.csv
 
 # Alternative: Terminal interface
-python -m audioloop.label_audio outputs_myexp/labeling_candidates_v1.csv
+python -m audioloop.label_audio outputs/myexp/labeling_candidates_v1.csv
 
-# 5. Merge human labels (creates training_sets_myexp/training_set_v2.csv)
-python -m audioloop.merge_labels training_sets_myexp/training_set_v1.csv outputs_myexp/labeling_candidates_v1.csv
+# 5. Merge human labels (creates training_sets/myexp/training_set_v2.csv)
+python -m audioloop.merge_labels training_sets/myexp/training_set_v1.csv outputs/myexp/labeling_candidates_v1.csv
 
 # 6. Track metrics (production mode - confidence and prediction metrics only)
 python -m audioloop.track_metrics --experiment myexp --plot
@@ -319,10 +319,10 @@ python -m audioloop.train training_sets_eval_test/training_set_v1.csv --experime
 python -m audioloop.active_learning --class-name siren --run-number 1 --experiment eval_test --with-ground-truth
 
 # 4. Auto-label candidates using ground truth (for rapid testing)
-python -m audioloop.auto_label_candidates outputs_eval_test/labeling_candidates_v1.csv
+python -m audioloop.auto_label_candidates outputs/eval_test/labeling_candidates_v1.csv
 
 # 5. Merge labels (creates training_sets_eval_test/training_set_v2.csv)
-python -m audioloop.merge_labels training_sets_eval_test/training_set_v1.csv outputs_eval_test/labeling_candidates_v1.csv --experiment eval_test
+python -m audioloop.merge_labels training_sets/eval_test/training_set_v1.csv outputs/eval_test/labeling_candidates_v1.csv --experiment eval_test
 
 # 6. Track comprehensive metrics (evaluation mode - F1, precision, recall, accuracy)
 python -m audioloop.track_metrics --experiment eval_test --plot
@@ -506,13 +506,13 @@ from audioloop.config import AudioLoopConfig
 config = AudioLoopConfig(experiment_name="my_exp", dataset="urbansound8k")
 
 # Access all path locations
-config.output_dir          # outputs_my_exp/
-config.training_sets_dir   # training_sets_my_exp/
+config.output_dir          # outputs/my_exp/
+config.training_sets_dir   # training_sets/my_exp/
 config.specs_dir          # data/all_specs/
 
 # Generate versioned file paths
-config.get_model_path(1)        # outputs_my_exp/model_v1.pt
-config.get_predictions_path(1)  # outputs_my_exp/predictions_v1.csv
+config.get_model_path(1)        # outputs/my_exp/model_v1.pt
+config.get_predictions_path(1)  # outputs/my_exp/predictions_v1.csv
 config.get_training_set_path(1) # training_sets_my_exp/training_set_v1.csv
 ```
 
@@ -816,7 +816,7 @@ Centralized path utilities eliminate hardcoded path duplication:
 from audioloop.utils.paths import get_output_dir, get_specs_dir, extract_version_from_filename
 
 # Environment-configurable paths
-output_dir = get_output_dir("experiment_name")  # outputs_experiment_name/
+output_dir = get_output_dir("experiment_name")  # outputs/experiment_name/
 specs_dir = get_specs_dir()                     # data/all_specs/ (or custom)
 
 # Version extraction

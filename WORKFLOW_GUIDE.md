@@ -67,10 +67,10 @@ AudioLoop uses a unified configuration system that automatically organizes files
 - **Candidates**: `outputs/labeling_candidates_v{N}.csv`
 
 ### Experiment Organization (With --experiment parameter)
-- **Models**: `outputs_{experiment}/model_v{N}.pt`
-- **Training sets**: `training_sets_{experiment}/training_set_v{N}.csv`
-- **Predictions**: `outputs_{experiment}/predictions_v{N}.csv`
-- **Candidates**: `outputs_{experiment}/labeling_candidates_v{N}.csv`
+- **Models**: `outputs/{experiment}/model_v{N}.pt`
+- **Training sets**: `training_sets/{experiment}/training_set_v{N}.csv`
+- **Predictions**: `outputs/{experiment}/predictions_v{N}.csv`
+- **Candidates**: `outputs/{experiment}/labeling_candidates_v{N}.csv`
 
 ### Configuration Precedence
 AudioLoop follows standard configuration patterns:
@@ -117,26 +117,26 @@ python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/label
 # All files automatically organized under experiment directories
 
 # 1. Train initial model with experiment organization
-python -m audioloop.train training_sets_dog_bark_exp/training_set_v1.csv --experiment dog_bark_exp
-# → Creates: outputs_dog_bark_exp/model_v1.pt
+python -m audioloop.train training_sets/dog_bark_exp/training_set_v1.csv --experiment dog_bark_exp
+# → Creates: outputs/dog_bark_exp/model_v1.pt
 
 # 2. Run active learning with experiment organization
 python -m audioloop.active_learning --class-name dog_bark --run-number 1 --experiment dog_bark_exp
-# → Creates: outputs_dog_bark_exp/predictions_v1.csv, outputs_dog_bark_exp/labeling_candidates_v1.csv
+# → Creates: outputs/dog_bark_exp/predictions_v1.csv, outputs/dog_bark_exp/labeling_candidates_v1.csv
 
 # 3. Human labeling (automatically uses correct experiment paths)
-python -m audioloop.label_audio outputs_dog_bark_exp/labeling_candidates_v1.csv --audio-dir data/urbansound8k
+python -m audioloop.label_audio outputs/dog_bark_exp/labeling_candidates_v1.csv --audio-dir data/urbansound8k
 
 # 4. Merge labels (creates organized training set)
-python -m audioloop.merge_labels training_sets_dog_bark_exp/training_set_v1.csv outputs_dog_bark_exp/labeling_candidates_v1.csv
-# → Creates: training_sets_dog_bark_exp/training_set_v2.csv
+python -m audioloop.merge_labels training_sets/dog_bark_exp/training_set_v1.csv outputs/dog_bark_exp/labeling_candidates_v1.csv
+# → Creates: training_sets/dog_bark_exp/training_set_v2.csv
 
 # === CYCLE 2: Improved Model ===
-python -m audioloop.train training_sets_dog_bark_exp/training_set_v2.csv --experiment dog_bark_exp
-# → Creates: outputs_dog_bark_exp/model_v2.pt
+python -m audioloop.train training_sets/dog_bark_exp/training_set_v2.csv --experiment dog_bark_exp
+# → Creates: outputs/dog_bark_exp/model_v2.pt
 
 python -m audioloop.active_learning --class-name dog_bark --run-number 2 --experiment dog_bark_exp
-# → Creates: outputs_dog_bark_exp/predictions_v2.csv, outputs_dog_bark_exp/labeling_candidates_v2.csv
+# → Creates: outputs/dog_bark_exp/predictions_v2.csv, outputs/dog_bark_exp/labeling_candidates_v2.csv
 ```
 
 ## Version Auto-Detection
@@ -239,10 +239,10 @@ python -m audioloop.active_learning --model outputs/model_v2b.pt --run-number 2b
 ```bash
 # Use experiment names to organize by class - no file conflicts!
 python -m audioloop.active_learning --class-name siren --run-number 1 --experiment siren_exp
-# → outputs_siren_exp/labeling_candidates_v1.csv
+# → outputs/siren_exp/labeling_candidates_v1.csv
 
 python -m audioloop.active_learning --class-name dog_bark --run-number 1 --experiment dog_bark_exp
-# → outputs_dog_bark_exp/labeling_candidates_v1.csv
+# → outputs/dog_bark_exp/labeling_candidates_v1.csv
 
 # Clean separation - no overwrites or manual renaming needed!
 ```
@@ -251,25 +251,25 @@ python -m audioloop.active_learning --class-name dog_bark --run-number 1 --exper
 
 | File Type | Default Pattern | Experiment Pattern | Auto-Generated | Example |
 |-----------|-----------------|-------------------|----------------|---------|
-| Training Set | `training_sets/training_set_v{N}.csv` | `training_sets_{exp}/training_set_v{N}.csv` | By merge_labels | `training_sets_myexp/training_set_v1.csv` |
-| Model | `outputs/model_v{N}.pt` | `outputs_{exp}/model_v{N}.pt` | By train | `outputs_myexp/model_v1.pt` |
-| Predictions | `outputs/predictions_v{N}.csv` | `outputs_{exp}/predictions_v{N}.csv` | By active_learning | `outputs_myexp/predictions_v1.csv` |
-| Candidates | `outputs/labeling_candidates_v{N}.csv` | `outputs_{exp}/labeling_candidates_v{N}.csv` | By active_learning | `outputs_myexp/labeling_candidates_v1.csv` |
+| Training Set | `training_sets/training_set_v{N}.csv` | `training_sets/{exp}/training_set_v{N}.csv` | By merge_labels | `training_sets/myexp/training_set_v1.csv` |
+| Model | `outputs/model_v{N}.pt` | `outputs/{exp}/model_v{N}.pt` | By train | `outputs/myexp/model_v1.pt` |
+| Predictions | `outputs/predictions_v{N}.csv` | `outputs/{exp}/predictions_v{N}.csv` | By active_learning | `outputs/myexp/predictions_v1.csv` |
+| Candidates | `outputs/labeling_candidates_v{N}.csv` | `outputs/{exp}/labeling_candidates_v{N}.csv` | By active_learning | `outputs/myexp/labeling_candidates_v1.csv` |
 
 ## Version Tracking Best Practices
 
 ### 1. Keep All Versions
 ```bash
 # Don't delete intermediate versions - experiment organization makes this clean
-ls outputs_siren_exp/
+ls outputs/siren_exp/
 model_v1.pt  model_v2.pt  model_v3.pt  # Keep all for comparison
 
 ls training_sets_siren_exp/
 training_set_v1.csv  training_set_v2.csv  training_set_v3.csv  # Track progression
 
 # Multiple experiments stay organized
-ls -d outputs_*/
-outputs_siren_exp/  outputs_dog_bark_exp/  outputs_gun_shot_exp/
+ls -d outputs/*/
+outputs/siren_exp/  outputs/dog_bark_exp/  outputs/gun_shot_exp/
 ```
 
 ### 2. Document Changes
@@ -326,15 +326,15 @@ python -m audioloop.active_learning --class-name siren \
 
 # Siren workflow - automatically organized
 python -m audioloop.active_learning --class-name siren --run-number 1 --experiment siren_detection
-# → Creates: outputs_siren_detection/predictions_v1.csv, outputs_siren_detection/labeling_candidates_v1.csv
+# → Creates: outputs/siren_detection/predictions_v1.csv, outputs/siren_detection/labeling_candidates_v1.csv
 
 # Dog bark workflow - automatically organized  
 python -m audioloop.active_learning --class-name dog_bark --run-number 1 --experiment dog_bark_detection
-# → Creates: outputs_dog_bark_detection/predictions_v1.csv, outputs_dog_bark_detection/labeling_candidates_v1.csv
+# → Creates: outputs/dog_bark_detection/predictions_v1.csv, outputs/dog_bark_detection/labeling_candidates_v1.csv
 
 # Gun shot workflow - automatically organized
 python -m audioloop.active_learning --class-name gun_shot --run-number 1 --experiment gun_shot_detection
-# → Creates: outputs_gun_shot_detection/predictions_v1.csv, outputs_gun_shot_detection/labeling_candidates_v1.csv
+# → Creates: outputs/gun_shot_detection/predictions_v1.csv, outputs/gun_shot_detection/labeling_candidates_v1.csv
 
 # Clean separation, no manual organization needed!
 ```
@@ -367,10 +367,10 @@ find . -name "training_set_*.csv" | sort -V
 find . -name "predictions_*.csv" | sort -V
 
 # Find latest version in specific experiment
-ls outputs_myexp/model_*.pt | sort -V | tail -n 1
+ls outputs/myexp/model_*.pt | sort -V | tail -n 1
 
 # Overview of all experiments
-ls -d outputs_*/ training_sets_*/
+ls -d outputs/*/ training_sets/*/
 ```
 
 ## Integration with External Tools

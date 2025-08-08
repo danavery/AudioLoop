@@ -57,13 +57,13 @@ from audioloop.config import AudioLoopConfig
 config = AudioLoopConfig(experiment_name="my_experiment", dataset="urbansound8k")
 
 # All paths are automatically organized
-config.output_dir          # outputs_my_experiment/
-config.training_sets_dir   # training_sets_my_experiment/
+config.output_dir          # outputs/my_experiment/
+config.training_sets_dir   # training_sets/my_experiment/
 config.specs_dir          # data/all_specs/
 
 # Generate versioned file paths
-config.get_model_path(1)        # outputs_my_experiment/model_v1.pt
-config.get_predictions_path(1)  # outputs_my_experiment/predictions_v1.csv
+config.get_model_path(1)        # outputs/my_experiment/model_v1.pt
+config.get_predictions_path(1)  # outputs/my_experiment/predictions_v1.csv
 ```
 
 ### Environment Variables

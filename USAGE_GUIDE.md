@@ -119,11 +119,11 @@ python -m audioloop.train training_sets/training_set_v1.csv
 
 # With experiment name
 python -m audioloop.train training_sets_myexp/training_set_v1.csv --experiment myexp
-# Output: outputs_myexp/model_v1.pt
+# Output: outputs/myexp/model_v1.pt
 
 # All commands support --experiment parameter
 python -m audioloop.active_learning --class-name siren --run-number 1 --experiment myexp
-# Uses: training_sets_myexp/ and outputs_myexp/
+# Uses: training_sets/myexp/ and outputs/myexp/
 ```
 
 ### Configuration in Python Code
@@ -137,13 +137,13 @@ from audioloop.config import AudioLoopConfig
 config = AudioLoopConfig(experiment_name="test", dataset="urbansound8k")
 
 # Access organized paths
-print(config.output_dir)         # outputs_test/
-print(config.training_sets_dir)  # training_sets_test/
+print(config.output_dir)         # outputs/test/
+print(config.training_sets_dir)  # training_sets/test/
 print(config.specs_dir)         # data/all_specs/
 
 # Generate versioned paths
-model_path = config.get_model_path(1)        # outputs_test/model_v1.pt
-pred_path = config.get_predictions_path(1)   # outputs_test/predictions_v1.csv
+model_path = config.get_model_path(1)        # outputs/test/model_v1.pt
+pred_path = config.get_predictions_path(1)   # outputs/test/predictions_v1.csv
 ```
 python -m audioloop.utils.create_bootstrap_set --class-name siren --metadata-csv /path/to/UrbanSound8K.csv --audio-root /path/to/audio
 ```

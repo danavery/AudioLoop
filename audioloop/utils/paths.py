@@ -31,7 +31,7 @@ def get_output_dir(experiment_name: str | None = None) -> Path:
     """Get the outputs directory, with optional experiment suffix."""
     output_root = get_output_root()
     if experiment_name:
-        return output_root / f"outputs_{experiment_name}"
+        return output_root / "outputs" / experiment_name
     return output_root / "outputs"
 
 
@@ -39,7 +39,7 @@ def get_training_sets_dir(experiment_name: str | None = None) -> Path:
     """Get the training sets directory, with optional experiment suffix."""
     output_root = get_output_root()
     if experiment_name:
-        return output_root / f"training_sets_{experiment_name}"
+        return output_root / "training_sets" / experiment_name
     return output_root / "training_sets"
 
 

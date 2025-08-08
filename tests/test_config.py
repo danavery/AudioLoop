@@ -63,14 +63,21 @@ class TestConfigPaths:
 
     @pytest.mark.parametrize(
         "experiment,expected_output,expected_training",
-        [(None, "outputs", "training_sets"), ("test", "outputs_test", "training_sets_test")],
+        [(None, "outputs", "training_sets"), ("test", "test", "test")],
     )
     def test_directory_paths(self, experiment, expected_output, expected_training):
         """Test output and training directory generation."""
         config = AudioLoopConfig(experiment_name=experiment)
 
-        assert config.output_dir.name == expected_output
-        assert config.training_sets_dir.name == expected_training
+        if experiment is None:
+            assert config.output_dir.name == expected_output
+            assert config.training_sets_dir.name == expected_training
+        else:
+            # For experiments, check the nested structure: outputs/experiment/
+            assert config.output_dir.parent.name == "outputs"
+            assert config.output_dir.name == expected_output
+            assert config.training_sets_dir.parent.name == "training_sets" 
+            assert config.training_sets_dir.name == expected_training
 
     @pytest.mark.parametrize(
         "version,expected_file",

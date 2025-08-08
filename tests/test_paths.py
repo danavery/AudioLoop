@@ -70,28 +70,40 @@ class TestDirectoryGeneration:
     """Test directory path generation."""
 
     @pytest.mark.parametrize(
-        "experiment,expected_suffix",
+        "experiment,expected_path",
         [
             (None, "outputs"),
-            ("test_exp", "outputs_test_exp"),
+            ("test_exp", "outputs/test_exp"),
         ],
     )
-    def test_output_directory_names(self, experiment, expected_suffix):
+    def test_output_directory_names(self, experiment, expected_path):
         """Test output directory generation with different experiment names."""
         result = get_output_dir(experiment)
-        assert result.name == expected_suffix
+        if experiment is None:
+            assert result.name == expected_path
+        else:
+            # For experiments, check nested structure
+            assert str(result).endswith(expected_path)
+            assert result.parent.name == "outputs"
+            assert result.name == experiment
 
     @pytest.mark.parametrize(
-        "experiment,expected_suffix",
+        "experiment,expected_path",
         [
             (None, "training_sets"),
-            ("test_exp", "training_sets_test_exp"),
+            ("test_exp", "training_sets/test_exp"),
         ],
     )
-    def test_training_sets_directory_names(self, experiment, expected_suffix):
+    def test_training_sets_directory_names(self, experiment, expected_path):
         """Test training sets directory generation."""
         result = get_training_sets_dir(experiment)
-        assert result.name == expected_suffix
+        if experiment is None:
+            assert result.name == expected_path
+        else:
+            # For experiments, check nested structure
+            assert str(result).endswith(expected_path)
+            assert result.parent.name == "training_sets"
+            assert result.name == experiment
 
     def test_directory_consistency(self):
         """Test that output and training directories are consistent."""
@@ -102,7 +114,12 @@ class TestDirectoryGeneration:
 
         assert "test_experiment" in str(output_dir)
         assert "test_experiment" in str(training_dir)
-        assert output_dir.parent == training_dir.parent
+        # Both should be nested under the same root, but in different base directories
+        assert output_dir.parent.parent == training_dir.parent.parent
+        assert output_dir.parent.name == "outputs"
+        assert training_dir.parent.name == "training_sets"
+        assert output_dir.name == exp_name
+        assert training_dir.name == exp_name
 
 
 class TestDirectoryCreation:
@@ -118,8 +135,8 @@ class TestDirectoryCreation:
             create_output_directories("test_exp")
 
             # Verify they exist
-            expected_output = Path(temp_dir) / "outputs_test_exp"
-            expected_training = Path(temp_dir) / "training_sets_test_exp"
+            expected_output = Path(temp_dir) / "outputs" / "test_exp"
+            expected_training = Path(temp_dir) / "training_sets" / "test_exp"
 
             assert expected_output.exists()
             assert expected_training.exists()
@@ -150,9 +167,12 @@ class TestPathIntegration:
             output_dir = get_output_dir("exp")
             training_dir = get_training_sets_dir("exp")
 
-            # Both should use the same root
-            assert output_dir.parent == Path("/test/root")
-            assert training_dir.parent == Path("/test/root")
+            # Both should have nested structure under same root
+            if "exp" in str(output_dir):
+                assert output_dir.parent.parent == Path("/test/root")
+                assert training_dir.parent.parent == Path("/test/root")
+                assert output_dir.parent.name == "outputs"
+                assert training_dir.parent.name == "training_sets"
 
     def test_create_matches_get_functions(self):
         """Test that create_output_directories creates paths matching get functions."""
