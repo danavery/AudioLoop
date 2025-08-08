@@ -58,7 +58,7 @@ def calculate_core_metrics(predictions_file: str) -> dict:
         for row in reader:
             # Always load required fields
             pred_data = {
-                "predicted_is_positive": row["predicted_is_positive"],
+                "prediction": row["prediction"],
                 "confidence": float(row["confidence"]),
             }
 

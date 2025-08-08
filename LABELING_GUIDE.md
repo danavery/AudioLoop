@@ -182,7 +182,8 @@ It's better to skip (leave unlabeled) than to guess:
 ### Input File
 `outputs/labeling_candidates_v1.csv` contains:
 - `filename`: Path to audio file
-- `prediction`: What the model thinks
+- `predicted_class`: What the model thinks (e.g., "Brass instrument" or "not_Brass instrument")
+- `prediction`: Boolean prediction (True/False)
 - `confidence`: How sure the model is
 - `needs_human_label`: Your input goes here
 

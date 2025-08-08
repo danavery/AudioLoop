@@ -593,17 +593,17 @@ data/all_specs/100263-2-0-117.pt,0,1
 ### Predictions CSV (Generated)
 Default format (production mode):
 ```csv
-filename,predicted_is_positive,prediction,confidence,entropy,prob_negative,prob_positive,original_class,fold,filepath
+filename,prediction,predicted_class,confidence,entropy,prob_negative,prob_positive,original_class,fold,filepath
 ```
 
 With ground truth evaluation (--with-ground-truth flag):
 ```csv
-filename,ground_truth,predicted_is_positive,prediction,confidence,entropy,prob_negative,prob_positive,correct,original_class,fold,filepath
+filename,ground_truth,prediction,predicted_class,confidence,entropy,prob_negative,prob_positive,correct,original_class,fold,filepath
 ```
 
 ### Candidates CSV (For Human Labeling)
 ```csv
-filename,predicted_is_positive,confidence,needs_human_label,prediction,entropy,prob_negative,prob_positive,original_class,fold,filepath
+filename,prediction,predicted_class,confidence,needs_human_label,entropy,prob_negative,prob_positive,original_class,fold,filepath
 ```
 
 ## Key Dependencies

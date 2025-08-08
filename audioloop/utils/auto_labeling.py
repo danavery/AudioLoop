@@ -109,13 +109,13 @@ def auto_label_from_ground_truth(candidates_csv: str) -> dict[str, int]:
 
 def parse_target_class(prediction: str) -> str:
     """
-    Parse the target class from prediction field.
+    Parse the target class from predicted_class field.
 
-    Helper function for extracting class names from prediction strings
+    Helper function for extracting class names from predicted_class strings
     that may have "not_" prefixes for negative predictions.
 
     Args:
-        prediction: Prediction string like "Guitar" or "not_Guitar"
+        prediction: Predicted class string like "Guitar" or "not_Guitar"
 
     Returns:
         Target class name (e.g., "Guitar")

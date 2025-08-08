@@ -17,7 +17,7 @@ def calculate_binary_metrics(predictions: list[dict[str, Any]]) -> dict[str, flo
 
     Args:
         predictions: List of prediction dictionaries with keys:
-            - predicted_is_positive: bool or str (required)
+            - prediction: bool or str (required)
             - confidence: float (required)
             - ground_truth: bool or str (optional, required for evaluation metrics)
 
@@ -40,7 +40,7 @@ def calculate_binary_metrics(predictions: list[dict[str, Any]]) -> dict[str, flo
     confidences = []
 
     for p in predictions:
-        pred_pos = p["predicted_is_positive"]
+        pred_pos = p["prediction"]
         if isinstance(pred_pos, str):
             pred_pos = pred_pos.lower() == "true"
         pred_labels.append(int(pred_pos))
@@ -178,7 +178,7 @@ def calculate_class_balance_metrics(predictions: list[dict[str, Any]]) -> dict[s
 
     # Always calculate predicted positive ratio
     for p in predictions:
-        pred_pos = p["predicted_is_positive"]
+        pred_pos = p["prediction"]
         if isinstance(pred_pos, str):
             pred_pos = pred_pos.lower() == "true"
         if pred_pos:

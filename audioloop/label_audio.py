@@ -276,7 +276,7 @@ class SimpleAudioLabeler:
         # Display candidate info
         print(f"Filename: {candidate.get('filename', 'Unknown')}")
         print(f"Filepath: {candidate.get('filepath', 'Unknown')}")
-        print(f"Prediction: {candidate.get('prediction', 'Unknown')}")
+        print(f"Prediction: {candidate.get('predicted_class', 'Unknown')}")
         print(f"Confidence: {candidate.get('confidence', 'Unknown')}")
         print(f"Original Class: {candidate.get('original_class', 'Unknown')}")
 

@@ -216,8 +216,8 @@ def run_binary_inference(
                 # Build result dictionary - always include core prediction fields
                 result = {
                     "filename": audio_filename,
-                    "predicted_is_positive": (predicted_class == 1),
-                    "prediction": prediction_name,
+                    "prediction": (predicted_class == 1),
+                    "predicted_class": prediction_name,
                     "confidence": confidences[i].item(),
                     "entropy": entropies[i].item(),
                     "prob_negative": prob_negative,
@@ -241,8 +241,8 @@ def run_binary_inference(
     # Save results to CSV - conditionally include ground truth columns
     fieldnames = [
         "filename",
-        "predicted_is_positive",
         "prediction",
+        "predicted_class",
         "confidence",
         "entropy",
         "prob_negative",

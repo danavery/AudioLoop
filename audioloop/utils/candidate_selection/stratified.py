@@ -44,8 +44,8 @@ class StratifiedUncertaintyStrategy(CandidateSelectionStrategy):
         random.seed(random_seed)
 
         # Separate predictions by predicted class
-        positive_preds = [p for p in predictions if p["prediction"] == positive_class_name]
-        negative_preds = [p for p in predictions if p["prediction"] == negative_class_name]
+        positive_preds = [p for p in predictions if p["predicted_class"] == positive_class_name]
+        negative_preds = [p for p in predictions if p["predicted_class"] == negative_class_name]
 
         # Sort each group by entropy (highest first = most uncertain)
         positive_preds.sort(key=lambda x: x["entropy"], reverse=True)
