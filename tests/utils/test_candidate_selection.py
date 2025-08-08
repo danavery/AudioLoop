@@ -35,42 +35,48 @@ def sample_predictions():
     return [
         {
             "filename": "file1.pt",
-            "prediction": "positive",
+            "prediction": 1,
+            "predicted_class": "positive",
             "confidence": 0.95,
             "entropy": 0.1,
             "filepath": "path/file1.pt",
         },
         {
             "filename": "file2.pt",
-            "prediction": "positive",
+            "prediction": 1,
+            "predicted_class": "positive",
             "confidence": 0.85,
             "entropy": 0.3,
             "filepath": "path/file2.pt",
         },
         {
             "filename": "file3.pt",
-            "prediction": "negative",
+            "prediction": 0,
+            "predicted_class": "negative",
             "confidence": 0.92,
             "entropy": 0.2,
             "filepath": "path/file3.pt",
         },
         {
             "filename": "file4.pt",
-            "prediction": "negative",
+            "prediction": 0,
+            "predicted_class": "negative",
             "confidence": 0.78,
             "entropy": 0.4,
             "filepath": "path/file4.pt",
         },
         {
             "filename": "file5.pt",
-            "prediction": "positive",
+            "prediction": 1,
+            "predicted_class": "positive",
             "confidence": 0.65,
             "entropy": 0.6,
             "filepath": "path/file5.pt",
         },
         {
             "filename": "file6.pt",
-            "prediction": "negative",
+            "prediction": 0,
+            "predicted_class": "negative",
             "confidence": 0.55,
             "entropy": 0.8,
             "filepath": "path/file6.pt",
@@ -90,7 +96,8 @@ def single_prediction():
     return [
         {
             "filename": "single.pt",
-            "prediction": "positive",
+            "prediction": 1,
+            "predicted_class": "positive",
             "confidence": 0.9,
             "entropy": 0.2,
             "filepath": "path/single.pt",
@@ -108,7 +115,8 @@ def imbalanced_predictions():
         predictions.append(
             {
                 "filename": f"pos_{i}.pt",
-                "prediction": "positive",
+                "prediction": 1,
+                "predicted_class": "positive",
                 "confidence": 0.8 + i * 0.1,
                 "entropy": 0.2 + i * 0.1,
                 "filepath": f"path/pos_{i}.pt",
@@ -120,7 +128,8 @@ def imbalanced_predictions():
         predictions.append(
             {
                 "filename": f"neg_{i}.pt",
-                "prediction": "negative",
+                "prediction": 0,
+                "predicted_class": "negative",
                 "confidence": 0.6 + i * 0.03,
                 "entropy": 0.3 + i * 0.05,
                 "filepath": f"path/neg_{i}.pt",
@@ -136,7 +145,8 @@ def predictions_with_ground_truth():
     return [
         {
             "filename": "file1.pt",
-            "prediction": "positive",
+            "prediction": 1,
+            "predicted_class": "positive",
             "confidence": 0.95,
             "entropy": 0.1,
             "ground_truth": True,
@@ -145,7 +155,8 @@ def predictions_with_ground_truth():
         },
         {
             "filename": "file2.pt",
-            "prediction": "positive",
+            "prediction": 1,
+            "predicted_class": "positive",
             "confidence": 0.85,
             "entropy": 0.3,
             "ground_truth": True,
@@ -154,7 +165,8 @@ def predictions_with_ground_truth():
         },
         {
             "filename": "file3.pt",
-            "prediction": "negative",
+            "prediction": 0,
+            "predicted_class": "negative",
             "confidence": 0.92,
             "entropy": 0.2,
             "ground_truth": False,
@@ -163,7 +175,8 @@ def predictions_with_ground_truth():
         },
         {
             "filename": "file4.pt",
-            "prediction": "negative",
+            "prediction": 0,
+            "predicted_class": "negative",
             "confidence": 0.78,
             "entropy": 0.4,
             "ground_truth": False,
@@ -211,8 +224,8 @@ def test_confidence_strategy_basic_selection(sample_predictions):
     assert len(candidates) == 4
 
     # Check that we have roughly equal positive/negative
-    positive_count = sum(1 for c in candidates if c["prediction"] == "positive")
-    negative_count = sum(1 for c in candidates if c["prediction"] == "negative")
+    positive_count = sum(1 for c in candidates if c["predicted_class"] == "positive")
+    negative_count = sum(1 for c in candidates if c["predicted_class"] == "negative")
 
     assert positive_count == 2
     assert negative_count == 2
@@ -232,8 +245,8 @@ def test_confidence_strategy_sorts_by_confidence(sample_predictions):
     )
 
     # Separate by prediction type
-    positive_candidates = [c for c in candidates if c["prediction"] == "positive"]
-    negative_candidates = [c for c in candidates if c["prediction"] == "negative"]
+    positive_candidates = [c for c in candidates if c["predicted_class"] == "positive"]
+    negative_candidates = [c for c in candidates if c["predicted_class"] == "negative"]
 
     # Should get highest confidence positive and negative
     assert len(positive_candidates) == 2
@@ -260,7 +273,7 @@ def test_confidence_strategy_percentage_split(sample_predictions):
         sample_predictions, num_candidates=5, positive_percentage=0.8, random_seed=42
     )
 
-    positive_count = sum(1 for c in candidates if c["prediction"] == "positive")
+    positive_count = sum(1 for c in candidates if c["predicted_class"] == "positive")
     # Should get 3 positives (all available) since we only have 3 positive samples
     assert positive_count == 3
 
@@ -269,7 +282,7 @@ def test_confidence_strategy_percentage_split(sample_predictions):
         sample_predictions, num_candidates=5, positive_percentage=0.2, random_seed=42
     )
 
-    positive_count = sum(1 for c in candidates if c["prediction"] == "positive")
+    positive_count = sum(1 for c in candidates if c["predicted_class"] == "positive")
     assert positive_count == 1  # 20% of 5 = 1
 
 
@@ -305,8 +318,8 @@ def test_confidence_strategy_imbalanced_data(imbalanced_predictions):
         random_seed=42,
     )
 
-    positive_count = sum(1 for c in candidates if c["prediction"] == "positive")
-    negative_count = sum(1 for c in candidates if c["prediction"] == "negative")
+    positive_count = sum(1 for c in candidates if c["predicted_class"] == "positive")
+    negative_count = sum(1 for c in candidates if c["predicted_class"] == "negative")
 
     # Should get all 2 positives and 2 negatives (total 4 candidates)
     assert positive_count == 2
@@ -331,8 +344,8 @@ def test_entropy_strategy_basic_selection(sample_predictions):
 
     assert len(candidates) == 4
 
-    positive_count = sum(1 for c in candidates if c["prediction"] == "positive")
-    negative_count = sum(1 for c in candidates if c["prediction"] == "negative")
+    positive_count = sum(1 for c in candidates if c["predicted_class"] == "positive")
+    negative_count = sum(1 for c in candidates if c["predicted_class"] == "negative")
 
     assert positive_count == 2
     assert negative_count == 2
@@ -352,8 +365,8 @@ def test_entropy_strategy_sorts_by_entropy(sample_predictions):
     )
 
     # Separate by prediction type
-    positive_candidates = [c for c in candidates if c["prediction"] == "positive"]
-    negative_candidates = [c for c in candidates if c["prediction"] == "negative"]
+    positive_candidates = [c for c in candidates if c["predicted_class"] == "positive"]
+    negative_candidates = [c for c in candidates if c["predicted_class"] == "negative"]
 
     # Should get highest entropy samples
     # From sample_predictions: positive entropies are [0.1, 0.3, 0.6]
@@ -736,11 +749,11 @@ def test_entropy_strategy_respects_positive_percentage(sample_predictions, posit
         random_seed=42,
     )
 
-    positive_count = sum(1 for c in candidates if c["prediction"] == "positive")
+    positive_count = sum(1 for c in candidates if c["predicted_class"] == "positive")
     expected_positive = int(4 * positive_percentage)
 
     # Should match expected count or be limited by available samples
-    available_positive = sum(1 for p in sample_predictions if p["prediction"] == "positive")
+    available_positive = sum(1 for p in sample_predictions if p["predicted_class"] == "positive")
     expected_positive = min(expected_positive, available_positive)
 
     assert positive_count == expected_positive
@@ -766,7 +779,7 @@ def test_strategies_with_custom_class_names(strategy_class, sample_predictions):
     custom_predictions = []
     for p in sample_predictions:
         custom_p = p.copy()
-        custom_p["prediction"] = "dog_bark" if p["prediction"] == "positive" else "other"
+        custom_p["predicted_class"] = "dog_bark" if p["predicted_class"] == "positive" else "other"
         custom_predictions.append(custom_p)
 
     candidates = strategy.select_candidates(
@@ -780,7 +793,7 @@ def test_strategies_with_custom_class_names(strategy_class, sample_predictions):
     assert len(candidates) <= 2
     # Verify the custom class names are preserved
     for candidate in candidates:
-        assert candidate["prediction"] in ["dog_bark", "other"]
+        assert candidate["predicted_class"] in ["dog_bark", "other"]
 
 
 def test_basic_transition_edge_cases():
@@ -801,7 +814,7 @@ def test_basic_transition_edge_cases():
         assert len(candidates) == 0
 
         # Zero candidates requested
-        sample_preds = [{"filename": "test.pt", "prediction": "positive", "confidence": 0.9}]
+        sample_preds = [{"filename": "test.pt", "prediction": 1, "predicted_class": "positive", "confidence": 0.9}]
         candidates = strategy.select_candidates(sample_preds, num_candidates=0, random_seed=42)
         assert len(candidates) == 0
 
@@ -811,9 +824,9 @@ def test_load_predictions(tmp_path):
     """Test load_predictions function."""
     # Create a temporary CSV file
     csv_file = tmp_path / "test_predictions.csv"
-    csv_content = """filename,confidence,entropy,prediction
-file1.pt,0.95,0.1,positive
-file2.pt,0.85,0.3,negative
+    csv_content = """filename,confidence,entropy,prediction,predicted_class
+file1.pt,0.95,0.1,1,positive
+file2.pt,0.85,0.3,0,negative
 """
     csv_file.write_text(csv_content)
 
@@ -824,11 +837,13 @@ file2.pt,0.85,0.3,negative
     assert predictions[0]["filename"] == "file1.pt"
     assert predictions[0]["confidence"] == 0.95
     assert predictions[0]["entropy"] == 0.1
-    assert predictions[0]["prediction"] == "positive"
+    assert predictions[0]["prediction"] == "1"
+    assert predictions[0]["predicted_class"] == "positive"
     assert predictions[1]["filename"] == "file2.pt"
     assert predictions[1]["confidence"] == 0.85
     assert predictions[1]["entropy"] == 0.3
-    assert predictions[1]["prediction"] == "negative"
+    assert predictions[1]["prediction"] == "0"
+    assert predictions[1]["predicted_class"] == "negative"
 
 
 def test_save_candidates(tmp_path):
@@ -837,12 +852,14 @@ def test_save_candidates(tmp_path):
     candidates = [
         {
             "filename": "file1.pt",
-            "prediction": "positive",
+            "prediction": 1,
+            "predicted_class": "positive",
             "confidence": 0.95,
         },
         {
             "filename": "file2.pt",
-            "prediction": "negative",
+            "prediction": 0,
+            "predicted_class": "negative",
             "confidence": 0.85,
         },
     ]
@@ -854,9 +871,9 @@ def test_save_candidates(tmp_path):
     # Verify file was created and contains expected content
     assert output_file.exists()
     content = output_file.read_text()
-    assert "filename,prediction,confidence,needs_human_label,human_confidence" in content
-    assert "file1.pt,positive,0.95,," in content
-    assert "file2.pt,negative,0.85,," in content
+    assert "filename,prediction,predicted_class,confidence,needs_human_label,human_confidence" in content
+    assert "file1.pt,1,positive,0.95,," in content
+    assert "file2.pt,0,negative,0.85,," in content
 
 
 def test_save_candidates_empty_list(tmp_path, capsys):
@@ -872,7 +889,7 @@ def test_save_candidates_empty_list(tmp_path, capsys):
 
 def test_save_candidates_creates_directory(tmp_path):
     """Test that save_candidates creates output directory if it doesn't exist."""
-    candidates = [{"filename": "test.pt", "prediction": "positive", "confidence": 0.9}]
+    candidates = [{"filename": "test.pt", "prediction": 1, "predicted_class": "positive", "confidence": 0.9}]
 
     # Use a nested directory that doesn't exist
     output_file = tmp_path / "nested" / "dir" / "candidates.csv"
