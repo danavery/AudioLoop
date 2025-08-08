@@ -12,35 +12,36 @@ The `automated_workflow.py` script provides a simple way to run complete active 
 python -m audioloop.create_all_specs
 python -m audioloop.utils.start_labeling --class-name siren --n 40
 
-# Fully automated workflow (auto-labeling for testing)
-python automated_workflow.py --class-name siren --cycles 3 --auto-label
+# Production workflow (pause for human labeling)
+python -m audioloop.automated_workflow --class-name dog_bark --cycles 2
 
-# Semi-automated workflow (pause for human labeling)
-python automated_workflow.py --class-name dog_bark --cycles 2
+# Evaluation workflow (auto-labeling for testing)
+python -m audioloop.automated_workflow --class-name siren --cycles 3 --evaluation-mode --auto-label
 ```
 
 ### Common Usage Patterns
 ```bash
-# Quick testing with auto-labeling
-python automated_workflow.py --class-name siren --cycles 3 --auto-label
+# Production workflow with human labeling
+python -m audioloop.automated_workflow --class-name dog_bark --cycles 2
 
-# Workflow with human labeling
-python automated_workflow.py --class-name dog_bark --cycles 2
+# Evaluation workflow for testing
+python -m audioloop.automated_workflow --class-name siren --cycles 3 --evaluation-mode --auto-label
 
 # Custom training parameters
-python automated_workflow.py --class-name gun_shot --cycles 3 --epochs 500 --batch-size 64
+python -m audioloop.automated_workflow --class-name gun_shot --cycles 3 --epochs 500 --batch-size 64
 
 # Custom active learning parameters
-python automated_workflow.py --class-name jackhammer --cycles 2 --candidates 100 --positive-pct 0.8
+python -m audioloop.automated_workflow --class-name jackhammer --cycles 2 --candidates 100 --positive-pct 0.8
 
-# FSD50K dataset
-python automated_workflow.py --class-name Drill --cycles 2 --dataset fsd50k --auto-label
+# FSD50K evaluation workflow
+python -m audioloop.automated_workflow --class-name Drill --cycles 2 --dataset fsd50k --evaluation-mode --auto-label
 ```
 
 ### Parameters
 - `--class-name`: Target class for binary classification (required)
 - `--cycles`: Number of active learning cycles (default: 3)
-- `--auto-label`: Use ground truth for automatic labeling (for testing)
+- `--evaluation-mode`: Enable evaluation mode with ground truth access
+- `--auto-label`: Use ground truth for automatic labeling (requires --evaluation-mode)
 - `--dataset`: Dataset choice (`urbansound8k` or `fsd50k`)
 - `--epochs`: Max training epochs per cycle (default: 1000)
 - `--candidates`: Number of candidates per cycle (default: 50)
@@ -158,8 +159,11 @@ python -m audioloop.train training_sets/training_set_v1.csv -v 1 --epochs 500 --
 
 ### Active Learning Workflow
 ```bash
-# Run active learning cycle (auto-detects model from run number)
+# Production workflow (default - no ground truth access)
 python -m audioloop.active_learning --class-name siren --run-number 1
+
+# Evaluation workflow (includes ground truth for comprehensive metrics)
+python -m audioloop.active_learning --class-name siren --run-number 1 --with-ground-truth
 
 # Run with basic transition strategy and auto-calculated thresholds (recommended for imbalanced datasets)
 python -m audioloop.active_learning --class-name siren --run-number 1 --selection-mode basic_transition --auto-thresholds --estimated-positive-pct 0.10
@@ -182,6 +186,39 @@ python -m audioloop.active_learning --list-classes
 
 # FSD50K dataset
 python -m audioloop.active_learning --dataset fsd50k --class-name Drill --run-number 1
+```
+
+### Workflow Modes
+
+AudioLoop supports two distinct workflow modes:
+
+#### Production Mode (Default)
+**Use case**: Real-world deployment with truly unlabeled datasets
+```bash
+# Production active learning (no ground truth columns)
+python -m audioloop.active_learning --class-name siren --run-number 1
+
+# Manual labeling using web UI (recommended)
+cd webui && python app.py  # Load: outputs/labeling_candidates_v1.csv
+
+# Or terminal interface
+python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --audio-dir data/urbansound8k
+
+# Track prediction and confidence metrics only
+python -m audioloop.track_metrics --plot
+```
+
+#### Evaluation Mode (Research/Testing)
+**Use case**: Research and testing with known datasets
+```bash
+# Evaluation active learning (includes ground truth columns)
+python -m audioloop.active_learning --class-name siren --run-number 1 --with-ground-truth
+
+# Auto-label using ground truth (for rapid testing)
+python -m audioloop.auto_label_candidates outputs/labeling_candidates_v1.csv
+
+# Track comprehensive evaluation metrics (F1, precision, recall, accuracy)
+python -m audioloop.track_metrics --plot
 ```
 
 ### Human Labeling

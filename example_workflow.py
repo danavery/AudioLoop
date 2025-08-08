@@ -9,7 +9,7 @@ This script demonstrates the full active learning cycle including:
 4. Running subsequent cycles
 
 NOTE: For convenience, consider the automated workflow instead:
-    python automated_workflow.py --class-name Drill --cycles 2 --auto-label
+    python -m audioloop.automated_workflow --class-name Drill --cycles 2 --evaluation-mode --auto-label
 
 Usage:
     python example_workflow.py --class-name Drill --cycles 2
@@ -241,7 +241,7 @@ Examples:
 
         print("\n💡 For convenience, consider using:")
         print(
-            f"   python automated_workflow.py --class-name {args.class_name} --cycles {args.cycles} --selection-mode {args.selection_mode} --auto-label"
+            f"   python -m audioloop.automated_workflow --class-name {args.class_name} --cycles {args.cycles} --selection-mode {args.selection_mode} --evaluation-mode --auto-label"
         )
 
         return 0
