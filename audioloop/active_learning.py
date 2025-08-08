@@ -25,6 +25,7 @@ def run_active_learning_for_class(
     estimated_positive_pct=None,
     experiment_name=None,
     seed=None,
+    with_ground_truth=False,
     **dataset_kwargs,
 ):
     """
@@ -49,6 +50,7 @@ def run_active_learning_for_class(
         estimated_positive_pct: Estimated percentage of positive samples (0.0-1.0). Used with auto_thresholds.
         experiment_name: Optional experiment name to customize output directory
         seed: Random seed for reproducibility (default: None)
+        with_ground_truth: Include ground truth evaluation columns (default: False)
         **dataset_kwargs: Additional dataset-specific configuration
 
     Returns:
@@ -87,6 +89,7 @@ def run_active_learning_for_class(
         basic_transition_variance_threshold=basic_transition_variance_threshold,
         auto_thresholds=auto_thresholds,
         estimated_positive_pct=estimated_positive_pct,
+        with_ground_truth=with_ground_truth,
     )
 
     # Call the main function with clean signature

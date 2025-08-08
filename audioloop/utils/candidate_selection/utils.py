@@ -64,63 +64,74 @@ def print_selection_statistics(
         print("No predictions available.")
         return
 
-    # Calculate overall accuracy statistics with robust boolean conversion
-    correct_predictions = 0
-    for p in all_predictions:
-        correct_val = p["correct"]
-        if isinstance(correct_val, str):
-            is_correct = correct_val.lower() in ("true", "1")
-        elif isinstance(correct_val, bool):
-            is_correct = correct_val
-        elif isinstance(correct_val, int | float):
-            is_correct = bool(correct_val)
-        else:
-            is_correct = False
+    # Check if ground truth evaluation is available
+    has_ground_truth = (
+        all_predictions and "correct" in all_predictions[0] and "ground_truth" in all_predictions[0]
+    )
 
-        if is_correct:
-            correct_predictions += 1
+    # Initialize variables that may be used later
+    overall_accuracy = 0.0
 
-    overall_accuracy = correct_predictions / total_samples
-
-    # Calculate accuracy by true class
-    true_positive_samples = []
-    true_negative_samples = []
-
-    for p in all_predictions:
-        ground_truth = p["ground_truth"]
-        # Handle string/boolean values with robust conversion
-        if isinstance(ground_truth, str):
-            ground_truth = ground_truth.lower() in ("true", "1")
-        elif isinstance(ground_truth, int | float):
-            ground_truth = bool(ground_truth)
-        else:
-            ground_truth = bool(ground_truth)
-
-        if ground_truth:
-            true_positive_samples.append(p)
-        else:
-            true_negative_samples.append(p)
-
-    # Calculate correct predictions with robust boolean conversion
-    def is_prediction_correct(pred):
-        correct_val = pred["correct"]
-        if isinstance(correct_val, str):
-            return correct_val.lower() in ("true", "1")
-        if isinstance(correct_val, bool):
-            return correct_val
-        if isinstance(correct_val, int | float):
-            return bool(correct_val)
+    def convert_to_bool(value):
+        """Convert various value types to boolean with robust handling."""
+        if isinstance(value, str):
+            return value.lower() in ("true", "1")
+        if isinstance(value, bool):
+            return value
+        if isinstance(value, int | float):
+            return bool(value)
         return False
 
-    positive_correct = sum(1 for p in true_positive_samples if is_prediction_correct(p))
-    negative_correct = sum(1 for p in true_negative_samples if is_prediction_correct(p))
+    if has_ground_truth:
+        # Calculate overall accuracy statistics with robust boolean conversion
+        correct_predictions = 0
+        for p in all_predictions:
+            if convert_to_bool(p["correct"]):
+                correct_predictions += 1
 
-    positive_accuracy = (
-        positive_correct / len(true_positive_samples) if true_positive_samples else 0
-    )
-    negative_accuracy = (
-        negative_correct / len(true_negative_samples) if true_negative_samples else 0
-    )
+        overall_accuracy = correct_predictions / total_samples
+
+        # Calculate accuracy by true class
+        true_positive_samples = []
+        true_negative_samples = []
+
+        for p in all_predictions:
+            if convert_to_bool(p["ground_truth"]):
+                true_positive_samples.append(p)
+            else:
+                true_negative_samples.append(p)
+
+        # Calculate correct predictions with robust boolean conversion
+        positive_correct = sum(1 for p in true_positive_samples if convert_to_bool(p["correct"]))
+        negative_correct = sum(1 for p in true_negative_samples if convert_to_bool(p["correct"]))
+
+        positive_accuracy = (
+            positive_correct / len(true_positive_samples) if true_positive_samples else 0
+        )
+        negative_accuracy = (
+            negative_correct / len(true_negative_samples) if true_negative_samples else 0
+        )
+
+        # Sanity check for accuracy calculations
+        expected_overall_accuracy = (positive_correct + negative_correct) / total_samples
+        accuracy_mismatch = abs(overall_accuracy - expected_overall_accuracy) > 0.001
+
+        print("\nModel Performance Summary:")
+        print(f"Overall Accuracy: {overall_accuracy:.3f}")
+        print(
+            f"True {positive_class_name} Accuracy: {positive_accuracy:.3f} ({positive_correct}/{len(true_positive_samples)})"
+        )
+        print(
+            f"True {negative_class_name} Accuracy: {negative_accuracy:.3f} ({negative_correct}/{len(true_negative_samples)})"
+        )
+
+        if accuracy_mismatch:
+            print("⚠️  WARNING: Accuracy calculation mismatch detected!")
+            print(f"   Expected overall accuracy: {expected_overall_accuracy:.3f}")
+            print(f"   Calculated overall accuracy: {overall_accuracy:.3f}")
+    else:
+        print("\nModel Performance Summary:")
+        print("Ground truth evaluation not available (use --evaluation-mode to enable)")
 
     # Overall confidence statistics
     all_confidences = [p["confidence"] for p in all_predictions]
@@ -131,24 +142,6 @@ def print_selection_statistics(
     min_conf = min(all_confidences)
     max_conf = max(all_confidences)
 
-    # Sanity check for accuracy calculations
-    expected_overall_accuracy = (positive_correct + negative_correct) / total_samples
-    accuracy_mismatch = abs(overall_accuracy - expected_overall_accuracy) > 0.001
-
-    print("\nModel Performance Summary:")
-    print(f"Overall Accuracy: {overall_accuracy:.3f}")
-    print(
-        f"True {positive_class_name} Accuracy: {positive_accuracy:.3f} ({positive_correct}/{len(true_positive_samples)})"
-    )
-    print(
-        f"True {negative_class_name} Accuracy: {negative_accuracy:.3f} ({negative_correct}/{len(true_negative_samples)})"
-    )
-
-    if accuracy_mismatch:
-        print("⚠️  WARNING: Accuracy calculation mismatch detected!")
-        print(f"   Expected overall accuracy: {expected_overall_accuracy:.3f}")
-        print(f"   Calculated overall accuracy: {overall_accuracy:.3f}")
-
     print(f"Overall Confidence: avg={avg_confidence:.3f}, range={min_conf:.3f}-{max_conf:.3f}")
     print(
         f"High confidence samples (≥{min_confidence}): {high_conf_count}/{total_samples} ({high_conf_percentage:.1%})"
@@ -156,7 +149,7 @@ def print_selection_statistics(
 
     # Show current selection mode and recommendations
     print(f"Selection strategy: {strategy_name}")
-    if overall_accuracy > 0.95 and high_conf_percentage > 0.8:
+    if has_ground_truth and overall_accuracy > 0.95 and high_conf_percentage > 0.8:
         if "confidence" in strategy_name.lower():
             print("💡 Recommendation: Model is highly accurate and confident")
             print("   Consider switching to entropy-based selection for uncertainty sampling")

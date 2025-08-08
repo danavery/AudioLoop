@@ -78,11 +78,7 @@ def calculate_core_metrics(predictions_file: str) -> dict:
     has_ground_truth = "ground_truth" in fieldnames
     has_entropy = "entropy" in fieldnames
 
-    print(f"Ground truth available: {'Yes' if has_ground_truth else 'No'}")
-    if not has_ground_truth:
-        print("  → Limited to prediction and confidence metrics")
-    else:
-        print("  → Full evaluation metrics available")
+
 
     # Calculate available metrics using imported functions
     binary_metrics = calculate_binary_metrics(predictions)

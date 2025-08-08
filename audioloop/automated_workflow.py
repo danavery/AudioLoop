@@ -203,6 +203,7 @@ def run_automated_workflow(
                 estimated_positive_pct=config.estimated_positive_pct,
                 experiment_name=config.experiment_name,
                 seed=seed,
+                with_ground_truth=evaluation_mode,
             )
             print(f"   ✅ Generated candidates: {candidates_file}")
         except Exception as e:
@@ -466,6 +467,8 @@ Prerequisites:
         config_overrides["auto_thresholds"] = True
     if args.use_class_weighting:
         config_overrides["use_class_weighting"] = True
+    if args.evaluation_mode:
+        config_overrides["with_ground_truth"] = True
 
     config = AudioLoopConfig(**config_overrides)
 
