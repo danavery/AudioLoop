@@ -166,11 +166,7 @@ AUDIOLOOP_DATASET=urbansound8k python -m audioloop.label_audio outputs/labeling_
 # Explicit UrbanSound8K dataset
 python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --dataset urbansound8k --audio-dir data/urbansound8k
 
-# Automated labeling (for testing candidate selection methods)
-python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --auto-label
-
-# Automated labeling with explicit dataset
-python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --auto-label --dataset urbansound8k
+# For auto-labeling with ground truth (evaluation workflows), see auto_label_candidates section below
 ```
 
 ### Label Management
@@ -245,35 +241,35 @@ ruff format audioloop/
 
 ### Automated Workflow (Recommended)
 ```bash
-# Fully automated workflow (auto-labeling for testing/development)
-python automated_workflow.py --class-name Drill --cycles 3 --auto-label
+# Evaluation workflow (auto-labeling for testing/development)
+python -m audioloop.automated_workflow --class-name Drill --cycles 3 --evaluation-mode --auto-label
 
-# Semi-automated workflow (pause for human labeling)
-python automated_workflow.py --class-name Speech --cycles 2
+# Production workflow (pause for human labeling)
+python -m audioloop.automated_workflow --class-name Speech --cycles 2
 
 # Custom training parameters
-python automated_workflow.py --class-name Music --cycles 3 --epochs 500 --batch-size 64
+python -m audioloop.automated_workflow --class-name Music --cycles 3 --epochs 500 --batch-size 64
 
 # Reproducible automated workflow with custom seed
-python automated_workflow.py --class-name Drill --cycles 3 --auto-label --seed 123
+python -m audioloop.automated_workflow --class-name Drill --cycles 3 --evaluation-mode --auto-label --seed 123
 
 # Custom active learning parameters
-python automated_workflow.py --class-name Explosion --cycles 2 --candidates 100 --positive-pct 0.8
+python -m audioloop.automated_workflow --class-name Explosion --cycles 2 --candidates 100 --positive-pct 0.8
 
-# UrbanSound8K dataset
-python automated_workflow.py --class-name siren --cycles 2 --dataset urbansound8k --auto-label
+# UrbanSound8K dataset (evaluation mode)
+python -m audioloop.automated_workflow --class-name siren --cycles 2 --dataset urbansound8k --evaluation-mode --auto-label
 
 # Use entropy-based selection
-python automated_workflow.py --class-name Drill --cycles 3 --selection-mode entropy
+python -m audioloop.automated_workflow --class-name Drill --cycles 3 --selection-mode entropy
 
 # Use basic transition (automatically switches strategies based on performance)
-python automated_workflow.py --class-name Drill --cycles 3 --selection-mode basic_transition --auto-label
+python -m audioloop.automated_workflow --class-name Drill --cycles 3 --selection-mode basic_transition --evaluation-mode --auto-label
 
 # Mix confidence and entropy modes across cycles
-python automated_workflow.py --class-name Speech --cycles 4 --selection-mode confidence --auto-label
+python -m audioloop.automated_workflow --class-name Speech --cycles 4 --selection-mode confidence --evaluation-mode --auto-label
 
 # Run experiment with custom output directory
-python automated_workflow.py --class-name siren --cycles 3 --auto-label --experiment myexp
+python -m audioloop.automated_workflow --class-name siren --cycles 3 --evaluation-mode --auto-label --experiment myexp
 ```
 
 ### Complete Workflow Examples
@@ -384,11 +380,11 @@ Using strategy: ConfidenceStrategy
 
 ### Example Workflow
 ```bash
-# Complete workflow demonstration with basic transition
-python example_workflow.py --class-name Drill --cycles 2 --selection-mode basic_transition
+# Complete workflow demonstration with basic transition (evaluation mode)
+python -m audioloop.automated_workflow --class-name Drill --cycles 2 --selection-mode basic_transition --evaluation-mode --auto-label
 
-# Manual workflow demonstration
-python example_workflow.py --class-name Drill --cycles 2
+# Manual workflow demonstration (production mode)
+python -m audioloop.automated_workflow --class-name Drill --cycles 2
 ```
 
 ### Basic Transition Configuration
