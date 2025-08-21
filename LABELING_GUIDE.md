@@ -245,10 +245,21 @@ Command: 0
 [... continues ...]
 
 Command: q
-Save changes before quitting? (y/n): y
 
-Saved labels to outputs/labeling_candidates_v1.csv
-Goodbye!
+==================================================
+LABELING SESSION SUMMARY
+==================================================
+Total samples: 50
+Labeled: 35 (70.0%)
+Unlabeled: 15
+
+You have 15 unlabeled samples remaining.
+Unlabeled samples will get new predictions in the next cycle.
+Are you sure you want to quit? (y/n): y
+
+Save changes before quitting? (y/n): y
+Labels saved!
+Session complete. Goodbye!
 ```
 
 ## Next Steps
