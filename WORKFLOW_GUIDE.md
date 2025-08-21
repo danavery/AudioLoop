@@ -1,397 +1,390 @@
-# AudioLoop Versioned Workflow Guide
+# AudioLoop Workflow Guide
 
-Complete reference for AudioLoop's versioned active learning workflow patterns.
+Complete guide to AudioLoop's active learning workflow patterns, best practices, and end-to-end processes. For specific command syntax, see [USAGE_GUIDE.md](USAGE_GUIDE.md).
 
-## Automated Workflow (Recommended)
+## Overview
 
-The `automated_workflow.py` script automates the complete active learning cycle, eliminating manual steps and reducing complexity.
+AudioLoop supports two fundamental workflow modes designed for different use cases:
 
-### Quick Start
+### Production Mode (Default)
+**Use case**: Real-world deployment with truly unlabeled datasets
+- **Ground truth**: Not available - you don't know the true labels
+- **Active learning**: Generates predictions without ground truth columns
+- **Metrics tracking**: Shows prediction and confidence metrics only
+- **Human labeling**: Manual review using web UI or terminal interface
+- **Goal**: Build models for actual unknown audio classification tasks
+
+### Evaluation Mode (Research/Testing)
+**Use case**: Research, development, and algorithm testing with known datasets
+- **Ground truth**: Available - you have the true labels for comparison
+- **Active learning**: Use `--with-ground-truth` flag to include evaluation columns
+- **Metrics tracking**: Shows full evaluation metrics (F1, precision, recall, accuracy)
+- **Auto-labeling**: Can use auto-labeling for rapid testing
+- **Goal**: Test candidate selection strategies, tune hyperparameters, compare methods
+
+## Automated vs Manual Workflows
+
+### Automated Workflow (Recommended)
+**When to use**: Most scenarios, especially for testing or when you want to run multiple cycles efficiently
+
+**Benefits**:
+- Eliminates manual steps between cycles
+- Consistent parameter application across cycles
+- Automatic file organization and versioning
+- Easy to reproduce and script
+
+**Limitations**:
+- Less control over individual steps
+- Harder to debug issues at specific stages
+- Fixed sequence of operations
+
+### Manual Workflow (Step-by-step)
+**When to use**: Learning the system, debugging issues, custom modifications, or fine-grained control
+
+**Benefits**:
+- Full control over each step
+- Easy to debug and inspect intermediate results
+- Can modify parameters between cycles
+- Educational for understanding the process
+
+**Limitations**:
+- More error-prone (manual versioning)
+- Time-consuming for multiple cycles
+- Easy to make mistakes in file paths
+
+## Complete Workflow Patterns
+
+### Pattern 1: Production Deployment Workflow
+
+**Scenario**: Deploy on unknown audio data for actual classification tasks
+
+**Characteristics**:
+- Real unlabeled audio dataset
+- No ground truth available
+- Manual human labeling required
+- Focus on model confidence and prediction consistency
+
+**Process**:
+1. **Initial Setup**: Create small labeled training set from domain knowledge
+2. **Iterative Training**: Train model → active learning → human labeling → merge labels
+3. **Quality Control**: Focus on labeling consistency and clear criteria
+4. **Deployment**: Use final model for inference on new audio
+5. **Monitoring**: Track prediction confidence and distribution trends
+
+**Example Flow**:
 ```bash
-# Prerequisites (one-time setup)
+# One-time setup
 python -m audioloop.create_all_specs
-python -m audioloop.utils.create_bootstrap_set --class-name siren --n 40
+python -m audioloop.utils.create_bootstrap_set --class-name siren --n 40 --experiment prod_siren
 
-# Production workflow (pause for human labeling)
-python -m audioloop.automated_workflow --class-name dog_bark --cycles 2
+# Iterative cycles (manual workflow for control)
+python -m audioloop.train training_sets/prod_siren/training_set_v1.csv --experiment prod_siren
+python -m audioloop.active_learning --class-name siren --run-number 1 --experiment prod_siren
+# Manual labeling via web UI or terminal
+python -m audioloop.merge_labels training_sets/prod_siren/training_set_v1.csv outputs/prod_siren/labeling_candidates_v1.csv --experiment prod_siren
 
-# Evaluation workflow (auto-labeling for testing)
-python -m audioloop.automated_workflow --class-name siren --cycles 3 --evaluation-mode --auto-label
+# Monitor progress
+python -m audioloop.track_metrics --experiment prod_siren --plot
 ```
 
-### What the Automated Workflow Does
-1. **Train Model**: Uses existing training set to create `model_v{N}.pt`
-2. **Active Learning**: Runs inference to generate `labeling_candidates_v{N}.csv`
-3. **Label Candidates**: Either auto-labels (evaluation mode) or pauses for human labeling (production mode)
-4. **Merge Labels**: Creates expanded `training_set_v{N+1}.csv`
-5. **Repeat**: Continues for specified number of cycles
+### Pattern 2: Research/Evaluation Workflow
 
-### Workflow Modes
-- **Production Mode** (default): Pauses for human labeling, no ground truth access
-- **Evaluation Mode**: Uses auto-labeling with ground truth for testing and research
+**Scenario**: Test algorithms, compare strategies, tune parameters with known datasets
 
-### Advanced Usage
+**Characteristics**:
+- Known dataset with ground truth
+- Rapid iteration and testing
+- Comprehensive metrics available
+- Auto-labeling possible for speed
+
+**Process**:
+1. **Dataset Preparation**: Use existing labeled dataset for evaluation
+2. **Bootstrap Sampling**: Create initial training set from ground truth
+3. **Strategy Testing**: Compare different selection strategies
+4. **Parameter Tuning**: Optimize thresholds and selection criteria
+5. **Performance Analysis**: Full evaluation metrics across iterations
+
+**Example Flow**:
 ```bash
-# Custom training parameters
-python -m audioloop.automated_workflow --class-name gun_shot --cycles 3 --epochs 500 --batch-size 64
+# Automated workflow for rapid testing
+python -m audioloop.automated_workflow --class-name Drill --cycles 3 --evaluation-mode --auto-label --experiment research_drill
 
-# Custom active learning parameters
-python -m audioloop.automated_workflow --class-name jackhammer --cycles 2 --candidates 100 --positive-pct 0.8
+# Compare different strategies
+python -m audioloop.automated_workflow --class-name Drill --cycles 2 --selection-mode confidence --evaluation-mode --auto-label --experiment strategy_confidence
+python -m audioloop.automated_workflow --class-name Drill --cycles 2 --selection-mode entropy --evaluation-mode --auto-label --experiment strategy_entropy
+python -m audioloop.automated_workflow --class-name Drill --cycles 2 --selection-mode basic_transition --evaluation-mode --auto-label --experiment strategy_transition
 
-# FSD50K evaluation workflow
-python -m audioloop.automated_workflow --class-name Drill --cycles 2 --dataset fsd50k --evaluation-mode --auto-label
+# Analyze results
+python -m audioloop.track_metrics --experiment strategy_confidence --plot
+python -m audioloop.track_metrics --experiment strategy_entropy --plot
+python -m audioloop.track_metrics --experiment strategy_transition --plot
 ```
 
-### Parameters
-- `--class-name`: Target class for binary classification
-- `--cycles`: Number of active learning cycles to run
-- `--evaluation-mode`: Enable evaluation mode with ground truth access
-- `--auto-label`: Use ground truth for automatic labeling (requires --evaluation-mode)
-- `--dataset`: Dataset choice (`urbansound8k` or `fsd50k`)
-- `--epochs`: Max training epochs per cycle
-- `--candidates`: Number of candidates to select per cycle
-- `--positive-pct`: Target percentage of positive samples
+### Pattern 3: Multi-Class Comparison Workflow
 
-## Manual Workflow (Step-by-step)
+**Scenario**: Compare model performance across different audio classes
 
-For fine-grained control or educational purposes, you can run each step manually:
+**Characteristics**:
+- Multiple binary classification tasks
+- Consistent methodology across classes
+- Comparative analysis of class difficulty
+- Experiment organization prevents file conflicts
 
-## Configuration and Experiment Organization
+**Process**:
+1. **Class Selection**: Choose representative classes for comparison
+2. **Parallel Experiments**: Run identical workflows for each class
+3. **Consistent Parameters**: Use same training/selection parameters
+4. **Comparative Analysis**: Analyze performance differences
+5. **Insights**: Understand which classes are easier/harder to learn
 
-AudioLoop uses a unified configuration system that automatically organizes files by experiment:
-
-### Default Organization (No Experiment Name)
-- **Models**: `outputs/model_v{N}.pt`
-- **Training sets**: `training_sets/training_set_v{N}.csv`
-- **Predictions**: `outputs/predictions_v{N}.csv`
-- **Candidates**: `outputs/labeling_candidates_v{N}.csv`
-
-### Experiment Organization (With --experiment parameter)
-- **Models**: `outputs/{experiment}/model_v{N}.pt`
-- **Training sets**: `training_sets/{experiment}/training_set_v{N}.csv`
-- **Predictions**: `outputs/{experiment}/predictions_v{N}.csv`
-- **Candidates**: `outputs/{experiment}/labeling_candidates_v{N}.csv`
-
-### Configuration Precedence
-AudioLoop follows standard configuration patterns:
-1. **Explicit CLI parameters** (highest priority)
-2. **Environment variables** (fallback when no explicit value)
-3. **Default values** (lowest priority)
-
+**Example Flow**:
 ```bash
-# Environment variables provide defaults
-export AUDIOLOOP_DATASET=urbansound8k
-export AUDIOLOOP_OUTPUT_ROOT=/custom/outputs
+# Run identical workflows for different classes
+for class_name in siren dog_bark gun_shot drilling; do
+    python -m audioloop.automated_workflow --class-name $class_name --cycles 3 --evaluation-mode --auto-label --experiment eval_$class_name
+done
 
-# Explicit parameters override environment variables
-python -m audioloop.train training_sets/training_set_v1.csv --dataset fsd50k
-# Uses fsd50k despite environment variable
+# Analyze comparative results
+for class_name in siren dog_bark gun_shot drilling; do
+    python -m audioloop.track_metrics --experiment eval_$class_name --plot
+done
 ```
 
-## Standard Workflow Pattern
+## Selection Strategy Workflows
 
-### Complete 3-Cycle Example (Dog Bark Detection)
+### Strategy 1: High-Confidence Start
 
-#### Default Organization (No Experiment)
+**When to use**: Early training cycles, establishing basic patterns
+
+**Approach**:
+- Start with confidence-based selection
+- Focus on samples model is most sure about
+- Build reliable training foundation
+- Switch to entropy later if needed
+
+**Progression**:
+1. Cycle 1-2: Confidence-based selection
+2. Monitor model confidence statistics
+3. Switch to entropy if overconfidence detected
+4. Continue with uncertainty sampling
+
+### Strategy 2: Automatic Transition
+
+**When to use**: Most scenarios, especially with imbalanced datasets
+
+**Approach**:
+- Use basic transition strategy with auto-thresholds
+- System automatically switches from confidence to entropy
+- Adapts to dataset characteristics
+- Minimal manual tuning required
+
+**Benefits**:
+- Automatic adaptation to model behavior
+- Optimal threshold calculation
+- Works well with rare classes
+- Reduces manual parameter tuning
+
+### Strategy 3: Pure Uncertainty Sampling
+
+**When to use**: When model quickly becomes overconfident, later training cycles
+
+**Approach**:
+- Start with entropy-based selection immediately
+- Focus on samples near decision boundaries
+- Good for challenging or ambiguous datasets
+- Helps prevent overconfidence issues
+
+## Experiment Organization Best Practices
+
+### File Organization Strategy
+
+**Default Organization** (simple projects):
+```
+outputs/
+├── model_v1.pt
+├── model_v2.pt
+├── predictions_v1.csv
+└── labeling_candidates_v1.csv
+
+training_sets/
+├── training_set_v1.csv
+└── training_set_v2.csv
+```
+
+**Experiment Organization** (recommended):
+```
+outputs/
+├── siren_detection/
+│   ├── model_v1.pt
+│   ├── predictions_v1.csv
+│   └── labeling_candidates_v1.csv
+└── drill_detection/
+    ├── model_v1.pt
+    ├── predictions_v1.csv
+    └── labeling_candidates_v1.csv
+
+training_sets/
+├── siren_detection/
+│   ├── training_set_v1.csv
+│   └── training_set_v2.csv
+└── drill_detection/
+    ├── training_set_v1.csv
+    └── training_set_v2.csv
+```
+
+### Naming Conventions
+
+**Experiment Names**:
+- `{class}_{purpose}`: e.g., `siren_production`, `drill_research`
+- `{strategy}_{class}`: e.g., `entropy_gunshot`, `confidence_music`
+- `{dataset}_{class}`: e.g., `fsd50k_piano`, `urban8k_siren`
+
+**Benefits**:
+- Clear separation of different experiments
+- No file conflicts between projects
+- Easy to compare results across experiments
+- Organized storage for long-term projects
+
+## Quality Control Workflows
+
+### Training Set Quality
+
+**Initial Creation**:
+1. Use balanced sampling (70-80% positive)
+2. Ensure sufficient samples (40-60 total)
+3. Verify class availability with `--list-classes`
+4. Use consistent seeds for reproducibility
+
+**Iterative Improvement**:
+1. Monitor training accuracy (should reach 95%+)
+2. Check label distribution after each merge
+3. Review difficult cases during labeling
+4. Maintain labeling consistency
+
+### Labeling Quality Control
+
+**Session Management**:
+1. Label in batches (20-50 samples per session)
+2. Take breaks to avoid ear fatigue
+3. Use consistent criteria throughout
+4. Skip unclear samples rather than guessing
+
+**Quality Assurance**:
+1. Review labeling criteria before starting
+2. Double-check difficult or ambiguous cases
+3. Use web UI for better user experience
+4. Save progress frequently
+
+### Model Quality Assessment
+
+**Training Convergence**:
+- Should reach high accuracy (95%+) on training set
+- Convergence typically within 200-500 epochs
+- Monitor for training instability or slow convergence
+
+**Active Learning Effectiveness**:
+- Track confidence statistics across cycles
+- Monitor selection diversity (avoid always selecting same files)
+- Assess improvement in model performance
+
+## Troubleshooting Workflows
+
+### Common Workflow Issues
+
+**Version Mismatches**:
+- Symptom: Model not found errors
+- Solution: Check file naming consistency, use explicit version parameters
+- Prevention: Use automated workflows or careful manual versioning
+
+**Poor Model Performance**:
+- Symptom: Low training accuracy, poor convergence
+- Solution: Check training set balance, increase sample size, verify labels
+- Prevention: Quality control during labeling, sufficient initial samples
+
+**Selection Bias**:
+- Symptom: Always selecting similar samples, poor diversity
+- Solution: Use entropy-based selection, check confidence thresholds
+- Prevention: Use basic transition strategy, monitor selection statistics
+
+**Labeling Inconsistency**:
+- Symptom: Contradictory labels, poor model performance
+- Solution: Review labeling criteria, re-label inconsistent samples
+- Prevention: Clear criteria documentation, regular quality checks
+
+### Debugging Strategies
+
+**Incremental Validation**:
+1. Test with small datasets first
+2. Verify each step produces expected outputs
+3. Check intermediate file contents
+4. Use evaluation mode for ground truth comparison
+
+**Performance Analysis**:
+1. Use metrics tracking to identify issues
+2. Compare confidence distributions across cycles
+3. Analyze selection patterns for bias
+4. Review difficult cases manually
+
+## Advanced Workflow Patterns
+
+### Parameter Sweep Workflow
+
+**Purpose**: Find optimal parameters for specific use case
+
+**Process**:
+1. Define parameter ranges to test
+2. Run systematic experiments
+3. Use evaluation mode for objective comparison
+4. Analyze results to find best configuration
+
+**Example**:
 ```bash
-# === CYCLE 1: Initial Training ===
-# 1. Train initial model (auto-detects v1 from filename)
-python -m audioloop.train training_sets/training_set_v1.csv
-# → Creates: outputs/model_v1.pt
-
-# 2. Run active learning (creates complete inference record and candidates)
-python -m audioloop.active_learning --class-name dog_bark --run-number 1
-# → Creates: outputs/predictions_v1.csv, outputs/labeling_candidates_v1.csv
-
-# 3. Human labeling
-python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --audio-dir data/urbansound8k
-
-# 4. Merge labels (auto-creates v2)
-python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv
-# → Creates: training_sets/training_set_v2.csv
+# Test different confidence thresholds
+for threshold in 0.7 0.8 0.9 0.95; do
+    python -m audioloop.automated_workflow --class-name siren --cycles 2 --evaluation-mode --auto-label --experiment threshold_$threshold --min-confidence $threshold
+done
 ```
 
-#### Organized Experiment (Recommended)
-```bash
-# === ORGANIZED EXPERIMENT: dog_bark_exp ===
-# All files automatically organized under experiment directories
+### Cross-Dataset Validation
 
-# 1. Train initial model with experiment organization
-python -m audioloop.train training_sets/dog_bark_exp/training_set_v1.csv --experiment dog_bark_exp
-# → Creates: outputs/dog_bark_exp/model_v1.pt
+**Purpose**: Test model generalization across datasets
 
-# 2. Run active learning with experiment organization
-python -m audioloop.active_learning --class-name dog_bark --run-number 1 --experiment dog_bark_exp
-# → Creates: outputs/dog_bark_exp/predictions_v1.csv, outputs/dog_bark_exp/labeling_candidates_v1.csv
+**Process**:
+1. Train on one dataset
+2. Test on different dataset
+3. Analyze performance differences
+4. Identify domain adaptation needs
 
-# 3. Human labeling (automatically uses correct experiment paths)
-python -m audioloop.label_audio outputs/dog_bark_exp/labeling_candidates_v1.csv --audio-dir data/urbansound8k
+### Continuous Learning Workflow
 
-# 4. Merge labels (creates organized training set)
-python -m audioloop.merge_labels training_sets/dog_bark_exp/training_set_v1.csv outputs/dog_bark_exp/labeling_candidates_v1.csv
-# → Creates: training_sets/dog_bark_exp/training_set_v2.csv
+**Purpose**: Ongoing model improvement in production
 
-# === CYCLE 2: Improved Model ===
-python -m audioloop.train training_sets/dog_bark_exp/training_set_v2.csv --experiment dog_bark_exp
-# → Creates: outputs/dog_bark_exp/model_v2.pt
+**Process**:
+1. Deploy initial model
+2. Collect new audio samples
+3. Periodic retraining with new data
+4. Monitor for distribution drift
+5. Update model as needed
 
-python -m audioloop.active_learning --class-name dog_bark --run-number 2 --experiment dog_bark_exp
-# → Creates: outputs/dog_bark_exp/predictions_v2.csv, outputs/dog_bark_exp/labeling_candidates_v2.csv
-```
+## Best Practices Summary
 
-## Version Auto-Detection
+### Setup Phase
+1. **Plan experiment organization**: Use descriptive experiment names
+2. **Prepare data properly**: Generate spectrograms, verify dataset structure
+3. **Start small**: Begin with 40-60 samples in initial training set
+4. **Document criteria**: Clear labeling guidelines for consistency
 
-AudioLoop automatically detects versions from filenames:
+### Execution Phase
+1. **Choose appropriate workflow**: Automated for efficiency, manual for control
+2. **Select strategy wisely**: Basic transition for most cases, specific strategies for special needs
+3. **Monitor progress**: Track metrics, review selection patterns
+4. **Maintain quality**: Consistent labeling, regular quality checks
 
-### Training Models
-```bash
-# Version auto-detected from training_set_v{N}.csv
-python -m audioloop.train training_sets/training_set_v1.csv
-# → Creates: outputs/model_v1.pt
+### Analysis Phase
+1. **Review metrics**: Use comprehensive tracking for insights
+2. **Compare experiments**: Analyze different strategies and parameters
+3. **Document findings**: Record what works for future reference
+4. **Plan next steps**: Based on results and remaining challenges
 
-python -m audioloop.train training_sets/training_set_v2.csv  
-# → Creates: outputs/model_v2.pt
-
-# Override auto-detection
-python -m audioloop.train training_sets/training_set_v1.csv -v 5
-# → Creates: outputs/model_v5.pt
-```
-
-### Active Learning Cycles
-```bash
-# Version auto-detected from run number (finds corresponding model)
-python -m audioloop.active_learning --class-name siren --run-number 1
-# → Uses: outputs/model_v1.pt
-# → Creates: outputs/predictions_v1.csv, outputs/labeling_candidates_v1.csv
-
-python -m audioloop.active_learning --class-name siren --run-number 2
-# → Uses: outputs/model_v2.pt
-# → Creates: outputs/predictions_v2.csv, outputs/labeling_candidates_v2.csv
-
-# Explicit model specification (overrides auto-detection)
-python -m audioloop.active_learning --class-name siren --run-number 1 \
-    --model outputs/custom_model.pt
-```
-
-## Clean Architecture
-
-**DESIGN**: AudioLoop maintains clean separation between inference and analysis:
-
-### Active Learning Pipeline (Focused Inference)
-- **Input**: Trained model + dataset metadata
-- **Process**: Runs inference on ALL available files, creates complete prediction record
-- **Output**: Predictions with confidence + selected candidates for human labeling
-- **Focus**: Lean, fast inference engine without statistical analysis
-
-### Metrics Pipeline (Comprehensive Analysis)
-- **Input**: Prediction files from multiple active learning iterations
-- **Process**: Calculate trends, accuracy, F1, precision, recall across versions
-- **Output**: Performance analysis, plots, and insights
-- **Focus**: Rich evaluation and progress tracking
-
-### Example: Clean Data Flow
-```bash
-# Version auto-detected from model filename
-python -m audioloop.active_learning --class-name siren --model outputs/model_v2.pt
-# → Creates: outputs/predictions_v2.csv, outputs/labeling_candidates_v2.csv
-
-# Or specify run number explicitly
-python -m audioloop.active_learning --class-name siren --run-number 3
-# → Uses: outputs/model_v3.pt (must exist)
-# → Creates: outputs/predictions_v3.csv, outputs/labeling_candidates_v3.csv
-```
-
-### Label Merging
-```bash
-# Next version auto-created
-python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv
-# → Creates: training_sets/training_set_v2.csv
-
-python -m audioloop.merge_labels training_sets/training_set_v2.csv outputs/labeling_candidates_v2.csv
-# → Creates: training_sets/training_set_v3.csv
-```
-
-## Workflow Patterns
-
-### Pattern 1: Sequential Versioning (Recommended)
-```bash
-# Always increment versions sequentially
-v1 → v2 → v3 → v4...
-
-# Training progression:
-training_set_v1.csv → model_v1.pt → predictions_v1.csv → training_set_v2.csv
-training_set_v2.csv → model_v2.pt → predictions_v2.csv → training_set_v3.csv
-training_set_v3.csv → model_v3.pt → predictions_v3.csv → training_set_v4.csv
-```
-
-### Pattern 2: Branching for Experiments
-```bash
-# Create experimental branches
-python -m audioloop.train training_sets/training_set_v2.csv -v 2a
-python -m audioloop.train training_sets/training_set_v2.csv -v 2b --epochs 1000
-
-# Compare results
-python -m audioloop.active_learning --model outputs/model_v2a.pt --run-number 2a
-python -m audioloop.active_learning --model outputs/model_v2b.pt --run-number 2b
-```
-
-### Pattern 3: Class-Specific Organization (Recommended)
-```bash
-# Use experiment names to organize by class - no file conflicts!
-python -m audioloop.active_learning --class-name siren --run-number 1 --experiment siren_exp
-# → outputs/siren_exp/labeling_candidates_v1.csv
-
-python -m audioloop.active_learning --class-name dog_bark --run-number 1 --experiment dog_bark_exp
-# → outputs/dog_bark_exp/labeling_candidates_v1.csv
-
-# Clean separation - no overwrites or manual renaming needed!
-```
-
-## File Naming Reference
-
-| File Type | Default Pattern | Experiment Pattern | Auto-Generated | Example |
-|-----------|-----------------|-------------------|----------------|---------|
-| Training Set | `training_sets/training_set_v{N}.csv` | `training_sets/{exp}/training_set_v{N}.csv` | By merge_labels | `training_sets/myexp/training_set_v1.csv` |
-| Model | `outputs/model_v{N}.pt` | `outputs/{exp}/model_v{N}.pt` | By train | `outputs/myexp/model_v1.pt` |
-| Predictions | `outputs/predictions_v{N}.csv` | `outputs/{exp}/predictions_v{N}.csv` | By active_learning | `outputs/myexp/predictions_v1.csv` |
-| Candidates | `outputs/labeling_candidates_v{N}.csv` | `outputs/{exp}/labeling_candidates_v{N}.csv` | By active_learning | `outputs/myexp/labeling_candidates_v1.csv` |
-
-## Version Tracking Best Practices
-
-### 1. Keep All Versions
-```bash
-# Don't delete intermediate versions - experiment organization makes this clean
-ls outputs/siren_exp/
-model_v1.pt  model_v2.pt  model_v3.pt  # Keep all for comparison
-
-ls training_sets_siren_exp/
-training_set_v1.csv  training_set_v2.csv  training_set_v3.csv  # Track progression
-
-# Multiple experiments stay organized
-ls -d outputs/*/
-outputs/siren_exp/  outputs/dog_bark_exp/  outputs/gun_shot_exp/
-```
-
-### 2. Document Changes
-```bash
-# Add notes about what changed between versions
-# training_set_v1.csv: Initial 20 samples
-# training_set_v2.csv: Added 15 high-confidence corrections
-# training_set_v3.csv: Added 20 boundary cases
-```
-
-### 3. Performance Tracking
-```bash
-# Compare model performance across versions
-python -c "
-import pandas as pd
-v1 = pd.read_csv('outputs/predictions_v1.csv')
-v2 = pd.read_csv('outputs/predictions_v2.csv')
-print(f'V1 accuracy: {v1.correct.mean():.3f}')
-print(f'V2 accuracy: {v2.correct.mean():.3f}')
-"
-```
-
-## Advanced Workflow Options
-
-### Custom Training Parameters
-```bash
-# Version with specific hyperparameters
-python -m audioloop.train training_sets/training_set_v1.csv \
-    -v 1_lr001 --learning-rate 0.001 --epochs 500
-# → Creates: outputs/model_v1_lr001.pt
-
-python -m audioloop.train training_sets/training_set_v1.csv \
-    -v 1_lr0001 --learning-rate 0.0001 --epochs 1000
-# → Creates: outputs/model_v1_lr0001.pt
-```
-
-### Custom Selection Criteria
-```bash
-# High-confidence selection
-python -m audioloop.active_learning --class-name siren \
-    --model outputs/model_v1.pt --run-number 1_highconf \
-    --min-confidence 0.95 --total-candidates 10
-
-# Balanced selection
-python -m audioloop.active_learning --class-name siren \
-    --model outputs/model_v1.pt --run-number 1_balanced \
-    --min-confidence 0.8 --positive-pct 0.5 --total-candidates 30
-```
-
-### Multi-Class Workflows (Simplified with Experiments)
-```bash
-# No manual directory creation or file moving needed!
-# Each experiment automatically gets its own organized directories
-
-# Siren workflow - automatically organized
-python -m audioloop.active_learning --class-name siren --run-number 1 --experiment siren_detection
-# → Creates: outputs/siren_detection/predictions_v1.csv, outputs/siren_detection/labeling_candidates_v1.csv
-
-# Dog bark workflow - automatically organized  
-python -m audioloop.active_learning --class-name dog_bark --run-number 1 --experiment dog_bark_detection
-# → Creates: outputs/dog_bark_detection/predictions_v1.csv, outputs/dog_bark_detection/labeling_candidates_v1.csv
-
-# Gun shot workflow - automatically organized
-python -m audioloop.active_learning --class-name gun_shot --run-number 1 --experiment gun_shot_detection
-# → Creates: outputs/gun_shot_detection/predictions_v1.csv, outputs/gun_shot_detection/labeling_candidates_v1.csv
-
-# Clean separation, no manual organization needed!
-```
-
-## Troubleshooting Version Issues
-
-### Version Mismatch
-```bash
-# Error: Model outputs/model_v2.pt not found
-# Solution: Train the model first
-python -m audioloop.train training_sets/training_set_v2.csv
-
-# Error: No training_set_v3.csv after merge
-# Solution: Check that merge completed successfully
-python -m audioloop.merge_labels training_sets/training_set_v2.csv outputs/labeling_candidates_v2.csv
-```
-
-### File Conflicts
-```bash
-# Error: File already exists
-# Solution: Use explicit versioning
-python -m audioloop.active_learning --class-name siren --run-number 1b --model outputs/model_v1.pt
-```
-
-### Lost Track of Versions
-```bash
-# List all versions across experiments
-find . -name "model_*.pt" | sort -V
-find . -name "training_set_*.csv" | sort -V
-find . -name "predictions_*.csv" | sort -V
-
-# Find latest version in specific experiment
-ls outputs/myexp/model_*.pt | sort -V | tail -n 1
-
-# Overview of all experiments
-ls -d outputs/*/ training_sets/*/
-```
-
-## Integration with External Tools
-
-### Git Version Control
-```bash
-# Tag major versions
-git add training_sets/training_set_v1.csv outputs/model_v1.pt
-git commit -m "Initial model v1 - 95% training accuracy"
-git tag v1.0
-
-git add training_sets/training_set_v2.csv outputs/model_v2.pt  
-git commit -m "Model v2 - improved with 20 new labels"
-git tag v2.0
-```
-
-### Experiment Tracking
-```bash
-# Log version progression
-echo "$(date): Created model_v1.pt with 95% accuracy" >> experiment_log.txt
-echo "$(date): Model_v2.pt improved to 97% accuracy" >> experiment_log.txt
-```
-
-See [README.md](README.md) for project overview and [USAGE_GUIDE.md](USAGE_GUIDE.md) for detailed command reference.
+For detailed command syntax and parameters, see [USAGE_GUIDE.md](USAGE_GUIDE.md).
+For development and architecture information, see [DEV_GUIDE.md](DEV_GUIDE.md).

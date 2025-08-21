@@ -1,405 +1,62 @@
-# DEV_GUIDE.md
+# AudioLoop Developer Guide
 
-## Project Overview
+Developer reference for AudioLoop architecture, patterns, and extensibility. For usage instructions, see [USAGE_GUIDE.md](USAGE_GUIDE.md). For workflow patterns, see [WORKFLOW_GUIDE.md](WORKFLOW_GUIDE.md).
+
+## Project Architecture
 
 AudioLoop is an active learning framework for binary audio classification supporting arbitrary audio datasets. It implements a versioned workflow for iterative model improvement through human-in-the-loop labeling. Built-in support includes FSD50K and UrbanSound8K, with easy extensibility for custom datasets.
 
-## Project Goal
+### Design Goals
 
-The eventual goal is to enable a user to arrive at the application with only a large unlabeled audio dataset and a small labeled subset of that dataset, and let the system independently create a model that can label the entire dataset with high accuracy. That means potentially automatically setting hyperparameters for the entire training process including early stopping strategies, learning rate scheduling, candidate selection strategies for the human labeling set.
-That includes both CLI and web interfaces for the training loop and the human labeling UI.
+The eventual goal is to enable a user to arrive at the application with only a large unlabeled audio dataset and a small labeled subset of that dataset, and let the system independently create a model that can label the entire dataset with high accuracy. This includes:
 
-## Backwards Compatibility
+- Automatic hyperparameter tuning for the entire training process
+- Adaptive early stopping strategies and learning rate scheduling  
+- Intelligent candidate selection strategies for human labeling
+- Both CLI and web interfaces for training and human labeling
 
-This is a project in rapid development and has no production users. Maintaining backwards compatibility during code changes is not required and will only complicate the codebase unnecessarily. Do not be concerned about backwards compatibility.
+### Development Philosophy
 
-## Workflow Modes
+This is a project in rapid development with no production users. Maintaining backwards compatibility during code changes is not required and would unnecessarily complicate the codebase. Focus on clean, maintainable code over backwards compatibility.
+
+## Core Concepts
+
+### Workflow Modes
 
 AudioLoop supports two primary workflow modes designed for different use cases:
 
-### Production Mode (Default)
-**Use case**: Real-world deployment with truly unlabeled datasets
-- **Ground truth**: Not available - you don't know the true labels
-- **Active learning**: Generates predictions without ground truth columns
-- **Metrics tracking**: Shows prediction and confidence metrics only
-- **Human labeling**: Manual review using web UI or terminal interface
-- **Goal**: Build models for actual unknown audio classification tasks
-
-### Evaluation Mode (Research/Testing)
-**Use case**: Research, development, and algorithm testing with known datasets
-- **Ground truth**: Available - you have the true labels for comparison
-- **Active learning**: Use `--with-ground-truth` flag to include evaluation columns
-- **Metrics tracking**: Shows full evaluation metrics (F1, precision, recall, accuracy)
-- **Auto-labeling**: Can use `auto_label_candidates.py` for rapid testing
-- **Goal**: Test candidate selection strategies, tune hyperparameters, compare methods
-
-**Key Distinction**: Production mode is for real deployment where ground truth is unknown. Evaluation mode is for research and testing where ground truth is available for validation.
-
-## Common Commands
-
-### Data Preparation (One-time Setup)
-```bash
-# Generate spectrograms for entire FSD50K dataset
-python -m audioloop.create_all_specs
-```
-
-### Creating Initial Training Sets
-```bash
-# Create FSD50K training set (default)
-python -m audioloop.utils.create_bootstrap_set --class-name Drill --n 50
-
-# Create UrbanSound8K training set
-python -m audioloop.utils.create_bootstrap_set --dataset urbansound8k --class-name siren --n 40
-
-# Create with custom parameters
-python -m audioloop.utils.create_bootstrap_set --class-name Speech --n 60 --positive-pct 0.8 --output training_sets/training_set_v2.csv
-
-# Create with custom seed for reproducible sampling
-python -m audioloop.utils.create_bootstrap_set --class-name Drill --n 50 --seed 123
-
-# List available classes for FSD50K
-python -m audioloop.utils.create_bootstrap_set --list-classes
-
-# List available classes for UrbanSound8K
-python -m audioloop.utils.create_bootstrap_set --dataset urbansound8k --list-classes
-```
-
-### Training Models
-```bash
-# Train model (version auto-detected from filename)
-python -m audioloop.train training_sets/training_set_v1.csv
-
-# Train with explicit version and parameters
-python -m audioloop.train training_sets/training_set_v1.csv -v 1 --epochs 500 --batch-size 64
-
-# Train with experiment name (outputs to outputs/myexp/)
-python -m audioloop.train training_sets/training_set_v1.csv --experiment myexp
-
-# Train with custom seed for reproducibility
-python -m audioloop.train training_sets/training_set_v1.csv --seed 123
-
-# Train with specific stopping criterion
-python -m audioloop.train training_sets/training_set_v1.csv --stopping-criterion hybrid
-python -m audioloop.train training_sets/training_set_v1.csv --stopping-criterion accuracy
-python -m audioloop.train training_sets/training_set_v1.csv --stopping-criterion plateau --patience 30
-
-# Custom hybrid stopping parameters
-python -m audioloop.train training_sets/training_set_v1.csv --stopping-criterion hybrid \
-  --high-accuracy-threshold 0.9 --high-accuracy-patience 15 --patience 25
-```
-
-### Active Learning Workflow
-```bash
-# Run active learning cycle (auto-detects version from run number)
-python -m audioloop.active_learning --class-name Drill --run-number 1
-
-# Run with UrbanSound8K dataset
-python -m audioloop.active_learning --dataset urbansound8k --class-name siren --run-number 1
-
-# Run with entropy-based selection
-python -m audioloop.active_learning --class-name Drill --run-number 1 --selection-mode entropy
-
-# Run with custom seed for reproducible candidate selection
-python -m audioloop.active_learning --class-name Drill --run-number 1 --seed 123
-
-# Run with explicit parameters
-python -m audioloop.active_learning --class-name Speech --run-number 2 --total-candidates 20 --positive-pct 0.75 --min-confidence 0.85
-
-# Run with experiment name (uses outputs/myexp/ instead of outputs/)
-python -m audioloop.active_learning --class-name Drill --run-number 1 --experiment myexp
-
-# Run with entropy-based selection (uncertainty sampling)
-python -m audioloop.active_learning --class-name Drill --run-number 1 --selection-mode entropy
-
-# Run with basic transition (starts with confidence, switches to entropy when criteria met)
-python -m audioloop.active_learning --class-name Drill --run-number 1 --selection-mode basic_transition
-
-# Run with auto-calculated thresholds (recommended for imbalanced datasets)
-python -m audioloop.active_learning --class-name Drill --run-number 1 --selection-mode basic_transition --auto-thresholds --estimated-positive-pct 0.10
-
-# Run with auto-thresholds using default estimate (5%)
-python -m audioloop.active_learning --class-name Drill --run-number 1 --selection-mode basic_transition --auto-thresholds
-
-# Run with custom basic transition thresholds (manual tuning)
-python -m audioloop.active_learning --class-name Drill --run-number 1 --selection-mode basic_transition \
-  --basic-transition-f1-threshold 0.25 --basic-transition-confidence-threshold 0.95 --basic-transition-variance-threshold 0.10
-
-# List available sound classes (respects AUDIOLOOP_DATASET environment variable)
-python -m audioloop.active_learning --list-classes
-
-# List UrbanSound8K classes
-python -m audioloop.active_learning --dataset urbansound8k --list-classes
-
-# Include ground truth evaluation columns (for research/evaluation with labeled datasets)
-python -m audioloop.active_learning --class-name Drill --run-number 1 --with-ground-truth
-
-# Production workflow (default - no ground truth columns, for real unlabeled datasets)
-python -m audioloop.active_learning --class-name Drill --run-number 1
-```
-
-### Human Labeling
-
-#### Web UI (Recommended)
-```bash
-# Install web UI dependencies
-uv sync --extra webui
-
-# Start web labeling interface
-cd webui && python app.py
-
-# Open browser to http://127.0.0.1:5000
-# Load: outputs/labeling_candidates_v1.csv
-# Features: Visual interface, audio player, keyboard shortcuts, progress tracking
-```
-
-#### Terminal Interface (Alternative)
-```bash
-# Interactive audio labeling tool (uses AUDIOLOOP_DATASET or default)
-python -m audioloop.label_audio outputs/labeling_candidates_v1.csv
-
-# Explicit FSD50K dataset
-python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --dataset fsd50k --audio-dir data/FSD50K/FSD50K.dev_audio
-
-# UrbanSound8K with environment variable
-AUDIOLOOP_DATASET=urbansound8k python -m audioloop.label_audio outputs/labeling_candidates_v1.csv
-
-# Explicit UrbanSound8K dataset
-python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --dataset urbansound8k --audio-dir data/urbansound8k
-
-# For auto-labeling with ground truth (evaluation workflows), see auto_label_candidates section below
-```
-
-### Label Management
-
-#### Production Workflow (Manual Labeling)
-```bash
-# Merge human labels back into training set (default experiment)
-python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv
-
-# Merge labels with explicit experiment name
-python -m audioloop.merge_labels training_sets/myexp/training_set_v1.csv outputs/myexp/labeling_candidates_v1.csv --experiment myexp
-
-# Merge with auto-generated output path
-python -m audioloop.merge_labels training_sets/training_set_v1.csv outputs/labeling_candidates_v1.csv --experiment myexp
-```
-
-#### Evaluation Workflow (Auto-Labeling for Research)
-```bash
-# Auto-label candidates using ground truth (requires --with-ground-truth mode)
-python -m audioloop.auto_label_candidates outputs/labeling_candidates_v1.csv
-
-# Auto-label with verbose progress output
-python -m audioloop.auto_label_candidates outputs/labeling_candidates_v1.csv --verbose
-
-# Auto-label candidates from experiment
-python -m audioloop.auto_label_candidates outputs/myexp/labeling_candidates_v2.csv
-
-# Note: Auto-labeling requires ground truth data in CSV (generated with --with-ground-truth)
-# For production workflows without ground truth, use manual labeling tools instead
-```
-
-### Comprehensive Metrics Tracking
-```bash
-# Track metrics (automatically detects evaluation vs production mode)
-python -m audioloop.track_metrics
-
-# Generate metrics plots - shows different visualizations based on available data
-python -m audioloop.track_metrics --plot
-
-# Save metrics plots to file
-python -m audioloop.track_metrics --save-plot comprehensive_metrics.png
-
-# Track metrics from experiment directory
-python -m audioloop.track_metrics --experiment myexp --plot
-
-# Evaluation mode: Shows F1, precision, recall, accuracy (when ground truth available)
-# Production mode: Shows prediction and confidence metrics only (no ground truth)
-# Mixed mode: Handles files with and without ground truth gracefully
-```
-
-### Outputs Management
-```bash
-# Analyze what files can be cleaned (dry run)
-python -m audioloop.clean_outputs
-
-# Clean safe files (removes example/demo files, keeps workflow files)
-python -m audioloop.clean_outputs --clean
-
-# Clean without confirmation
-python -m audioloop.clean_outputs --clean --force
-
-# Move misplaced training files to training_sets/
-python -m audioloop.clean_outputs --move-training
-```
-
-### Code Quality
-```bash
-# Format and lint code
-ruff check audioloop/
-ruff format audioloop/
-```
-
-### Automated Workflow (Recommended)
-```bash
-# Evaluation workflow (auto-labeling for testing/development)
-python -m audioloop.automated_workflow --class-name Drill --cycles 3 --evaluation-mode --auto-label
-
-# Production workflow (pause for human labeling)
-python -m audioloop.automated_workflow --class-name Speech --cycles 2
-
-# Custom training parameters
-python -m audioloop.automated_workflow --class-name Music --cycles 3 --epochs 500 --batch-size 64
-
-# Reproducible automated workflow with custom seed
-python -m audioloop.automated_workflow --class-name Drill --cycles 3 --evaluation-mode --auto-label --seed 123
-
-# Custom active learning parameters
-python -m audioloop.automated_workflow --class-name Explosion --cycles 2 --candidates 100 --positive-pct 0.8
-
-# UrbanSound8K dataset (evaluation mode)
-python -m audioloop.automated_workflow --class-name siren --cycles 2 --dataset urbansound8k --evaluation-mode --auto-label
-
-# Use entropy-based selection
-python -m audioloop.automated_workflow --class-name Drill --cycles 3 --selection-mode entropy
-
-# Use basic transition (automatically switches strategies based on performance)
-python -m audioloop.automated_workflow --class-name Drill --cycles 3 --selection-mode basic_transition --evaluation-mode --auto-label
-
-# Mix confidence and entropy modes across cycles
-python -m audioloop.automated_workflow --class-name Speech --cycles 4 --selection-mode confidence --evaluation-mode --auto-label
-
-# Run experiment with custom output directory
-python -m audioloop.automated_workflow --class-name siren --cycles 3 --evaluation-mode --auto-label --experiment myexp
-```
-
-### Complete Workflow Examples
-
-#### Production Workflow (Real Deployment)
-**Use case**: Deploy on unknown audio data for actual classification tasks
-
-```bash
-# 1. Create initial training set for experiment
-python -m audioloop.utils.create_bootstrap_set --class-name siren --n 40 --experiment myexp
-
-# 2. Train initial model
-python -m audioloop.train training_sets_myexp/training_set_v1.csv --experiment myexp
-
-# 3. Run active learning cycle (production mode - no ground truth)
-python -m audioloop.active_learning --class-name siren --run-number 1 --experiment myexp
-
-# 4. Label candidates manually using web UI (recommended)
-cd webui && python app.py
-# Load: outputs/myexp/labeling_candidates_v1.csv
-
-# Alternative: Terminal interface
-python -m audioloop.label_audio outputs/myexp/labeling_candidates_v1.csv
-
-# 5. Merge human labels (creates training_sets/myexp/training_set_v2.csv)
-python -m audioloop.merge_labels training_sets/myexp/training_set_v1.csv outputs/myexp/labeling_candidates_v1.csv
-
-# 6. Track metrics (production mode - confidence and prediction metrics only)
-python -m audioloop.track_metrics --experiment myexp --plot
-```
-
-#### Evaluation Workflow (Research/Testing)
-**Use case**: Test algorithms, compare strategies, tune parameters with known datasets
-
-```bash
-# 1. Create initial training set for experiment
-python -m audioloop.utils.create_bootstrap_set --class-name siren --n 40 --experiment eval_test
-
-# 2. Train initial model
-python -m audioloop.train training_sets_eval_test/training_set_v1.csv --experiment eval_test
-
-# 3. Run active learning cycle WITH ground truth evaluation
-python -m audioloop.active_learning --class-name siren --run-number 1 --experiment eval_test --with-ground-truth
-
-# 4. Auto-label candidates using ground truth (for rapid testing)
-python -m audioloop.auto_label_candidates outputs/eval_test/labeling_candidates_v1.csv
-
-# 5. Merge labels (creates training_sets_eval_test/training_set_v2.csv)
-python -m audioloop.merge_labels training_sets/eval_test/training_set_v1.csv outputs/eval_test/labeling_candidates_v1.csv --experiment eval_test
-
-# 6. Track comprehensive metrics (evaluation mode - F1, precision, recall, accuracy)
-python -m audioloop.track_metrics --experiment eval_test --plot
-```
-
-**Key Differences**:
-- **Production**: No `--with-ground-truth`, manual labeling, confidence metrics only
-- **Evaluation**: Uses `--with-ground-truth`, auto-labeling possible, full evaluation metrics
-
-**Use automated workflow for**: Convenience, testing multiple cycles quickly, parameter sweeping  
-**Use manual workflow for**: Learning the system, debugging issues, fine-grained control
-
-## Selection Strategies
-
-AudioLoop uses a pluggable strategy pattern for candidate selection in active learning:
-
-### ConfidenceStrategy (Default)
-- **Class**: `ConfidenceStrategy`
-- **Algorithm**: Selects samples with highest model confidence scores
-- **Use Case**: Early training cycles when model is uncertain
-- **Behavior**: Focuses on samples the model is most sure about
-- **Risk**: Can lead to overconfidence and performance degradation in later cycles
-- **Selection Mode**: `--selection-mode confidence`
-
-### EntropyStrategy (Uncertainty Sampling)
-- **Class**: `EntropyStrategy`
-- **Algorithm**: Selects samples with highest entropy (most uncertain predictions)
-- **Use Case**: Later training cycles or when model becomes overconfident
-- **Behavior**: Focuses on samples near decision boundaries
-- **Benefit**: Helps model learn challenging cases and avoid overconfidence
-- **Selection Mode**: `--selection-mode entropy`
-
-### Strategy Architecture
-Each strategy class implements the `CandidateSelectionStrategy` interface:
-```python
-from audioloop.utils.candidate_selection import ConfidenceStrategy, EntropyStrategy
-
-# Direct instantiation (like stopping criteria)
-strategy = ConfidenceStrategy()
-candidates = strategy.select_candidates(predictions, num_candidates=50)
-```
-
-### Recommended Usage
-1. **Start with ConfidenceStrategy** for initial cycles to establish basic patterns
-2. **Switch to EntropyStrategy** when model becomes overconfident (mean confidence >0.95, std confidence <0.11)
-3. **Monitor F1 score** - switch strategies if performance starts degrading
-
-### Output Format
-The active learning script displays strategy class names in the output:
-```
-Running active learning cycle
-------------------------------------------------------------
-Selection strategy: ConfidenceStrategy
-------------------------------------------------------------
-
-Step 2: Selecting candidates for human labeling...
-Using strategy: ConfidenceStrategy
-```
-
-### Example Workflow
-```bash
-# Complete workflow demonstration with basic transition (evaluation mode)
-python -m audioloop.automated_workflow --class-name Drill --cycles 2 --selection-mode basic_transition --evaluation-mode --auto-label
-
-# Manual workflow demonstration (production mode)
-python -m audioloop.automated_workflow --class-name Drill --cycles 2
-```
-
-### Basic Transition Configuration
-```bash
-# Default basic transition thresholds
-python -m audioloop.active_learning --class-name Drill --run-number 1 --selection-mode basic_transition
-
-# Custom thresholds for sensitive datasets
-python -m audioloop.active_learning --class-name Drill --run-number 1 --selection-mode basic_transition \
-  --basic-transition-f1-threshold 0.15 --basic-transition-confidence-threshold 0.85 --basic-transition-variance-threshold 0.15
-
-# Stricter thresholds for high-confidence models
-python -m audioloop.active_learning --class-name Drill --run-number 1 --selection-mode basic_transition \
-  --basic-transition-f1-threshold 0.3 --basic-transition-confidence-threshold 0.95 --basic-transition-variance-threshold 0.08
-```
+**Production Mode** (Default):
+- Real-world deployment with truly unlabeled datasets
+- No ground truth available
+- Manual human labeling required
+- Tracks prediction and confidence metrics only
+
+**Evaluation Mode** (Research/Testing):
+- Research and testing with known datasets
+- Ground truth available for comprehensive evaluation
+- Auto-labeling possible for rapid testing
+- Full evaluation metrics (F1, precision, recall, accuracy)
+
+Use the `--with-ground-truth` flag to enable evaluation mode in active learning commands.
+
+### Selection Strategies
+
+AudioLoop uses a pluggable strategy pattern for candidate selection:
+
+**ConfidenceStrategy** (Default):
+- Selects samples with highest model confidence scores
+- Best for early training cycles when model is uncertain
+- Can lead to overconfidence in later cycles
+
+**EntropyStrategy** (Uncertainty Sampling):
+- Selects samples with highest entropy (most uncertain predictions)
+- Best for later training cycles or when model becomes overconfident
+- Focuses on samples near decision boundaries
+
+**BasicTransitionStrategy**:
+- Automatically switches from confidence to entropy based on model performance
+- Uses F1 score, mean confidence, and confidence variance as transition criteria
+- Adaptive thresholds based on dataset characteristics
 
 ## Architecture Overview
 
@@ -422,8 +79,6 @@ python -m audioloop.active_learning --class-name Drill --run-number 1 --selectio
 - **`models/base.py`**: Abstract base class (`AudioLoopModel`) defining the pluggable model interface
 - **`models/cnn_5layer.py`**: Primary CNN architecture with adaptive pooling
 - **`models/simple_cnn.py`**: Alternative lightweight CNN model
-
-**📖 For adding new models, see [Adding New Models Guide](docs/adding_new_models.md)**
 
 AudioLoop uses a pluggable model architecture where all models implement the `AudioLoopModel` abstract base class. This allows easy integration of custom PyTorch models or HuggingFace models while maintaining compatibility with the existing training and inference pipeline.
 
@@ -611,7 +266,7 @@ filename,prediction,predicted_class,confidence,needs_human_label,entropy,prob_ne
 - **TQDM**: Progress bars
 - **Ruff**: Code formatting and linting
 
-### Development Patterns
+## Development Patterns
 
 ### Unified Configuration Pattern
 All modules use the unified configuration system instead of scattered parameters:
@@ -890,3 +545,14 @@ criterion = HybridStoppingCriterion(
 - **`HybridStoppingCriterion`** (default): Adaptive switching from accuracy to plateau mode
 - **`AccuracyCriterion`**: Stops at 100% accuracy or max epochs
 - **`PlateauCriterion`**: Stops when loss plateaus (early stopping)
+
+## Related Documentation
+
+For specific guides, see:
+- **[docs/adding_new_models.md](docs/adding_new_models.md)**: Detailed guide for integrating custom models
+- **[docs/candidate_selection_explained.md](docs/candidate_selection_explained.md)**: Deep dive into selection strategies
+- **[docs/stopping_criteria_guide.md](docs/stopping_criteria_guide.md)**: Training stopping criteria
+- **[docs/shape_compatibility_and_variable_lengths.md](docs/shape_compatibility_and_variable_lengths.md)**: Variable-length spectrogram support
+- **[FSD50K_INTEGRATION.md](FSD50K_INTEGRATION.md)**: FSD50K dataset integration
+- **[LABELING_GUIDE.md](LABELING_GUIDE.md)**: Audio labeling best practices
+- **[webui/README.md](webui/README.md)**: Web-based labeling interface
