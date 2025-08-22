@@ -1,4 +1,5 @@
 import argparse
+import logging
 import re
 
 from .config import AudioLoopConfig
@@ -96,6 +97,11 @@ def main():
         action="store_true",
         help="Apply inverse frequency class weighting to handle imbalanced datasets",
     )
+    parser.add_argument(
+        "--quiet", "-q",
+        action="store_true",
+        help="Suppress training progress output",
+    )
 
     args = parser.parse_args()
 
@@ -144,12 +150,16 @@ def main():
 
     config = AudioLoopConfig(**config_overrides)
 
+    # Set log level based on quiet flag
+    log_level = logging.WARNING if args.quiet else logging.INFO
+
     # Run training with clean signature
     accuracy = run_training(
         config=config,
         labels_file=args.labels_file,
         version=args.version,
         model_path=args.output,
+        log_level=log_level,
     )
     print(f"\nFinal training accuracy: {accuracy:.4f}")
 

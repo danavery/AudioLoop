@@ -167,21 +167,19 @@ def run_automated_workflow(
             print(f"Using previous training set: {current_training_set}")
 
         # Step 1: Train model
-        print(f"\n🧠 STEP 1: TRAINING MODEL v{cycle}")
-        print("▼" * 50)
-        print(f"   Training set: {current_training_set}")
-        print(f"   Model output: {current_model}")
-
+        print("├─ Training model...")
         try:
+            import logging
             final_accuracy = run_training(
                 config=config,
                 labels_file=current_training_set,
                 version=cycle,
                 model_path=current_model,
+                log_level=logging.WARNING,  # Quiet mode
             )
-            print(f"   ✅ Model trained (final accuracy: {final_accuracy:.3f})")
+            print(f"├─ Training model... ✓ ({final_accuracy * 100:.1f}% accuracy)")
         except Exception as e:
-            print(f"   ❌ Training failed: {e}")
+            print(f"├─ Training model... ❌ ({e})")
             break
 
         # Step 2: Run active learning

@@ -1,3 +1,4 @@
+import logging
 import random
 import time
 
@@ -12,6 +13,9 @@ from .models.model_registry import get_model_class, list_available_models
 from .utils.data_utils import get_device, variable_length_collate_fn
 from .utils.spectrogram_dataset import SpectrogramDataset
 from .utils.stopping_criteria import create_stopping_criterion
+
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
 
 def set_seed(seed):
@@ -75,6 +79,7 @@ def run_training(
     labels_file: str,
     version: int,
     model_path: str | None = None,
+    log_level: int = logging.INFO,
 ):
     """
     Run training for a binary audio classification model using config-driven parameters.
@@ -84,23 +89,35 @@ def run_training(
         labels_file: Path to CSV file with training labels
         version: Model version number (for workflow tracking)
         model_path: Path to save trained model (uses config.get_model_path(version) if None)
+        log_level: Logging level (logging.INFO for normal output, logging.WARNING for quiet)
 
     Returns:
         Final training accuracy
     """
+    # Set up logging for this training run
+    logger.setLevel(log_level)
+    
+    # Create a console handler if none exists (for standalone usage)
+    if not logger.handlers:
+        handler = logging.StreamHandler()
+        formatter = logging.Formatter('%(message)s')  # Simple format
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        logger.propagate = False  # Don't propagate to root logger
+
     device = get_device()
-    print(f"Using device: {device}")
+    logger.info(f"Using device: {device}")
 
     set_seed(config.seed)
 
     # Create dataset from precomputed spectrograms
     train_dataset = SpectrogramDataset(csv_file=labels_file, specs_dir=str(config.specs_dir))
-    print(f"Dataset size: {len(train_dataset)}")
+    logger.info(f"Dataset size: {len(train_dataset)}")
 
     # Determine number of classes from the dataset
     labels = [train_dataset[i]["label"] for i in range(len(train_dataset))]
     num_classes = len(set(labels))
-    print(f"Number of classes: {num_classes}")
+    logger.info(f"Number of classes: {num_classes}")
 
     # Optimize data loader for better performance
     # num_workers=2 enables parallel data loading
@@ -137,24 +154,24 @@ def run_training(
             f"Try a different model with --model-type or use a compatible dataset."
         )
 
-    print(f"✅ Dataset shape {dataset_shape} is compatible with model '{config.model_type}'")
+    logger.info(f"✅ Dataset shape {dataset_shape} is compatible with model '{config.model_type}'")
 
     # Print model info
     model_info = model.get_model_info()
-    print(f"Using model: {model_info['model_type']}")
+    logger.info(f"Using model: {model_info['model_type']}")
     if "use_batchnorm" in model_info:
         if model_info["use_batchnorm"]:
-            print("Using model WITH BatchNorm")
+            logger.info("Using model WITH BatchNorm")
         else:
-            print(
+            logger.info(
                 f"⚠️  Small dataset ({len(train_dataset)} samples) detected - using model WITHOUT BatchNorm"
             )
 
     # Print basic model info
     sample = train_dataset[0]
     sample_shape = sample["data"].shape
-    print(f"Sample spectrogram shape: {sample_shape}")
-    print(f"Model created with {sum(p.numel() for p in model.parameters())} parameters")
+    logger.info(f"Sample spectrogram shape: {sample_shape}")
+    logger.info(f"Model created with {sum(p.numel() for p in model.parameters())} parameters")
 
     # Create loss criterion with optional class weighting
     if config.use_class_weighting:
@@ -164,10 +181,10 @@ def run_training(
         total_samples = len(train_dataset)
         class_weights = total_samples / (len(class_counts) * class_counts.float())
 
-        print("Class weighting enabled:")
-        print(f"  Class counts: {class_counts.tolist()}")
-        print(f"  Class weights: {class_weights.tolist()}")
-        print(f"  Weight ratio (neg/pos): {class_weights[0] / class_weights[1]:.2f}")
+        logger.info("Class weighting enabled:")
+        logger.info(f"  Class counts: {class_counts.tolist()}")
+        logger.info(f"  Class weights: {class_weights.tolist()}")
+        logger.info(f"  Weight ratio (neg/pos): {class_weights[0] / class_weights[1]:.2f}")
 
         criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
     else:
@@ -181,9 +198,9 @@ def run_training(
     # Reset stopping criterion for this training run
     stopping_criterion.reset()
 
-    print("Starting training...")
-    print(f"Stopping criterion: {stopping_criterion.__class__.__name__}")
-    print("-" * 50)
+    logger.info("Starting training...")
+    logger.info(f"Stopping criterion: {stopping_criterion.__class__.__name__}")
+    logger.info("-" * 50)
 
     # Pre-allocate timing list to avoid memory allocation during training
     epoch_times = []
@@ -198,7 +215,7 @@ def run_training(
 
         # Print progress periodically
         if epoch % 10 == 0 or accuracy >= 1.0 or epoch < 5:
-            print(
+            logger.info(
                 f"Epoch {epoch + 1:4d}/{config.max_epochs} ({epoch_time:.2f}s) - "
                 f"Loss: {avg_loss:.4f} - Accuracy: {accuracy:.4f} ({accuracy * 100:.2f}%)"
             )
@@ -212,30 +229,30 @@ def run_training(
         if stopping_criterion.should_update_best_model():
             stopping_criterion.update_best_model(model.state_dict().copy())
             best_accuracy = accuracy  # Track best accuracy separately
-            print(f"    💾 Best model updated (epoch {epoch + 1})")
+            logger.info(f"    💾 Best model updated (epoch {epoch + 1})")
 
         # Stop if criterion says to stop
         if should_stop:
-            print()
-            print("=" * 60)
-            print(f"🛑 Stopping criterion met ({stopping_criterion.__class__.__name__})")
-            print(f"Training completed in {epoch + 1} epochs")
+            logger.info("")
+            logger.info("=" * 60)
+            logger.info(f"🛑 Stopping criterion met ({stopping_criterion.__class__.__name__})")
+            logger.info(f"Training completed in {epoch + 1} epochs")
 
             # Report best accuracy if available, otherwise final epoch accuracy
             if best_accuracy is not None:
-                print(f"Final accuracy: {best_accuracy:.4f} (best saved model)")
+                logger.info(f"Final accuracy: {best_accuracy:.4f} (best saved model)")
             else:
-                print(f"Final accuracy: {accuracy:.4f} (final epoch)")
-            print("=" * 60)
+                logger.info(f"Final accuracy: {accuracy:.4f} (final epoch)")
+            logger.info("=" * 60)
             break
     else:
         # Report best accuracy if available, otherwise final epoch accuracy
         if best_accuracy is not None:
-            print(
+            logger.info(
                 f"\nTraining completed {config.max_epochs} epochs. Final accuracy: {best_accuracy:.4f} (best saved model)"
             )
         else:
-            print(
+            logger.info(
                 f"\nTraining completed {config.max_epochs} epochs. Final accuracy: {accuracy:.4f} (final epoch)"
             )
 
@@ -258,7 +275,7 @@ def run_training(
             },  # Exclude runtime-only fields
         }
         torch.save(save_dict, model_path)
-        print(f"✅ Best model saved to: {model_path}")
+        logger.info(f"✅ Best model saved to: {model_path}")
     else:
         # Save the final model state with complete metadata
         model_info = model.get_model_info()
@@ -269,7 +286,7 @@ def run_training(
             },  # Exclude runtime-only fields
         }
         torch.save(save_dict, model_path)
-        print(f"📁 Final model saved to: {model_path}")
+        logger.info(f"📁 Final model saved to: {model_path}")
 
     # Clean up and return the best accuracy if available, otherwise final accuracy
     del train_loader

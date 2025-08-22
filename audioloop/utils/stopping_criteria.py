@@ -5,8 +5,11 @@ This module provides a pluggable architecture for training stopping decisions,
 following the Strategy pattern.
 """
 
+import logging
 from abc import ABC, abstractmethod
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 class TrainingStoppingCriterion(ABC):
@@ -172,7 +175,7 @@ class PlateauCriterion(TrainingStoppingCriterion):
             trivial_accuracy = max(positive_ratio, 1 - positive_ratio)
             self.accuracy_floor = min(trivial_accuracy + 0.15, 0.99)
             self._auto_accuracy_floor = False
-            print(
+            logger.info(
                 f"Auto-calculated accuracy floor: {self.accuracy_floor:.2f} (trivial accuracy: {trivial_accuracy:.2f})"
             )
 
