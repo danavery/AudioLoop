@@ -75,7 +75,7 @@ def calculate_core_metrics(predictions_file: str) -> dict:
         raise ValueError(f"No samples found in {predictions_file}")
 
     # Check what metrics we can calculate
-    has_ground_truth = "ground_truth" in fieldnames
+
     has_entropy = "entropy" in fieldnames
 
     # Calculate available metrics using imported functions

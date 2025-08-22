@@ -217,15 +217,17 @@ class SimpleAudioLabeler:
 
     def _get_labeling_summary(self):
         """Calculate and return labeling session summary."""
-        labeled_count = sum(1 for c in self.candidates if c.get("needs_human_label", "").strip() != "")
+        labeled_count = sum(
+            1 for c in self.candidates if c.get("needs_human_label", "").strip() != ""
+        )
         unlabeled_count = len(self.candidates) - labeled_count
         total_count = len(self.candidates)
-        
+
         return {
             "labeled": labeled_count,
-            "unlabeled": unlabeled_count, 
+            "unlabeled": unlabeled_count,
             "total": total_count,
-            "percentage": (labeled_count / total_count * 100) if total_count > 0 else 0
+            "percentage": (labeled_count / total_count * 100) if total_count > 0 else 0,
         }
 
     def _show_session_summary(self, summary):
@@ -240,27 +242,27 @@ class SimpleAudioLabeler:
     def _handle_quit_with_summary(self):
         """Handle quit command with session summary and confirmation."""
         self._stop_audio()
-        
+
         # Show session summary
         summary = self._get_labeling_summary()
         self._show_session_summary(summary)
-        
+
         # If there are unlabeled samples, ask for confirmation
-        if summary['unlabeled'] > 0:
+        if summary["unlabeled"] > 0:
             print(f"\nYou have {summary['unlabeled']} unlabeled samples remaining.")
             print("Unlabeled samples will get new predictions in the next cycle.")
             confirm = input("Are you sure you want to quit? (y/n): ").strip().lower()
             if confirm not in ["y", "yes"]:
                 print("Continuing labeling session...")
                 return False  # Don't quit
-        
+
         # Save if needed and exit
         if self.changes_made:
             save = input("\nSave changes before quitting? (y/n): ").strip().lower()
             if save in ["y", "yes"]:
                 self._save_candidates()
                 print("Labels saved!")
-        
+
         print("Session complete. Goodbye!")
         return True  # Quit confirmed
 
@@ -358,14 +360,18 @@ class SimpleAudioLabeler:
         print("  h or ? - Show this help")
         print("  q      - Quit (shows session summary and prompts to save)")
         print("\nTip: After labeling with 1/0, audio auto-plays for the next sample")
-        print("Note: When quitting, you'll see a summary and confirmation if samples remain unlabeled")
+        print(
+            "Note: When quitting, you'll see a summary and confirmation if samples remain unlabeled"
+        )
 
     def run(self):
         """Run the interactive labeling session."""
         print(f"\nSimple Audio Labeling Tool - {self.dataset_name.upper()}")
         print("Type 'h' for help")
         print("Commands: 1=positive, 0=negative, u=next unlabeled, x=stop audio, q=quit")
-        print("Note: Quitting shows a session summary and asks for confirmation if samples remain unlabeled\n")
+        print(
+            "Note: Quitting shows a session summary and asks for confirmation if samples remain unlabeled\n"
+        )
 
         # Display first candidate and auto-play
         self._display_current()

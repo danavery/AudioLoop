@@ -98,7 +98,8 @@ def main():
         help="Apply inverse frequency class weighting to handle imbalanced datasets",
     )
     parser.add_argument(
-        "--quiet", "-q",
+        "--quiet",
+        "-q",
         action="store_true",
         help="Suppress training progress output",
     )

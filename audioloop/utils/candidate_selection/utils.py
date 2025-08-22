@@ -146,7 +146,9 @@ def print_selection_statistics(
     min_conf = min(all_confidences)
     max_conf = max(all_confidences)
 
-    logger.info(f"Overall Confidence: avg={avg_confidence:.3f}, range={min_conf:.3f}-{max_conf:.3f}")
+    logger.info(
+        f"Overall Confidence: avg={avg_confidence:.3f}, range={min_conf:.3f}-{max_conf:.3f}"
+    )
     logger.info(
         f"High confidence samples (≥{min_confidence}): {high_conf_count}/{total_samples} ({high_conf_percentage:.1%})"
     )

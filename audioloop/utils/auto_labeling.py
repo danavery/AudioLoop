@@ -37,7 +37,7 @@ def auto_label_from_ground_truth(candidates_csv: str, log_level=logging.INFO) ->
     """
     # Set up logging for this auto-labeling run
     logger.setLevel(log_level)
-    
+
     candidates_path = Path(candidates_csv)
 
     if not candidates_path.exists():

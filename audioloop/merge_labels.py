@@ -10,7 +10,9 @@ from .utils.paths import extract_version_from_filename
 logger = logging.getLogger(__name__)
 
 
-def merge_training_sets(original_csv, new_labels_csv, output_csv=None, config=None, log_level=logging.INFO):
+def merge_training_sets(
+    original_csv, new_labels_csv, output_csv=None, config=None, log_level=logging.INFO
+):
     """
     Merge original training set with newly labeled samples.
 
@@ -130,7 +132,9 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None, config=No
     for item in all_data:
         label_counts[item["label"]] += 1
 
-    logger.info(f"Label distribution: {label_counts[0]} negative class, {label_counts[1]} positive class")
+    logger.info(
+        f"Label distribution: {label_counts[0]} negative class, {label_counts[1]} positive class"
+    )
 
     return output_csv
 

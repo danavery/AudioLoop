@@ -37,7 +37,9 @@ from audioloop.merge_labels import merge_training_sets
 from audioloop.training_core import run_training
 
 
-def auto_label_candidates(candidates_file, dataset_name="fsd50k", audio_dir=None, log_level=logging.INFO):
+def auto_label_candidates(
+    candidates_file, dataset_name="fsd50k", audio_dir=None, log_level=logging.INFO
+):
     """
     Automatically label candidates using ground truth data.
 
@@ -170,6 +172,7 @@ def run_automated_workflow(
         print("├─ Training model...")
         try:
             import logging
+
             final_accuracy = run_training(
                 config=config,
                 labels_file=current_training_set,
@@ -186,6 +189,7 @@ def run_automated_workflow(
         print("├─ Selecting candidates...")
         try:
             import logging
+
             predictions_file, candidates_file = run_active_learning_for_class(
                 positive_class_name=class_name,
                 model_path=current_model,
@@ -208,11 +212,12 @@ def run_automated_workflow(
             # Count candidates for clean reporting
             try:
                 import csv
+
                 with open(candidates_file) as f:
                     candidate_count = sum(1 for _ in csv.DictReader(f))
                 print(f"├─ Selecting candidates... ✓ ({candidate_count} samples)")
-            except:
-                print(f"├─ Selecting candidates... ✓")
+            except Exception:
+                print("├─ Selecting candidates... ✓")
         except Exception as e:
             print(f"├─ Selecting candidates... ❌ ({e})")
             break
@@ -221,7 +226,10 @@ def run_automated_workflow(
         if evaluation_mode and auto_label:
             print("├─ Auto-labeling...")
             labeled_count = auto_label_candidates(
-                candidates_file=candidates_file, dataset_name=config.dataset, audio_dir=audio_dir, log_level=logging.WARNING
+                candidates_file=candidates_file,
+                dataset_name=config.dataset,
+                audio_dir=audio_dir,
+                log_level=logging.WARNING,
             )
             print("├─ Auto-labeling... ✓")
         else:
@@ -237,7 +245,9 @@ def run_automated_workflow(
         print("├─ Merging labels...")
         try:
             new_training_set = merge_training_sets(
-                original_csv=current_training_set, new_labels_csv=candidates_file, log_level=logging.WARNING
+                original_csv=current_training_set,
+                new_labels_csv=candidates_file,
+                log_level=logging.WARNING,
             )
             training_sets.append(new_training_set)
             print(f"├─ Merging labels... ✓ (created {os.path.basename(new_training_set)})")
