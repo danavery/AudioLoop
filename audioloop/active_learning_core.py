@@ -1,4 +1,5 @@
 import csv
+import logging
 import os
 
 import torch
@@ -14,6 +15,9 @@ from .utils.candidate_selection import (
 )
 from .utils.data_utils import entropy, get_device, variable_length_collate_fn
 from .utils.spectrogram_dataset import SpectrogramDataset
+
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
 
 def load_training_set_filenames(training_set_csv):
@@ -84,7 +88,7 @@ def run_binary_inference(
         list: Inference results with predictions and confidences
     """
     device = get_device()
-    print(f"Using device: {device}")
+    logger.info(f"Using device: {device}")
 
     # Set default predictions_csv if not provided
     if predictions_csv is None:
@@ -99,12 +103,12 @@ def run_binary_inference(
 
     # Load all available metadata and create binary labels inline
     metadata = dataset_config.load_metadata(split="dev")
-    print(f"Found {len(metadata)} total samples in dataset")
+    logger.info(f"Found {len(metadata)} total samples in dataset")
 
     # Load training set filenames to exclude
     training_filenames = load_training_set_filenames(training_set_csv)
     if training_filenames:
-        print(f"Excluding {len(training_filenames)} files already in training set")
+        logger.info(f"Excluding {len(training_filenames)} files already in training set")
 
     # Create dataset entries directly (no intermediate file)
     dataset_entries = []
@@ -143,12 +147,12 @@ def run_binary_inference(
     # Load dataset directly from entries
     dataset = SpectrogramDataset(data=dataset_entries, specs_dir=str(config.specs_dir))
     if filtered_count > 0:
-        print(f"Filtered out {filtered_count} files already in training set")
-    print(f"Running inference on {len(dataset)} files")
+        logger.info(f"Filtered out {filtered_count} files already in training set")
+    logger.info(f"Running inference on {len(dataset)} files")
 
     # Binary classification
     num_classes = 2
-    print(
+    logger.info(
         f"Binary classification model (2 classes: {negative_class_name}/0, {positive_class_name}/1)"
     )
 
@@ -157,7 +161,7 @@ def run_binary_inference(
         raise FileNotFoundError(f"Model file not found: {model_path}")
 
     model = load_model(model_path, num_classes, device)
-    print(f"Loaded model from: {model_path}")
+    logger.info(f"Loaded model from: {model_path}")
 
     # Create data loader
     data_loader = DataLoader(
@@ -172,7 +176,7 @@ def run_binary_inference(
 
     # Run inference and collect results
     results = []
-    print("Running binary classification inference...")
+    logger.info("Running binary classification inference...")
 
     with torch.no_grad():
         for batch in tqdm(data_loader):
@@ -268,7 +272,7 @@ def run_binary_inference(
             formatted_result["prob_positive"] = f"{result['prob_positive']:.3f}"
             writer.writerow(formatted_result)
 
-    print(f"Predictions saved to: {predictions_csv}")
+    logger.info(f"Predictions saved to: {predictions_csv}")
     return results
 
 
@@ -282,6 +286,7 @@ def run_active_learning_cycle(
     dataset_file=None,
     training_set_csv=None,
     seed=None,
+    log_level=logging.INFO,
 ):
     """
     Run a complete active learning cycle for binary classification using config-driven parameters.
@@ -296,10 +301,13 @@ def run_active_learning_cycle(
         dataset_file: Path to dataset metadata CSV (auto-detected from config if None)
         training_set_csv: Path to training set CSV (uses config.get_training_set_path(run_number) if None)
         seed: Random seed for reproducibility (overrides config.seed if provided)
+        log_level: Logging level (logging.INFO for normal output, logging.WARNING for quiet)
 
     Returns:
         tuple: (predictions_file, candidates_file)
     """
+    # Set up logging for this active learning run
+    logger.setLevel(log_level)
 
     # Ensure output directories exist
     config.create_directories()
@@ -312,14 +320,14 @@ def run_active_learning_cycle(
     if training_set_csv is None:
         training_set_csv = str(config.get_training_set_path(run_number))
 
-    print(f"Using model: {model_path}")
+    logger.info(f"Using model: {model_path}")
     if os.path.exists(training_set_csv):
-        print(f"Using training set: {training_set_csv}")
+        logger.info(f"Using training set: {training_set_csv}")
     else:
-        print(f"Training set not found: {training_set_csv} (will process all files)")
+        logger.info(f"Training set not found: {training_set_csv} (will process all files)")
 
     # Step 1: Run inference on all files
-    print("\nStep 1: Running binary classification inference...")
+    logger.info("\nStep 1: Running binary classification inference...")
     predictions_file = str(config.get_predictions_path(run_number))
 
     _ = run_binary_inference(
@@ -334,7 +342,7 @@ def run_active_learning_cycle(
     )
 
     # Step 2: Select candidates for active learning
-    print("\nStep 2: Selecting candidates for human labeling...")
+    logger.info("\nStep 2: Selecting candidates for human labeling...")
     candidates_file = str(config.get_candidates_path(run_number))
 
     # Create strategy with parameters from config
@@ -359,7 +367,7 @@ def run_active_learning_cycle(
 
     strategy = create_strategy(config.selection_mode, **strategy_kwargs)
 
-    print(f"Using strategy: {strategy.get_active_strategy_name()}")
+    logger.info(f"Using strategy: {strategy.get_active_strategy_name()}")
     predictions = load_predictions(predictions_file)
     candidates = strategy.select_candidates(
         predictions=predictions,
@@ -380,11 +388,11 @@ def run_active_learning_cycle(
         min_confidence=config.min_confidence,
     )
 
-    print("\n🎯 Active Learning Cycle Complete!")
-    print("Next steps:")
-    print(f"1. Review {candidates_file}")
-    print("2. Add human labels to 'needs_human_label' column")
-    print("3. Add those labels to your training set")
-    print("4. Retrain model and repeat")
+    logger.info("\n🎯 Active Learning Cycle Complete!")
+    logger.info("Next steps:")
+    logger.info(f"1. Review {candidates_file}")
+    logger.info("2. Add human labels to 'needs_human_label' column")
+    logger.info("3. Add those labels to your training set")
+    logger.info("4. Retrain model and repeat")
 
     return predictions_file, candidates_file

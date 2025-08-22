@@ -6,10 +6,14 @@ within each predicted class. Designed for extremely imbalanced datasets where
 standard uncertainty sampling often results in all-negative selections.
 """
 
+import logging
 import random
 from typing import Any
 
 from .base import CandidateSelectionStrategy
+
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
 
 class StratifiedUncertaintyStrategy(CandidateSelectionStrategy):
@@ -56,7 +60,7 @@ class StratifiedUncertaintyStrategy(CandidateSelectionStrategy):
 
         if available_positives == 0:
             # No predicted positives - fall back to pure entropy sampling
-            print("  No predicted positives available, using pure entropy sampling")
+            logger.info("  No predicted positives available, using pure entropy sampling")
             all_preds = predictions.copy()
             all_preds.sort(key=lambda x: x["entropy"], reverse=True)
             selected = all_preds[:num_candidates]
@@ -85,10 +89,10 @@ class StratifiedUncertaintyStrategy(CandidateSelectionStrategy):
         random.shuffle(all_candidates)
 
         # Print selection summary
-        print(
+        logger.info(
             f"  Stratified selection: {len(selected_positives)} positive + {len(selected_negatives)} negative"
         )
-        print(
+        logger.info(
             f"  Available predictions: {available_positives} positive, {len(negative_preds)} negative"
         )
 

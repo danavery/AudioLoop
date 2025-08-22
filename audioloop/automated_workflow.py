@@ -23,6 +23,7 @@ Usage:
 import argparse
 import csv
 import json
+import logging
 import os
 import sys
 import time
@@ -36,7 +37,7 @@ from audioloop.merge_labels import merge_training_sets
 from audioloop.training_core import run_training
 
 
-def auto_label_candidates(candidates_file, dataset_name="fsd50k", audio_dir=None):
+def auto_label_candidates(candidates_file, dataset_name="fsd50k", audio_dir=None, log_level=logging.INFO):
     """
     Automatically label candidates using ground truth data.
 
@@ -44,18 +45,17 @@ def auto_label_candidates(candidates_file, dataset_name="fsd50k", audio_dir=None
         candidates_file: Path to candidates CSV file
         dataset_name: Dataset name (unused, kept for compatibility)
         audio_dir: Audio directory (unused, kept for compatibility)
+        log_level: Logging level (logging.INFO for normal output, logging.WARNING for quiet)
 
     Returns:
         int: Number of samples that were labeled
     """
-    print(f"📝 Auto-labeling candidates: {candidates_file}")
-
     try:
         from audioloop.utils.auto_labeling import auto_label_from_ground_truth
 
-        results = auto_label_from_ground_truth(candidates_file)
+        results = auto_label_from_ground_truth(candidates_file, log_level=log_level)
 
-        print(f"   ✅ Auto-labeled {results['total']} samples")
+        # Always show the summary (even in quiet mode)
         print(f"      Positive: {results['positive_count']}")
         print(f"      Negative: {results['negative_count']}")
 
@@ -183,10 +183,9 @@ def run_automated_workflow(
             break
 
         # Step 2: Run active learning
-        print("\n🎯 STEP 2: ACTIVE LEARNING INFERENCE")
-        print("▼" * 50)
-        print(f"   Running active learning cycle {cycle}...")
+        print("├─ Selecting candidates...")
         try:
+            import logging
             predictions_file, candidates_file = run_active_learning_for_class(
                 positive_class_name=class_name,
                 model_path=current_model,
@@ -204,20 +203,30 @@ def run_automated_workflow(
                 experiment_name=config.experiment_name,
                 seed=seed,
                 with_ground_truth=evaluation_mode,
+                log_level=logging.WARNING,  # Quiet mode
             )
-            print(f"   ✅ Generated candidates: {candidates_file}")
+            # Count candidates for clean reporting
+            try:
+                import csv
+                with open(candidates_file) as f:
+                    candidate_count = sum(1 for _ in csv.DictReader(f))
+                print(f"├─ Selecting candidates... ✓ ({candidate_count} samples)")
+            except:
+                print(f"├─ Selecting candidates... ✓")
         except Exception as e:
-            print(f"   ❌ Active learning failed: {e}")
+            print(f"├─ Selecting candidates... ❌ ({e})")
             break
 
         # Step 3: Label candidates
-        print("\n🏷️  STEP 3: LABELING CANDIDATES")
-        print("▼" * 50)
         if evaluation_mode and auto_label:
+            print("├─ Auto-labeling...")
             labeled_count = auto_label_candidates(
-                candidates_file=candidates_file, dataset_name=config.dataset, audio_dir=audio_dir
+                candidates_file=candidates_file, dataset_name=config.dataset, audio_dir=audio_dir, log_level=logging.WARNING
             )
+            print("├─ Auto-labeling... ✓")
         else:
+            print("\n🏷️  STEP 3: LABELING CANDIDATES")
+            print("▼" * 50)
             labeled_count = prompt_for_manual_labeling(candidates_file)
 
         if labeled_count == 0:
@@ -225,16 +234,15 @@ def run_automated_workflow(
             break
 
         # Step 4: Merge labels into new training set
-        print("\n📊 STEP 4: MERGING LABELS")
-        print("▼" * 50)
+        print("├─ Merging labels...")
         try:
             new_training_set = merge_training_sets(
-                original_csv=current_training_set, new_labels_csv=candidates_file
+                original_csv=current_training_set, new_labels_csv=candidates_file, log_level=logging.WARNING
             )
             training_sets.append(new_training_set)
-            print(f"   ✅ Created: {new_training_set}")
+            print(f"├─ Merging labels... ✓ (created {os.path.basename(new_training_set)})")
         except Exception as e:
-            print(f"   ❌ Label merging failed: {e}")
+            print(f"├─ Merging labels... ❌ ({e})")
             break
 
         # Show progress summary

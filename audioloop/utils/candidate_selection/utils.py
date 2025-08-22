@@ -6,8 +6,12 @@ and printing selection statistics used across all candidate selection strategies
 """
 
 import csv
+import logging
 import os
 from typing import Any
+
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
 
 def load_predictions(predictions_file: str) -> list[dict[str, Any]]:
@@ -25,7 +29,7 @@ def load_predictions(predictions_file: str) -> list[dict[str, Any]]:
 def save_candidates(candidates: list[dict[str, Any]], candidates_csv: str) -> None:
     """Save candidates to CSV file."""
     if not candidates:
-        print("No candidates to save.")
+        logger.info("No candidates to save.")
         return
 
     # Add labeling helper columns
@@ -46,7 +50,7 @@ def save_candidates(candidates: list[dict[str, Any]], candidates_csv: str) -> No
         writer.writeheader()
         writer.writerows(candidates)
 
-    print(f"Candidates saved to: {candidates_csv}")
+    logger.info(f"Candidates saved to: {candidates_csv}")
 
 
 def print_selection_statistics(
@@ -61,7 +65,7 @@ def print_selection_statistics(
     total_samples = len(all_predictions)
 
     if total_samples == 0:
-        print("No predictions available.")
+        logger.info("No predictions available.")
         return
 
     # Check if ground truth evaluation is available
@@ -116,22 +120,22 @@ def print_selection_statistics(
         expected_overall_accuracy = (positive_correct + negative_correct) / total_samples
         accuracy_mismatch = abs(overall_accuracy - expected_overall_accuracy) > 0.001
 
-        print("\nModel Performance Summary:")
-        print(f"Overall Accuracy: {overall_accuracy:.3f}")
-        print(
+        logger.info("\nModel Performance Summary:")
+        logger.info(f"Overall Accuracy: {overall_accuracy:.3f}")
+        logger.info(
             f"True {positive_class_name} Accuracy: {positive_accuracy:.3f} ({positive_correct}/{len(true_positive_samples)})"
         )
-        print(
+        logger.info(
             f"True {negative_class_name} Accuracy: {negative_accuracy:.3f} ({negative_correct}/{len(true_negative_samples)})"
         )
 
         if accuracy_mismatch:
-            print("⚠️  WARNING: Accuracy calculation mismatch detected!")
-            print(f"   Expected overall accuracy: {expected_overall_accuracy:.3f}")
-            print(f"   Calculated overall accuracy: {overall_accuracy:.3f}")
+            logger.info("⚠️  WARNING: Accuracy calculation mismatch detected!")
+            logger.info(f"   Expected overall accuracy: {expected_overall_accuracy:.3f}")
+            logger.info(f"   Calculated overall accuracy: {overall_accuracy:.3f}")
     else:
-        print("\nModel Performance Summary:")
-        print("Ground truth evaluation not available (use --evaluation-mode to enable)")
+        logger.info("\nModel Performance Summary:")
+        logger.info("Ground truth evaluation not available (use --evaluation-mode to enable)")
 
     # Overall confidence statistics
     all_confidences = [p["confidence"] for p in all_predictions]
@@ -142,21 +146,21 @@ def print_selection_statistics(
     min_conf = min(all_confidences)
     max_conf = max(all_confidences)
 
-    print(f"Overall Confidence: avg={avg_confidence:.3f}, range={min_conf:.3f}-{max_conf:.3f}")
-    print(
+    logger.info(f"Overall Confidence: avg={avg_confidence:.3f}, range={min_conf:.3f}-{max_conf:.3f}")
+    logger.info(
         f"High confidence samples (≥{min_confidence}): {high_conf_count}/{total_samples} ({high_conf_percentage:.1%})"
     )
 
     # Show current selection mode and recommendations
-    print(f"Selection strategy: {strategy_name}")
+    logger.info(f"Selection strategy: {strategy_name}")
     if has_ground_truth and overall_accuracy > 0.95 and high_conf_percentage > 0.8:
         if "confidence" in strategy_name.lower():
-            print("💡 Recommendation: Model is highly accurate and confident")
-            print("   Consider switching to entropy-based selection for uncertainty sampling")
-            print("   Current confidence-based selection may not find challenging cases")
+            logger.info("💡 Recommendation: Model is highly accurate and confident")
+            logger.info("   Consider switching to entropy-based selection for uncertainty sampling")
+            logger.info("   Current confidence-based selection may not find challenging cases")
         else:
-            print("💡 Model is highly accurate and confident")
-            print("   Using entropy-based selection should help find challenging cases")
+            logger.info("💡 Model is highly accurate and confident")
+            logger.info("   Using entropy-based selection should help find challenging cases")
 
     # Selection statistics
     positive_candidates = [
@@ -169,28 +173,28 @@ def print_selection_statistics(
     positive_preds = [p for p in all_predictions if p["predicted_class"] == positive_class_name]
     negative_preds = [p for p in all_predictions if p["predicted_class"] == negative_class_name]
 
-    print("\nActive Learning Candidate Selection:")
-    print(f"Available {positive_class_name} predictions: {len(positive_preds)}")
-    print(f"Available {negative_class_name} predictions: {len(negative_preds)}")
-    print(f"Selected {len(positive_candidates)} {positive_class_name} candidates")
-    print(f"Selected {len(negative_candidates)} {negative_class_name} candidates")
-    print(f"Total candidates for labeling: {len(selected_candidates)}")
+    logger.info("\nActive Learning Candidate Selection:")
+    logger.info(f"Available {positive_class_name} predictions: {len(positive_preds)}")
+    logger.info(f"Available {negative_class_name} predictions: {len(negative_preds)}")
+    logger.info(f"Selected {len(positive_candidates)} {positive_class_name} candidates")
+    logger.info(f"Selected {len(negative_candidates)} {negative_class_name} candidates")
+    logger.info(f"Total candidates for labeling: {len(selected_candidates)}")
 
     # Print candidate summaries
     if positive_candidates:
         conf_values = [p["confidence"] for p in positive_candidates]
-        print(
+        logger.info(
             f"{positive_class_name} confidence range: {min(conf_values):.3f} - {max(conf_values):.3f}"
         )
-        print(
+        logger.info(
             f"  First 3 {positive_class_name} samples: {[p['filename'] for p in positive_candidates[:3]]}"
         )
     if negative_candidates:
         conf_values = [p["confidence"] for p in negative_candidates]
-        print(
+        logger.info(
             f"{negative_class_name} confidence range: {min(conf_values):.3f} - {max(conf_values):.3f}"
         )
-        print(
+        logger.info(
             f"  First 3 {negative_class_name} samples: {[p['filename'] for p in negative_candidates[:3]]}"
         )
 

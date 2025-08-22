@@ -96,14 +96,6 @@ def run_training(
     """
     # Set up logging for this training run
     logger.setLevel(log_level)
-    
-    # Create a console handler if none exists (for standalone usage)
-    if not logger.handlers:
-        handler = logging.StreamHandler()
-        formatter = logging.Formatter('%(message)s')  # Simple format
-        handler.setFormatter(formatter)
-        logger.addHandler(handler)
-        logger.propagate = False  # Don't propagate to root logger
 
     device = get_device()
     logger.info(f"Using device: {device}")

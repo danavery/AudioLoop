@@ -1,12 +1,16 @@
 import argparse
 import csv
+import logging
 import os
 
 from .config import AudioLoopConfig
 from .utils.paths import extract_version_from_filename
 
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
-def merge_training_sets(original_csv, new_labels_csv, output_csv=None, config=None):
+
+def merge_training_sets(original_csv, new_labels_csv, output_csv=None, config=None, log_level=logging.INFO):
     """
     Merge original training set with newly labeled samples.
 
@@ -15,10 +19,13 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None, config=No
         new_labels_csv: Path to newly labeled samples (candidates CSV with human labels)
         output_csv: Path for merged training set (auto-generated if None)
         config: AudioLoopConfig instance (auto-created if None)
+        log_level: Logging level (logging.INFO for normal output, logging.WARNING for quiet)
 
     Returns:
         str: Path to the created output file
     """
+    # Set up logging for this merge run
+    logger.setLevel(log_level)
     # Auto-generate output filename if not provided
     if output_csv is None:
         if config is None:
@@ -57,9 +64,9 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None, config=No
                             "label": int(row[1]),
                         }
                     )
-        print(f"Loaded {len(all_data)} samples from {original_csv}")
+        logger.info(f"Loaded {len(all_data)} samples from {original_csv}")
     else:
-        print(f"Warning: {original_csv} not found, starting fresh")
+        logger.warning(f"Warning: {original_csv} not found, starting fresh")
 
     # Read new labels from candidates CSV format
     new_count = 0
@@ -71,10 +78,10 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None, config=No
         for row in reader:
             # Handle candidates CSV format (with needs_human_label column)
             if "needs_human_label" not in row or "filename" not in row:
-                print(
+                logger.error(
                     "Error: Expected candidates CSV format with 'needs_human_label' and 'filename' columns"
                 )
-                print(f"Found columns: {list(row.keys())}")
+                logger.error(f"Found columns: {list(row.keys())}")
                 continue
 
             filename = os.path.basename(row["filename"]) if row["filename"] else ""
@@ -86,7 +93,7 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None, config=No
             try:
                 label_int = int(label)
                 if label_int not in [0, 1]:
-                    print(f"Warning: Invalid label '{label}' for {filename}, skipping")
+                    logger.warning(f"Warning: Invalid label '{label}' for {filename}, skipping")
                     continue
 
                 all_data.append({"filename": filename, "label": label_int})
@@ -96,10 +103,10 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None, config=No
                 else:
                     new_negative += 1
             except ValueError:
-                print(f"Warning: Invalid label '{label}' for {filename}, skipping")
+                logger.warning(f"Warning: Invalid label '{label}' for {filename}, skipping")
                 continue
 
-    print(
+    logger.info(
         f"Added {new_count} new labeled samples ({new_positive} positive, {new_negative} negative)"
     )
 
@@ -113,8 +120,8 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None, config=No
         writer.writeheader()
         writer.writerows(all_data)
 
-    print(f"Created merged training set: {output_csv}")
-    print(
+    logger.info(f"Created merged training set: {output_csv}")
+    logger.info(
         f"Total samples: {len(all_data)} (original: {len(all_data) - new_count}, new: {new_count})"
     )
 
@@ -123,7 +130,7 @@ def merge_training_sets(original_csv, new_labels_csv, output_csv=None, config=No
     for item in all_data:
         label_counts[item["label"]] += 1
 
-    print(f"Label distribution: {label_counts[0]} negative class, {label_counts[1]} positive class")
+    logger.info(f"Label distribution: {label_counts[0]} negative class, {label_counts[1]} positive class")
 
     return output_csv
 

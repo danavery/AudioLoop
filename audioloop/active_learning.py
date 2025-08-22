@@ -1,4 +1,5 @@
 import argparse
+import logging
 import os
 import re
 
@@ -26,6 +27,7 @@ def run_active_learning_for_class(
     experiment_name=None,
     seed=None,
     with_ground_truth=False,
+    log_level=logging.INFO,
     **dataset_kwargs,
 ):
     """
@@ -103,6 +105,7 @@ def run_active_learning_for_class(
         dataset_file=dataset_file,
         training_set_csv=training_set_csv,
         seed=seed,
+        log_level=log_level,
     )
 
 

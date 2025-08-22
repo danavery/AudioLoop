@@ -10,10 +10,14 @@ not for production workflows with unlabeled data.
 """
 
 import csv
+import logging
 from pathlib import Path
 
+# Set up logger for this module
+logger = logging.getLogger(__name__)
 
-def auto_label_from_ground_truth(candidates_csv: str) -> dict[str, int]:
+
+def auto_label_from_ground_truth(candidates_csv: str, log_level=logging.INFO) -> dict[str, int]:
     """
     Automatically label candidates using ground truth data.
 
@@ -22,6 +26,7 @@ def auto_label_from_ground_truth(candidates_csv: str) -> dict[str, int]:
 
     Args:
         candidates_csv: Path to candidates CSV with 'ground_truth' column
+        log_level: Logging level (logging.INFO for normal output, logging.WARNING for quiet)
 
     Returns:
         dict: Statistics with keys 'positive_count', 'negative_count', 'total'
@@ -30,6 +35,9 @@ def auto_label_from_ground_truth(candidates_csv: str) -> dict[str, int]:
         FileNotFoundError: If candidates CSV file doesn't exist
         ValueError: If no ground truth data available or invalid format
     """
+    # Set up logging for this auto-labeling run
+    logger.setLevel(log_level)
+    
     candidates_path = Path(candidates_csv)
 
     if not candidates_path.exists():
@@ -66,7 +74,7 @@ def auto_label_from_ground_truth(candidates_csv: str) -> dict[str, int]:
     negative_count = 0
 
     # Apply ground truth labels
-    print(f"Auto-labeling {len(candidates)} candidates using ground truth...")
+    logger.info(f"Auto-labeling {len(candidates)} candidates using ground truth...")
 
     for i, candidate in enumerate(candidates):
         ground_truth = candidate.get("ground_truth", "")
@@ -81,7 +89,7 @@ def auto_label_from_ground_truth(candidates_csv: str) -> dict[str, int]:
 
         # Show progress for large files
         if (i + 1) % 100 == 0 or i == len(candidates) - 1:
-            print(f"Processed {i + 1}/{len(candidates)} samples...")
+            logger.info(f"Processed {i + 1}/{len(candidates)} samples...")
 
     # Save results back to file
     try:
@@ -98,11 +106,11 @@ def auto_label_from_ground_truth(candidates_csv: str) -> dict[str, int]:
         "total": len(candidates),
     }
 
-    print("Auto-labeling complete:")
-    print(f"  Positive samples: {positive_count}")
-    print(f"  Negative samples: {negative_count}")
-    print(f"  Total samples: {len(candidates)}")
-    print(f"  Results saved to: {candidates_csv}")
+    logger.info("Auto-labeling complete:")
+    logger.info(f"  Positive samples: {positive_count}")
+    logger.info(f"  Negative samples: {negative_count}")
+    logger.info(f"  Total samples: {len(candidates)}")
+    logger.info(f"  Results saved to: {candidates_csv}")
 
     return results
 
