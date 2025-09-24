@@ -112,8 +112,12 @@ The generated binary labels are compatible with existing AudioLoop scripts:
 # 1. Create binary labels
 python fsd50k_example.py --class Guitar --output outputs/fsd50k_guitar.csv
 
-# 2. Generate spectrograms for FSD50K
+# 2. Generate spectrograms for FSD50K (uses default 'dev' split)
 python -m audioloop.create_all_specs --dataset fsd50k
+
+# Or specify split explicitly
+python -m audioloop.create_all_specs --dataset fsd50k --split dev   # Development set
+python -m audioloop.create_all_specs --dataset fsd50k --split eval  # Evaluation set
 
 # 3. Train model (modify train.py to use FSD50K processor)
 python -m audioloop.train outputs/fsd50k_guitar.csv
@@ -144,6 +148,38 @@ Fields:
 - `original_labels`: Original multi-label classes (comma-separated)
 - `strategy`: Binary classification strategy used
 - `split`: Original split (train/val from dev.csv)
+
+## Dataset Splits
+
+FSD50K provides two splits with clear separation for evaluation:
+
+```bash
+# Check available splits
+python -m audioloop.utils.create_bootstrap_set --dataset fsd50k --list-splits
+
+# Output:
+# Available splits for fsd50k:
+#   dev (default)
+#   eval
+# Usage: --split dev (or any split from the list above)
+```
+
+**Split Details:**
+- **`dev`** (default): ~40,000 samples for development and training
+- **`eval`**: ~10,000 samples held out for final evaluation
+
+**Usage Examples:**
+```bash
+# Create training set from dev split (default)
+python -m audioloop.utils.create_bootstrap_set --dataset fsd50k --class-name Piano --n 100
+
+# Create training set from eval split (for final testing)
+python -m audioloop.utils.create_bootstrap_set --dataset fsd50k --split eval --class-name Piano --n 50
+
+# Generate spectrograms for both splits
+python -m audioloop.create_all_specs --dataset fsd50k --split dev
+python -m audioloop.create_all_specs --dataset fsd50k --split eval
+```
 
 ## Data Statistics
 
@@ -191,7 +227,7 @@ python -m audioloop.create_all_specs
 python -m audioloop.create_all_specs --dataset urbansound8k
 
 # Process FSD50K eval split
-python -m audioloop.create_all_specs --split eval
+python -m audioloop.create_all_specs --dataset fsd50k --split eval
 
 # Process without clearing existing spectrograms
 python -m audioloop.create_all_specs --no-clear

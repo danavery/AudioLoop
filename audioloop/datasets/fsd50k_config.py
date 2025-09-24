@@ -211,7 +211,16 @@ class FSD50KConfig(DatasetConfig):
 
     # === Metadata and File Management ===
 
-    def load_metadata(self, split: str = "dev") -> list[dict]:
+    # === Split Management ===
+    def get_available_splits(self) -> list[str]:
+        """Return list of valid split names for FSD50K dataset."""
+        return ["dev", "eval"]
+
+    def get_default_split(self) -> str:
+        """Return the default split name for FSD50K dataset."""
+        return "dev"
+
+    def _load_metadata_for_split(self, split: str) -> list[dict]:
         """Load metadata for specified split."""
         csv_path = self.dev_csv if split == "dev" else self.eval_csv
 

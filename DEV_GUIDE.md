@@ -319,6 +319,7 @@ cp audioloop/datasets/templates/simple_audio_template.py audioloop/datasets/my_d
 
 # 3. Use immediately
 python -m audioloop.utils.create_bootstrap_set --dataset my_dataset --list-classes
+python -m audioloop.utils.create_bootstrap_set --dataset my_dataset --list-splits
 ```
 
 Your CSV format:

@@ -77,7 +77,43 @@ python -m audioloop.utils.create_bootstrap_set --list-classes              # Lis
 # Explicit parameter takes precedence over environment variable
 export AUDIOLOOP_DATASET=urbansound8k
 python -m audioloop.utils.create_bootstrap_set --dataset fsd50k --class-name Drill  # Uses fsd50k
+```
 
+### Understanding Dataset Splits
+
+Different datasets organize their data differently. AudioLoop now provides a unified interface to work with each dataset's natural split organization:
+
+```bash
+# Discover available splits for any dataset
+python -m audioloop.utils.create_bootstrap_set --dataset fsd50k --list-splits
+python -m audioloop.utils.create_bootstrap_set --dataset urbansound8k --list-splits
+
+# FSD50K has train/eval splits
+python -m audioloop.utils.create_bootstrap_set --dataset fsd50k --list-splits
+# Output:
+# Available splits for fsd50k:
+#   dev (default)
+#   eval
+# Usage: --split dev (or any split from the list above)
+
+# UrbanSound8K treats all data as one split (designed for cross-validation)
+python -m audioloop.utils.create_bootstrap_set --dataset urbansound8k --list-splits
+# Output:
+# Available splits for urbansound8k:
+#   all (default)
+# Usage: --split all (or any split from the list above)
+
+# Use specific splits when creating training sets
+python -m audioloop.utils.create_bootstrap_set --dataset fsd50k --split eval --class-name Piano --n 100
+```
+
+**Key Points:**
+- Each dataset defines its own valid split names
+- Use `--list-splits` to discover what splits are available
+- If no `--split` is provided, the dataset's default split is used
+- Invalid split names will show clear error messages with valid options
+
+```bash
 # Create with custom parameters
 python -m audioloop.utils.create_bootstrap_set --class-name Speech --n 60 --positive-pct 0.8 --output training_sets/training_set_v2.csv
 
@@ -110,7 +146,8 @@ python -m audioloop.utils.create_bootstrap_set --class-name siren --n 40 --exper
 --metadata-csv METADATA_CSV    # Custom metadata CSV path
 --audio-root AUDIO_ROOT        # Custom audio directory path
 --output-dir OUTPUT_DIR        # Custom spectrogram output directory
---split {dev,eval}             # FSD50K dataset split (default: dev)
+--split {dev,eval}             # Dataset split (varies by dataset, use --list-splits to see options)
+--list-splits                   # Show available splits for the selected dataset
 ```
 
 ## Training Models

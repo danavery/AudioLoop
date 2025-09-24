@@ -15,6 +15,7 @@ This template provides a complete DatasetConfig implementation with:
 - Spectrogram preprocessing pipeline
 - Binary classification support
 - Automatic file extension detection
+- Dataset split interface (single "all" split for simple datasets)
 
 Supported CSV formats:
     filename,label
@@ -115,12 +116,21 @@ class TemplateAudioConfig(DatasetConfig):
         """Mapping from class IDs to class names."""
         return self._class_vocabulary.copy()
 
-    def load_metadata(self, split: str = "dev") -> list[dict[str, Any]]:
+    # === Split Management ===
+    def get_available_splits(self) -> list[str]:
+        """Return list of valid split names for simple dataset."""
+        return ["all"]
+
+    def get_default_split(self) -> str:
+        """Return the default split name for simple dataset."""
+        return "all"
+
+    def _load_metadata_for_split(self, split: str) -> list[dict[str, Any]]:
         """
         Load metadata entries from the CSV file.
 
         Args:
-            split: Ignored for simple datasets (no train/dev/test splits)
+            split: Always "all" for simple datasets (no train/dev/test splits)
 
         Returns:
             List of metadata dictionaries

@@ -227,6 +227,27 @@ def list_available_classes(dataset_name: str, **kwargs) -> None:
             pass
 
 
+def list_available_splits(dataset_name: str, **kwargs) -> None:
+    """List all available splits for a dataset.
+
+    Args:
+        dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
+        **kwargs: Additional dataset-specific parameters
+    """
+    config = AudioLoopConfig(dataset=dataset_name)
+    dataset_config = config.get_dataset_config()
+
+    splits = dataset_config.get_available_splits()
+    default = dataset_config.get_default_split()
+
+    print(f"Available splits for {dataset_name}:")
+    for split in splits:
+        marker = " (default)" if split == default else ""
+        print(f"  {split}{marker}")
+
+    print(f"\nUsage: --split {splits[0]} (or any split from the list above)")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Create initial training sets for any supported dataset",
@@ -300,6 +321,9 @@ Examples:
         "--list-classes", action="store_true", help="List all available classes for the dataset"
     )
     parser.add_argument(
+        "--list-splits", action="store_true", help="List all available splits for the dataset"
+    )
+    parser.add_argument(
         "--show-distribution",
         action="store_true",
         help="Show positive/negative distribution for the specified class",
@@ -335,6 +359,8 @@ Examples:
 
     if args.list_classes:
         list_available_classes(dataset_name, **dataset_kwargs)
+    elif args.list_splits:
+        list_available_splits(dataset_name, **dataset_kwargs)
     elif args.show_distribution:
         try:
             show_class_distribution(dataset_name, args.class_name, **dataset_kwargs)

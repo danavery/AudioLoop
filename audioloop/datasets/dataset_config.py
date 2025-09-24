@@ -46,13 +46,57 @@ class DatasetConfig(ABC):
         """Print available classes for this dataset."""
         pass
 
-    # === Metadata and File Management ===
+    # === Split Management ===
     @abstractmethod
-    def load_metadata(self, split: str = "dev") -> list[dict[str, Any]]:
+    def get_available_splits(self) -> list[str]:
+        """Return list of valid split names for this dataset.
+
+        Returns:
+            List of split names that can be passed to load_metadata()
+        """
+        pass
+
+    @abstractmethod
+    def get_default_split(self) -> str:
+        """Return the default split name for this dataset.
+
+        Returns:
+            Default split name used when load_metadata() called without arguments
+        """
+        pass
+
+    # === Metadata and File Management ===
+    def load_metadata(self, split: str | None = None) -> list[dict[str, Any]]:
         """Load metadata entries for the specified split.
 
         Args:
-            split: Dataset split to load ('dev', 'eval', etc.)
+            split: Dataset split to load (use get_available_splits() to see options)
+                   If None, uses get_default_split()
+
+        Returns:
+            List of metadata dictionaries
+
+        Raises:
+            ValueError: If split is not in get_available_splits()
+        """
+        if split is None:
+            split = self.get_default_split()
+
+        available = self.get_available_splits()
+        if split not in available:
+            raise ValueError(
+                f"Split '{split}' not available for {self.__class__.__name__}. "
+                f"Valid splits: {available}"
+            )
+
+        return self._load_metadata_for_split(split)
+
+    @abstractmethod
+    def _load_metadata_for_split(self, split: str) -> list[dict[str, Any]]:
+        """Internal method to load metadata for a validated split.
+
+        Args:
+            split: Validated split name from get_available_splits()
 
         Returns:
             List of metadata dictionaries

@@ -175,7 +175,7 @@ def create_specs(config, dataset_config, clear_output=True, limit=None) -> tuple
 
     # Load metadata
     logger.info(f"Loading {dataset_config.__class__.__name__} metadata...")
-    audio_files = dataset_config.load_metadata(split="dev")
+    audio_files = dataset_config.load_metadata()
 
     # Apply limit if specified
     if limit is not None:
@@ -244,7 +244,7 @@ def create_inference_csv(config, dataset_config) -> Path:
         Path to created inference CSV
     """
     # Load metadata
-    audio_files = dataset_config.load_metadata(split="dev")
+    audio_files = dataset_config.load_metadata()
 
     # Prepare data for CSV - use labels arrays consistently
     files_data = []

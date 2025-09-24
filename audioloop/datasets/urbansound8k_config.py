@@ -152,7 +152,16 @@ class UrbanSound8KConfig(DatasetConfig):
 
     # === Metadata and File Management ===
 
-    def load_metadata(self, split: str = "dev") -> list[dict]:
+    # === Split Management ===
+    def get_available_splits(self) -> list[str]:
+        """Return list of valid split names for UrbanSound8K dataset."""
+        return ["all"]
+
+    def get_default_split(self) -> str:
+        """Return the default split name for UrbanSound8K dataset."""
+        return "all"
+
+    def _load_metadata_for_split(self, split: str) -> list[dict]:
         """Load all metadata for the UrbanSound8K dataset."""
         if not self.metadata_csv.exists():
             raise FileNotFoundError(f"Metadata CSV not found: {self.metadata_csv}")

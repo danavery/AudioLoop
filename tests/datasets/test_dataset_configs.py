@@ -51,7 +51,13 @@ class TestDatasetConfigInterface:
             def vocabulary(self) -> dict[int, str]:
                 return {0: "test"}
 
-            def load_metadata(self, split="dev"):
+            def get_available_splits(self) -> list[str]:
+                return ["test"]
+
+            def get_default_split(self) -> str:
+                return "test"
+
+            def _load_metadata_for_split(self, split: str):
                 return []
 
             def list_classes(self):
@@ -99,15 +105,91 @@ class TestDatasetConfigInterface:
 
         # Test required methods exist and are callable
         assert hasattr(config, "load_metadata")
+        assert hasattr(config, "get_available_splits")
+        assert hasattr(config, "get_default_split")
         assert hasattr(config, "get_audio_path")
         assert hasattr(config, "fix_spectrogram_length")
         assert hasattr(config, "process_single_file")
         assert hasattr(config, "get_output_shape")
         assert callable(config.load_metadata)
+        assert callable(config.get_available_splits)
+        assert callable(config.get_default_split)
         assert callable(config.get_audio_path)
         assert callable(config.fix_spectrogram_length)
         assert callable(config.process_single_file)
         assert callable(config.get_output_shape)
+
+
+class TestDatasetSplitInterface:
+    """Test the new split validation interface."""
+
+    @pytest.mark.parametrize("config_class,expected_splits", [
+        (FSD50KConfig, ["dev", "eval"]),
+        (UrbanSound8KConfig, ["all"]),
+    ])
+    def test_get_available_splits(self, config_class, expected_splits):
+        """Test that datasets return correct available splits."""
+        config = config_class()
+        splits = config.get_available_splits()
+        assert splits == expected_splits
+
+    @pytest.mark.parametrize("config_class,expected_default", [
+        (FSD50KConfig, "dev"),
+        (UrbanSound8KConfig, "all"),
+    ])
+    def test_get_default_split(self, config_class, expected_default):
+        """Test that datasets return correct default splits."""
+        config = config_class()
+        default = config.get_default_split()
+        assert default == expected_default
+
+    def test_load_metadata_with_default_split(self):
+        """Test that load_metadata() with no args uses default split."""
+        config = FSD50KConfig()
+
+        # Mock file system to avoid needing actual files
+        with patch.object(config, '_load_metadata_for_split', return_value=[{"test": "data"}]) as mock_load:
+            result = config.load_metadata()
+            mock_load.assert_called_once_with("dev")  # Should use default
+            assert result == [{"test": "data"}]
+
+    def test_load_metadata_with_explicit_valid_split(self):
+        """Test that load_metadata() with valid split works."""
+        config = FSD50KConfig()
+
+        with patch.object(config, '_load_metadata_for_split', return_value=[{"eval": "data"}]) as mock_load:
+            result = config.load_metadata(split="eval")
+            mock_load.assert_called_once_with("eval")
+            assert result == [{"eval": "data"}]
+
+    def test_load_metadata_with_invalid_split_raises_error(self):
+        """Test that load_metadata() with invalid split raises clear error."""
+        config = FSD50KConfig()
+
+        with pytest.raises(ValueError, match="Split 'invalid' not available for FSD50KConfig"):
+            config.load_metadata(split="invalid")
+
+    def test_urbansound8k_rejects_dev_split(self):
+        """Test that UrbanSound8K correctly rejects 'dev' split."""
+        config = UrbanSound8KConfig()
+
+        with pytest.raises(ValueError, match="Split 'dev' not available for UrbanSound8KConfig"):
+            config.load_metadata(split="dev")
+
+    def test_error_message_shows_valid_splits(self):
+        """Test that error message includes list of valid splits."""
+        config = UrbanSound8KConfig()
+
+        with pytest.raises(ValueError, match=r"Valid splits: \['all'\]"):
+            config.load_metadata(split="nonexistent")
+
+    def test_default_split_is_in_available_splits(self):
+        """Test that default split is always in available splits list."""
+        for config_class in [FSD50KConfig, UrbanSound8KConfig]:
+            config = config_class()
+            default = config.get_default_split()
+            available = config.get_available_splits()
+            assert default in available, f"{config_class.__name__} default '{default}' not in available {available}"
 
 
 class TestDatasetConfigBehavior:

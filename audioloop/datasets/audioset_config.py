@@ -105,11 +105,17 @@ class AudiosetConfig(DatasetConfig):
 
     # === Metadata and File Management ===
 
-    def load_metadata(self, split: str = "dev") -> list[dict]:
+    # === Split Management ===
+    def get_available_splits(self) -> list[str]:
+        """Return list of valid split names for AudioSet dataset."""
+        return ["balanced_train", "unbalanced_train", "eval"]
+
+    def get_default_split(self) -> str:
+        """Return the default split name for AudioSet dataset."""
+        return "balanced_train"
+
+    def _load_metadata_for_split(self, split: str) -> list[dict]:
         """Load metadata for specified split."""
-        # Map standard split names to AudioSet split names
-        if split == "dev":
-            split = "balanced_train"
         if split == "balanced_train":
             csv_path = self._dataset_csv
             self._current_split = "unbal_train"  # Subset files are from unbalanced dataset
@@ -120,6 +126,7 @@ class AudiosetConfig(DatasetConfig):
             csv_path = self.unbalanced_csv
             self._current_split = "unbal_train"
         else:
+            # This shouldn't happen due to validation in base class, but keep for safety
             raise ValueError(
                 f"Unknown split: {split}. Use 'balanced_train', 'eval', or 'unbalanced_train'"
             )
