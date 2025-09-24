@@ -29,6 +29,9 @@ webui = [
 [tool.ruff]
 line-length = 100
 
+[tool.basedpyright]
+typeCheckingMode = "standard"
+
 [tool.ruff.lint]
 # extend-select = ["I", "B", "SIM", "RET"]
 extend-select = ["I", "B", "SIM", "RET", "UP", "C4", "F", "RUF", "TID", "E"]
