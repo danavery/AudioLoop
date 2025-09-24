@@ -6,6 +6,7 @@ used in the AudioLoop active learning framework, including the simplified
 BasicTransitionStrategy design.
 """
 
+import logging
 from unittest.mock import Mock, patch
 
 import pytest
@@ -886,15 +887,16 @@ def test_save_candidates(tmp_path):
     assert "file2.pt,0,negative,0.85,," in content
 
 
-def test_save_candidates_empty_list(tmp_path, capsys):
+def test_save_candidates_empty_list(tmp_path, caplog):
     """Test save_candidates with empty candidates list."""
     output_file = tmp_path / "empty_candidates.csv"
-    save_candidates([], str(output_file))
 
-    # Should not create file and should print message
+    with caplog.at_level(logging.INFO):
+        save_candidates([], str(output_file))
+
+    # Should not create file and should log message
     assert not output_file.exists()
-    captured = capsys.readouterr()
-    assert "No candidates to save" in captured.out
+    assert "No candidates to save" in caplog.text
 
 
 def test_save_candidates_creates_directory(tmp_path):
