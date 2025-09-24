@@ -102,7 +102,7 @@ def run_binary_inference(
         dataset_file = str(dataset_config.dataset_csv)
 
     # Load all available metadata and create binary labels inline
-    metadata = dataset_config.load_metadata(split="dev")
+    metadata = dataset_config.load_metadata()
     logger.info(f"Found {len(metadata)} total samples in dataset")
 
     # Load training set filenames to exclude

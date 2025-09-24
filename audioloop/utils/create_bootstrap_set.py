@@ -22,8 +22,8 @@ def get_matching_samples(
     config = AudioLoopConfig(dataset=dataset_name)
     dataset_config = config.get_dataset_config()
 
-    # Get split parameter (FSD50K uses it, UrbanSound8K ignores it)
-    split = kwargs.get("split", "dev")
+    # Get split parameter or use dataset's default
+    split = kwargs.get("split")
     metadata = dataset_config.load_metadata(split=split)
 
     # Get positive class ID if we have a class name
@@ -311,9 +311,8 @@ Examples:
     parser.add_argument("--output-dir", help="Path to spectrogram output directory")
     parser.add_argument(
         "--split",
-        default="dev",
-        choices=["dev", "eval"],
-        help="Dataset split for FSD50K (default: dev)",
+        default=None,
+        help="Dataset split to use (varies by dataset, use --list-splits to see options)",
     )
 
     # Utility options
