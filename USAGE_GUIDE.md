@@ -46,18 +46,18 @@ AudioLoop automatically organizes files by experiment:
 ### Generate Spectrograms (One-time Setup)
 ```bash
 # Generate spectrograms for FSD50K dataset (default)
-python -m audioloop.create_all_specs
+python -m audioloop.create_specs
 
 # Generate spectrograms for UrbanSound8K dataset
-python -m audioloop.create_all_specs --dataset urbansound8k
+python -m audioloop.create_specs --dataset urbansound8k
 
 # With environment variable set (fallback when no explicit --dataset)
 export AUDIOLOOP_DATASET=urbansound8k
-python -m audioloop.create_all_specs  # Uses environment variable
+python -m audioloop.create_specs  # Uses environment variable
 
 # Explicit parameter overrides environment variable
 export AUDIOLOOP_DATASET=urbansound8k
-python -m audioloop.create_all_specs --dataset fsd50k  # Uses fsd50k despite env var
+python -m audioloop.create_specs --dataset fsd50k  # Uses fsd50k despite env var
 ```
 
 ### Creating Initial Training Sets
@@ -609,7 +609,7 @@ print(f"Created: {new_training_set}")
 
 **Spectrograms not found:**
 ```bash
-python -m audioloop.create_all_specs  # Regenerate spectrograms
+python -m audioloop.create_specs  # Regenerate spectrograms
 ```
 
 **No training set exists:**
@@ -665,7 +665,7 @@ echo $AUDIOLOOP_DATASET                # Check current setting
 ### Essential Commands
 ```bash
 # Setup
-python -m audioloop.create_all_specs
+python -m audioloop.create_specs
 python -m audioloop.utils.create_bootstrap_set --class-name siren --n 40
 
 # Manual workflow

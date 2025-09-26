@@ -9,7 +9,7 @@ AudioLoop is an active learning framework for binary audio classification that m
 uv sync
 
 # Generate spectrograms (one-time setup)
-python -m audioloop.create_all_specs
+python -m audioloop.create_specs
 
 # Create initial training set
 python -m audioloop.utils.create_bootstrap_set --class-name Drill --n 50
@@ -127,7 +127,7 @@ For detailed usage instructions, see **[USAGE_GUIDE.md](USAGE_GUIDE.md)**.
 
 2. **Prepare Data**:
    - Download UrbanSound8K or FSD50K dataset
-   - Generate spectrograms: `python -m audioloop.create_all_specs`
+   - Generate spectrograms: `python -m audioloop.create_specs`
 
 3. **Run Example**:
    ```bash

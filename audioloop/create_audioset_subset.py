@@ -97,7 +97,7 @@ def create_subset(class_name: str, total_samples: int, positive_ratio: float = 0
         f"Saved {len(subset):,} samples ({len(selected_pos)} pos, {len(selected_neg)} neg) to {output_path}"
     )
     print(
-        f"Next: python -m audioloop.create_all_specs --dataset audioset --metadata-file {output_path}"
+        f"Next: python -m audioloop.create_specs --dataset audioset --metadata-file {output_path}"
     )
 
 

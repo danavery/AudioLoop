@@ -74,7 +74,7 @@ AudioLoop supports two fundamental workflow modes designed for different use cas
 **Example Flow**:
 ```bash
 # One-time setup
-python -m audioloop.create_all_specs
+python -m audioloop.create_specs
 python -m audioloop.utils.create_bootstrap_set --class-name siren --n 40 --experiment prod_siren
 
 # Iterative cycles (manual workflow for control)

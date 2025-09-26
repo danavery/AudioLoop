@@ -309,7 +309,7 @@ Examples:
   python -m audioloop.automated_workflow --class-name Speech --cycles 2 --selection-mode entropy
 
 Prerequisites:
-  1. Run: python -m audioloop.create_all_specs  (one-time setup)
+  1. Run: python -m audioloop.create_specs  (one-time setup)
   2. Run: python -m audioloop.utils.create_bootstrap_set --class-name <CLASS_NAME> --n 50
         """,
     )
@@ -525,7 +525,7 @@ Prerequisites:
     # Check prerequisites
     if not os.path.exists("data/all_specs"):
         print("❌ Spectrograms not found!")
-        print("💡 Run this first: python -m audioloop.create_all_specs")
+        print("💡 Run this first: python -m audioloop.create_specs")
         return 1
 
     # Run the workflow

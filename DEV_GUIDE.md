@@ -67,7 +67,7 @@ AudioLoop uses a pluggable strategy pattern for candidate selection:
 - **`training_core.py`**: Core training logic with automatic versioning and pluggable stopping criteria
 - **`label_audio.py`**: Terminal-based audio labeling interface with multi-dataset support
 - **`merge_labels.py`**: Combines human labels with training sets
-- **`create_all_specs.py`**: Preprocesses audio into spectrograms
+- **`create_specs.py`**: Preprocesses audio into spectrograms
 - **`track_metrics.py`**: Comprehensive metrics tracking and visualization (accuracy, F1, precision, recall, confidence, entropy) across active learning cycles
 - **`config.py`**: Unified configuration system coordinating paths, datasets, and experiments
 - **`utils/create_bootstrap_set.py`**: Bootstrap training set creation from ground truth (evaluation mode only)
@@ -205,7 +205,7 @@ Customize paths and behavior via environment variables:
 ## Data Flow
 
 ### Production Mode (Default)
-1. **Preprocessing**: Raw audio → spectrograms via `create_all_specs.py`
+1. **Preprocessing**: Raw audio → spectrograms via `create_specs.py`
 2. **Initial Training Set**: User-provided labeled dataset
 3. **Model Training**: Small labeled set → CNN model via `train.py`
 4. **Active Learning**: Model predictions on ALL files → candidate selection via `active_learning.py`
@@ -215,7 +215,7 @@ Customize paths and behavior via environment variables:
 8. **Iteration**: Repeat training with expanded data
 
 ### Evaluation Mode (Research/Testing)
-1. **Preprocessing**: Raw audio → spectrograms via `create_all_specs.py` 
+1. **Preprocessing**: Raw audio → spectrograms via `create_specs.py` 
 2. **Bootstrap Training Set**: Sample from ground truth via `utils/create_bootstrap_set.py`
 3. **Model Training**: Small labeled set → CNN model via `train.py`
 4. **Active Learning**: Model predictions with ground truth → candidate selection via `active_learning.py --with-ground-truth`

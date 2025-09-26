@@ -113,11 +113,11 @@ The generated binary labels are compatible with existing AudioLoop scripts:
 python fsd50k_example.py --class Guitar --output outputs/fsd50k_guitar.csv
 
 # 2. Generate spectrograms for FSD50K (uses default 'dev' split)
-python -m audioloop.create_all_specs --dataset fsd50k
+python -m audioloop.create_specs --dataset fsd50k
 
 # Or specify split explicitly
-python -m audioloop.create_all_specs --dataset fsd50k --split dev   # Development set
-python -m audioloop.create_all_specs --dataset fsd50k --split eval  # Evaluation set
+python -m audioloop.create_specs --dataset fsd50k --split dev   # Development set
+python -m audioloop.create_specs --dataset fsd50k --split eval  # Evaluation set
 
 # 3. Train model (modify train.py to use FSD50K processor)
 python -m audioloop.train outputs/fsd50k_guitar.csv
@@ -177,8 +177,8 @@ python -m audioloop.utils.create_bootstrap_set --dataset fsd50k --class-name Pia
 python -m audioloop.utils.create_bootstrap_set --dataset fsd50k --split eval --class-name Piano --n 50
 
 # Generate spectrograms for both splits
-python -m audioloop.create_all_specs --dataset fsd50k --split dev
-python -m audioloop.create_all_specs --dataset fsd50k --split eval
+python -m audioloop.create_specs --dataset fsd50k --split dev
+python -m audioloop.create_specs --dataset fsd50k --split eval
 ```
 
 ## Data Statistics
@@ -217,20 +217,20 @@ else:
 Update `active_learning.py` to handle FSD50K class names and binary strategies.
 
 ### 3. Spectrogram Generation
-Use the updated `create_all_specs.py` script which now supports both datasets:
+Use the updated `create_specs.py` script which now supports both datasets:
 
 ```bash
 # Process FSD50K dataset (default, clears directory first)
-python -m audioloop.create_all_specs
+python -m audioloop.create_specs
 
 # Process UrbanSound8K dataset (clears directory first)
-python -m audioloop.create_all_specs --dataset urbansound8k
+python -m audioloop.create_specs --dataset urbansound8k
 
 # Process FSD50K eval split
-python -m audioloop.create_all_specs --dataset fsd50k --split eval
+python -m audioloop.create_specs --dataset fsd50k --split eval
 
 # Process without clearing existing spectrograms
-python -m audioloop.create_all_specs --no-clear
+python -m audioloop.create_specs --no-clear
 ```
 
 The script automatically:

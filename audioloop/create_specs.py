@@ -277,16 +277,16 @@ if __name__ == "__main__":
         epilog="""
 Examples:
   # Process FSD50K dataset (default)
-  python -m audioloop.create_all_specs
+  python -m audioloop.create_specs
 
   # Process UrbanSound8K dataset
-  python -m audioloop.create_all_specs --dataset urbansound8k
+  python -m audioloop.create_specs --dataset urbansound8k
 
   # Process without clearing existing spectrograms
-  python -m audioloop.create_all_specs --no-clear
+  python -m audioloop.create_specs --no-clear
 
   # Process only first 100 files (for testing)
-  python -m audioloop.create_all_specs --limit 100
+  python -m audioloop.create_specs --limit 100
         """,
     )
 
