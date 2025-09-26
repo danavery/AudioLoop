@@ -123,20 +123,26 @@ class TestDatasetConfigInterface:
 class TestDatasetSplitInterface:
     """Test the new split validation interface."""
 
-    @pytest.mark.parametrize("config_class,expected_splits", [
-        (FSD50KConfig, ["dev", "eval"]),
-        (UrbanSound8KConfig, ["all"]),
-    ])
+    @pytest.mark.parametrize(
+        "config_class,expected_splits",
+        [
+            (FSD50KConfig, ["dev", "eval"]),
+            (UrbanSound8KConfig, ["all"]),
+        ],
+    )
     def test_get_available_splits(self, config_class, expected_splits):
         """Test that datasets return correct available splits."""
         config = config_class()
         splits = config.get_available_splits()
         assert splits == expected_splits
 
-    @pytest.mark.parametrize("config_class,expected_default", [
-        (FSD50KConfig, "dev"),
-        (UrbanSound8KConfig, "all"),
-    ])
+    @pytest.mark.parametrize(
+        "config_class,expected_default",
+        [
+            (FSD50KConfig, "dev"),
+            (UrbanSound8KConfig, "all"),
+        ],
+    )
     def test_get_default_split(self, config_class, expected_default):
         """Test that datasets return correct default splits."""
         config = config_class()
@@ -148,7 +154,9 @@ class TestDatasetSplitInterface:
         config = FSD50KConfig()
 
         # Mock file system to avoid needing actual files
-        with patch.object(config, '_load_metadata_for_split', return_value=[{"test": "data"}]) as mock_load:
+        with patch.object(
+            config, "_load_metadata_for_split", return_value=[{"test": "data"}]
+        ) as mock_load:
             result = config.load_metadata()
             mock_load.assert_called_once_with("dev")  # Should use default
             assert result == [{"test": "data"}]
@@ -157,7 +165,9 @@ class TestDatasetSplitInterface:
         """Test that load_metadata() with valid split works."""
         config = FSD50KConfig()
 
-        with patch.object(config, '_load_metadata_for_split', return_value=[{"eval": "data"}]) as mock_load:
+        with patch.object(
+            config, "_load_metadata_for_split", return_value=[{"eval": "data"}]
+        ) as mock_load:
             result = config.load_metadata(split="eval")
             mock_load.assert_called_once_with("eval")
             assert result == [{"eval": "data"}]
@@ -189,7 +199,9 @@ class TestDatasetSplitInterface:
             config = config_class()
             default = config.get_default_split()
             available = config.get_available_splits()
-            assert default in available, f"{config_class.__name__} default '{default}' not in available {available}"
+            assert default in available, (
+                f"{config_class.__name__} default '{default}' not in available {available}"
+            )
 
 
 class TestDatasetConfigBehavior:

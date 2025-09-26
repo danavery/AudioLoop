@@ -224,3 +224,25 @@ class DatasetConfig(ABC):
             Tuple of (success: bool, original_length: int | None)
         """
         pass
+
+    # === Custom Metadata Support ===
+    def supports_custom_csv(self) -> bool:
+        """Return True if this dataset supports custom CSV files/subsets.
+
+        Override in subclasses that support custom metadata sources.
+
+        Returns:
+            False by default - datasets must opt-in to custom support
+        """
+        return False
+
+    def set_custom_csv(self, custom_csv_path: Path) -> None:
+        """Set custom CSV file to use instead of default dataset metadata.
+
+        Args:
+            custom_csv_path: Path to custom CSV file
+
+        Raises:
+            NotImplementedError: If dataset doesn't support custom CSV files
+        """
+        raise NotImplementedError(f"{self.__class__.__name__} doesn't support custom CSV files")

@@ -314,6 +314,12 @@ Examples:
         help="Limit the number of files to process (useful for testing)",
     )
 
+    parser.add_argument(
+        "--metadata-file",
+        type=Path,
+        help="Use a specific metadata file instead of the default dataset CSV (e.g., for AudioSet subsets)",
+    )
+
     args = parser.parse_args()
 
     # Get unified config
@@ -326,6 +332,21 @@ Examples:
 
     # Get dataset config using registry approach
     dataset_config = config.get_dataset_config()
+
+    # Handle custom metadata file if provided
+    if args.metadata_file:
+        if not args.metadata_file.exists():
+            logger.error(f"Metadata file not found: {args.metadata_file}")
+            exit(1)
+        logger.info(f"Using custom metadata file: {args.metadata_file}")
+
+        # Check if dataset supports custom metadata files
+        if dataset_config.supports_custom_csv():
+            dataset_config.set_custom_csv(args.metadata_file)
+        else:
+            logger.error(f"Dataset {dataset_name} doesn't support custom metadata files")
+            exit(1)
+
     logger.info(f"Processing {dataset_name} dataset")
 
     # Create spectrograms
