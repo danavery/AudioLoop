@@ -449,7 +449,7 @@ Notes:
     parser.add_argument(
         "--experiment",
         type=str,
-        help="Experiment name to customize output directory (default: outputs, with experiment: outputs_experiment)",
+        help="Experiment name to customize output directory (default: outputs, with experiment: outputs/experiment)",
     )
     parser.add_argument("--plot", action="store_true", help="Display plots of the metrics.")
     parser.add_argument(
@@ -462,7 +462,7 @@ Notes:
     args = parser.parse_args()
 
     # Determine output directory based on experiment name
-    output_dir = f"outputs_{args.experiment}" if args.experiment else "outputs"
+    output_dir = f"outputs/{args.experiment}" if args.experiment else "outputs"
 
     try:
         metrics_results = track_metrics_across_versions(output_dir)
