@@ -298,6 +298,35 @@ from audioloop.utils.candidate_selection import ConfidenceStrategy, EntropyStrat
 strategy = ConfidenceStrategy()
 ```
 
+### Class Weighting Configuration
+AudioLoop supports three class weighting modes for handling imbalanced datasets:
+
+**Design Rationale**: Active learning with imbalanced classes can cause training set class ratios to drift between cycles, leading to unstable model performance. Class weighting provides consistent training signals across cycles.
+
+**Configuration:**
+```python
+from audioloop.config import AudioLoopConfig
+
+# No weighting (default) - treats all classes equally
+config = AudioLoopConfig(class_weighting=None)
+
+# Adaptive weighting - calculates inverse frequency from training set each cycle
+config = AudioLoopConfig(class_weighting="adaptive")
+
+# Fixed weighting - maintains consistent target positive ratio across cycles
+config = AudioLoopConfig(class_weighting=0.25)  # Target 25% positive
+```
+
+**Implementation**: The `class_weighting` parameter is a unified setting that replaced the previous boolean `use_class_weighting` flag, enabling experimentation with fixed target ratios:
+- `None`: Standard CrossEntropyLoss without weights
+- `"adaptive"`: Weights calculated as `total_samples / (num_classes * class_counts)` each cycle
+- `float` (0.0-1.0): Fixed weights as `weight_positive = (1.0 - target) / target`
+
+**When to Use**:
+- **No weighting**: Balanced datasets or as baseline for comparison
+- **Adaptive**: Naturally imbalanced data where training set ratio should match
+- **Fixed**: When F1 scores oscillate between cycles due to ratio drift (experimental)
+
 ### Dataset Extensibility
 AudioLoop supports adding custom datasets through a simple file-based convention with automatic discovery:
 

@@ -311,6 +311,21 @@ training_sets/
 - Solution: Review labeling criteria, re-label inconsistent samples
 - Prevention: Clear criteria documentation, regular quality checks
 
+**Performance Oscillation Across Cycles**:
+- Symptom: F1 score or accuracy jumps up and down significantly between cycles (e.g., 0.3 → 0.5 → 0.3 → 0.6)
+- Cause: Training set class ratio changes each cycle due to incorrect model predictions
+- Solution: Use fixed class weighting to maintain consistent decision boundaries
+  ```bash
+  # Use fixed weighting targeting your estimated positive percentage
+  --class-weighting 0.25  # For ~25% positive class
+  --class-weighting 0.05  # For ~5% positive class
+  ```
+- Alternative: Use adaptive weighting for balanced classes or no weighting as baseline
+  ```bash
+  --class-weighting adaptive  # Adapts to current training set ratio
+  # (omit flag for no weighting)
+  ```
+
 ### Debugging Strategies
 
 **Incremental Validation**:

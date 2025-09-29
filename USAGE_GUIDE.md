@@ -177,6 +177,10 @@ python -m audioloop.train training_sets/training_set_v1.csv --stopping-criterion
 # Train with custom model
 python -m audioloop.train training_sets/training_set_v1.csv --model-type simple_cnn
 
+# Train with class weighting for imbalanced datasets
+python -m audioloop.train training_sets/training_set_v1.csv --class-weighting adaptive
+python -m audioloop.train training_sets/training_set_v1.csv --class-weighting 0.25
+
 # List available models
 python -m audioloop.train --list-models
 ```
@@ -191,8 +195,16 @@ python -m audioloop.train --list-models
 --patience N                  # Epochs to wait for improvement (plateau/hybrid)
 --high-accuracy-threshold 0.95  # Threshold for hybrid criterion
 --model-type MODEL_TYPE       # Model architecture to use
+--class-weighting {adaptive,0.0-1.0}  # Class weighting mode (see below)
 --experiment EXPERIMENT       # Experiment name for organization
 ```
+
+**Class Weighting Modes:**
+- **No weighting** (default): Omit the flag - treats all classes equally
+- **Adaptive** (`--class-weighting adaptive`): Calculates inverse frequency from current training set ratio each cycle
+- **Fixed** (`--class-weighting 0.25`): Maintains consistent target positive ratio (0.0-1.0) across all cycles
+  - Use when F1 scores oscillate wildly between cycles
+  - Set to your estimated positive class percentage (e.g., 0.05 for 5% positive, 0.25 for 25% positive)
 
 ## Active Learning
 
@@ -421,6 +433,9 @@ python -m audioloop.automated_workflow --class-name Speech --cycles 4 --selectio
 
 # Run experiment with custom output directory
 python -m audioloop.automated_workflow --class-name siren --cycles 3 --evaluation-mode --auto-label --experiment myexp
+
+# Use fixed class weighting to stabilize performance
+python -m audioloop.automated_workflow --class-name "Brass instrument" --cycles 10 --class-weighting 0.05 --evaluation-mode --auto-label
 ```
 
 **Automated Workflow Parameters:**
@@ -434,6 +449,7 @@ python -m audioloop.automated_workflow --class-name siren --cycles 3 --evaluatio
 --candidates N                # Number of candidates per cycle (default: 50)
 --positive-pct 0.75          # Target percentage of positive samples (default: 0.75)
 --selection-mode {confidence,entropy,basic_transition}  # Selection strategy
+--class-weighting {adaptive,0.0-1.0}  # Class weighting mode (default: none)
 --experiment EXPERIMENT       # Experiment name for organization
 --seed SEED                   # Random seed for reproducibility
 ```
@@ -569,7 +585,8 @@ predictions_file, candidates_file = run_active_learning_cycle(
 # Merge labels
 new_training_set = merge_training_sets(
     "training_sets/training_set_v1.csv",
-    "outputs/labeling_candidates_v1.csv"
+    "outputs/labeling_candidates_v1.csv",
+    config=config
 )
 print(f"Created: {new_training_set}")
 ```

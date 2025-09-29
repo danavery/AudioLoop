@@ -166,20 +166,33 @@ def run_training(
     logger.info(f"Model created with {sum(p.numel() for p in model.parameters())} parameters")
 
     # Create loss criterion with optional class weighting
-    if config.use_class_weighting:
-        # Calculate class weights from training dataset
+    if isinstance(config.class_weighting, float):
+        # Fixed class weighting mode
+        weight_neg = 1.0
+        weight_pos = (1.0 - config.class_weighting) / config.class_weighting
+        class_weights = torch.tensor([weight_neg, weight_pos])
+
+        logger.info(f"Fixed class weighting: target {config.class_weighting:.1%} positive")
+        logger.info(f"  Class weights: [neg={weight_neg:.2f}, pos={weight_pos:.2f}]")
+
+        criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
+
+    elif config.class_weighting == "adaptive":
+        # Adaptive class weighting mode (calculates from training set)
         labels = [train_dataset[i]["label"] for i in range(len(train_dataset))]
         class_counts = torch.bincount(torch.tensor(labels))
         total_samples = len(train_dataset)
         class_weights = total_samples / (len(class_counts) * class_counts.float())
 
-        logger.info("Class weighting enabled:")
+        logger.info("Adaptive class weighting enabled:")
         logger.info(f"  Class counts: {class_counts.tolist()}")
         logger.info(f"  Class weights: {class_weights.tolist()}")
         logger.info(f"  Weight ratio (neg/pos): {class_weights[0] / class_weights[1]:.2f}")
 
         criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
+
     else:
+        # No class weighting
         criterion = nn.CrossEntropyLoss()
 
     optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=1e-5)

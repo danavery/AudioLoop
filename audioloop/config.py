@@ -27,6 +27,16 @@ Basic Usage:
     config.get_model_path(1)        # outputs_test/model_v1.pt
     config.get_predictions_path(1)  # outputs_test/predictions_v1.csv
 
+Class Weighting Modes:
+    # No weighting (default) - treats all classes equally
+    config = AudioLoopConfig(class_weighting=None)
+
+    # Adaptive weighting - calculates inverse frequency from training set each cycle
+    config = AudioLoopConfig(class_weighting="adaptive")
+
+    # Fixed weighting - maintains consistent target positive ratio across cycles
+    config = AudioLoopConfig(class_weighting=0.25)  # Target 25% positive samples
+
 Configuration Precedence:
     1. Explicit constructor parameters (highest priority)
     2. Environment variables (fallback when no explicit value)
@@ -74,7 +84,7 @@ class AudioLoopConfig:
     model_type: str = "cnn5layer"
     model_kwargs: dict[str, Any] = field(default_factory=dict)
     use_batchnorm: bool | None = None  # None = auto-detect based on dataset size
-    use_class_weighting: bool = False  # Apply inverse frequency class weighting
+    class_weighting: str | float | None = None  # "adaptive", float (target positive ratio 0.0-1.0), or None
 
     # Stopping criteria configuration
     stopping_criterion_type: str = "plateau"
@@ -127,6 +137,10 @@ class AudioLoopConfig:
             raise ValueError(f"Unknown stopping criterion: {self.stopping_criterion_type}")
         if self.stopping_criterion_type == "plateau" and self.patience <= 0:
             raise ValueError("patience must be positive for plateau criterion")
+        if isinstance(self.class_weighting, float) and not (0.0 < self.class_weighting < 1.0):
+            raise ValueError("class_weighting must be between 0.0 and 1.0 (exclusive)")
+        if isinstance(self.class_weighting, str) and self.class_weighting != "adaptive":
+            raise ValueError("class_weighting must be 'adaptive', a float, or None")
 
     def _validate_active_learning_params(self):
         """Validate active learning cycle parameters."""

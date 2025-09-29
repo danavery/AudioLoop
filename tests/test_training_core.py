@@ -15,12 +15,35 @@ class TestClassWeightingConfig:
     def test_class_weighting_disabled_by_default(self):
         """Test that class weighting is disabled by default."""
         config = AudioLoopConfig()
-        assert config.use_class_weighting is False
+        assert config.class_weighting is None
 
-    def test_class_weighting_enabled_via_config(self):
-        """Test that class weighting can be enabled via config."""
-        config = AudioLoopConfig(use_class_weighting=True)
-        assert config.use_class_weighting is True
+    def test_class_weighting_adaptive_mode(self):
+        """Test that adaptive class weighting can be enabled."""
+        config = AudioLoopConfig(class_weighting="adaptive")
+        assert config.class_weighting == "adaptive"
+
+    def test_class_weighting_fixed_mode(self):
+        """Test that fixed class weighting can be configured."""
+        config = AudioLoopConfig(class_weighting=0.25)
+        assert config.class_weighting == 0.25
+
+    def test_class_weighting_validation_rejects_invalid_string(self):
+        """Test that invalid string values are rejected."""
+        try:
+            config = AudioLoopConfig(class_weighting="invalid")
+            config._validate_training_params()
+            assert False, "Should have raised ValueError"
+        except ValueError as e:
+            assert "class_weighting must be 'adaptive'" in str(e)
+
+    def test_class_weighting_validation_rejects_out_of_range_float(self):
+        """Test that out-of-range float values are rejected."""
+        try:
+            config = AudioLoopConfig(class_weighting=1.5)
+            config._validate_training_params()
+            assert False, "Should have raised ValueError"
+        except ValueError as e:
+            assert "between 0.0 and 1.0" in str(e)
 
 
 class TestClassWeightingCalculation:
