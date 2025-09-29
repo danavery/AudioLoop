@@ -137,7 +137,7 @@ Examples:
   # List all available classes
   python -m audioloop.active_learning --list-classes
 
-  # Use custom experiment name (outputs go to outputs_myexp/)
+  # Use custom experiment name (outputs go to outputs/myexp/)
   python -m audioloop.active_learning --class-name siren --run-number 1 --experiment myexp
 
   # Include ground truth evaluation columns (for datasets with known labels)
@@ -172,7 +172,7 @@ Examples:
     parser.add_argument(
         "--model",
         type=str,
-        help="Path to trained model file (default: outputs/model_v{run_number}.pt or outputs_experiment/model_v{run_number}.pt)",
+        help="Path to trained model file (default: outputs/model_v{run_number}.pt or outputs/{experiment}/model_v{run_number}.pt)",
     )
 
     # Optional parameters
@@ -207,7 +207,7 @@ Examples:
     parser.add_argument(
         "--training-set",
         type=str,
-        help="Path to training set CSV (default: training_sets/training_set_v{run_number}.csv or training_sets_experiment/training_set_v{run_number}.csv)",
+        help="Path to training set CSV (default: training_sets/training_set_v{run_number}.csv or training_sets/{experiment}/training_set_v{run_number}.csv)",
     )
     parser.add_argument(
         "--selection-mode",
@@ -244,7 +244,7 @@ Examples:
     parser.add_argument(
         "--experiment",
         type=str,
-        help="Experiment name to customize output directory (default: outputs, with experiment: outputs_experiment)",
+        help="Experiment name to customize output directory (default: outputs, with experiment: outputs/experiment)",
     )
     parser.add_argument(
         "--seed",

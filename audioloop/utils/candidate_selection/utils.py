@@ -37,11 +37,10 @@ def save_candidates(candidates: list[dict[str, Any]], candidates_csv: str) -> No
         candidate["needs_human_label"] = ""  # Empty column for human to fill
         candidate["human_confidence"] = ""  # Human confidence in the label
 
-    # Ensure outputs directory exists
-    os.makedirs(
-        os.path.dirname(candidates_csv) if os.path.dirname(candidates_csv) else "outputs",
-        exist_ok=True,
-    )
+    # Ensure parent directory exists (path should come from config)
+    parent_dir = os.path.dirname(candidates_csv)
+    if parent_dir:
+        os.makedirs(parent_dir, exist_ok=True)
 
     # Save candidates
     fieldnames = list(candidates[0].keys())

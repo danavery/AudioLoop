@@ -36,7 +36,7 @@ def main():
     parser.add_argument(
         "-o",
         "--output",
-        help="Path to save trained model (default: auto-generated in outputs/ or outputs_experiment/)",
+        help="Path to save trained model (default: auto-generated in outputs/ or outputs/experiment/)",
     )
     parser.add_argument(
         "-v",
@@ -90,7 +90,7 @@ def main():
     parser.add_argument(
         "--experiment",
         type=str,
-        help="Experiment name to customize output directory (default: outputs, with experiment: outputs_experiment)",
+        help="Experiment name to customize output directory (default: outputs, with experiment: outputs/experiment)",
     )
     parser.add_argument(
         "--class-weighting",

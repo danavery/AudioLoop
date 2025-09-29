@@ -19,13 +19,13 @@ Basic Usage:
     config = AudioLoopConfig(experiment_name="test", dataset="urbansound8k")
 
     # Access organized paths
-    config.output_dir          # outputs_test/
-    config.training_sets_dir   # training_sets_test/
+    config.output_dir          # outputs/test/
+    config.training_sets_dir   # training_sets/test/
     config.specs_dir          # data/all_specs/
 
     # Generate versioned paths
-    config.get_model_path(1)        # outputs_test/model_v1.pt
-    config.get_predictions_path(1)  # outputs_test/predictions_v1.csv
+    config.get_model_path(1)        # outputs/test/model_v1.pt
+    config.get_predictions_path(1)  # outputs/test/predictions_v1.csv
 
 Class Weighting Modes:
     # No weighting (default) - treats all classes equally

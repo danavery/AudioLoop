@@ -164,7 +164,7 @@ config.specs_dir          # data/all_specs/
 # Generate versioned file paths
 config.get_model_path(1)        # outputs/my_exp/model_v1.pt
 config.get_predictions_path(1)  # outputs/my_exp/predictions_v1.csv
-config.get_training_set_path(1) # training_sets_my_exp/training_set_v1.csv
+config.get_training_set_path(1) # training_sets/my_exp/training_set_v1.csv
 ```
 
 ### Configuration Precedence
@@ -492,17 +492,26 @@ python -c "from audioloop.models.model_registry import list_available_models; pr
 ```
 
 ### Path Management
-Centralized path utilities eliminate hardcoded path duplication:
+**Architecture**: All path generation flows through `AudioLoopConfig`. The `utils/paths.py` module provides internal helpers used by config only.
+
+**Principle**: Production code should never directly call `get_output_dir()` or `get_training_sets_dir()` - always use `AudioLoopConfig` properties and methods.
+
 ```python
-from audioloop.utils.paths import get_output_dir, get_specs_dir, extract_version_from_filename
+from audioloop.config import AudioLoopConfig
+from audioloop.utils.paths import extract_version_from_filename
+from pathlib import Path
 
-# Environment-configurable paths
-output_dir = get_output_dir("experiment_name")  # outputs/experiment_name/
-specs_dir = get_specs_dir()                     # data/all_specs/ (or custom)
+# Correct: Use config for all paths
+config = AudioLoopConfig(experiment_name="test")
+output_dir = config.output_dir           # outputs/test/
+training_dir = config.training_sets_dir  # training_sets/test/
+model_path = config.get_model_path(1)    # outputs/test/model_v1.pt
 
-# Version extraction
+# Utility: Version extraction (doesn't build paths)
 version = extract_version_from_filename(Path("model_v5.pt"), "model")  # 5
 ```
+
+**Why this matters**: Centralizing path logic prevents inconsistencies and makes experiment organization reliable across all modules.
 
 ### Binary Classification Setup
 Any class from supported datasets (UrbanSound8K or FSD50K) can be converted to binary classification by specifying `--class-name` or `--class-id`. The system automatically creates positive/negative labels and appropriate class names.

@@ -21,6 +21,7 @@ import os
 import random
 
 from audioloop.active_learning import run_active_learning_for_class
+from audioloop.config import AudioLoopConfig
 from audioloop.merge_labels import merge_training_sets
 
 
@@ -98,6 +99,8 @@ def run_complete_workflow(
     print(f"   Selection strategy: {selection_mode}")
     print("=" * 60)
 
+    # Create config for consistent path handling
+    config = AudioLoopConfig()
     training_sets = []
     current_model = initial_model
 
@@ -138,7 +141,7 @@ def run_complete_workflow(
             if not os.path.exists(current_training_set):
                 current_training_set = "training_sets/training_set_v1.csv"
 
-            new_training_set = merge_training_sets(current_training_set, candidates_file)
+            new_training_set = merge_training_sets(current_training_set, candidates_file, config=config)
             training_sets.append(new_training_set)
             print(f"   ✅ Created: {new_training_set}")
 

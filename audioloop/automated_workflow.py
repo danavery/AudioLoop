@@ -247,6 +247,7 @@ def run_automated_workflow(
             new_training_set = merge_training_sets(
                 original_csv=current_training_set,
                 new_labels_csv=candidates_file,
+                config=config,
                 log_level=logging.WARNING,
             )
             training_sets.append(new_training_set)
@@ -426,7 +427,7 @@ Prerequisites:
     parser.add_argument(
         "--experiment",
         type=str,
-        help="Experiment name to customize output directory (default: outputs, with experiment: outputs_experiment)",
+        help="Experiment name to customize output directory (default: outputs, with experiment: outputs/experiment)",
     )
     parser.add_argument(
         "--seed",

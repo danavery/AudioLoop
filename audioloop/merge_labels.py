@@ -20,7 +20,7 @@ def merge_training_sets(
         original_csv: Path to existing training set (e.g., training_set_v1.csv)
         new_labels_csv: Path to newly labeled samples (candidates CSV with human labels)
         output_csv: Path for merged training set (auto-generated if None)
-        config: AudioLoopConfig instance (auto-created if None)
+        config: AudioLoopConfig instance (required for auto-generating output path)
         log_level: Logging level (logging.INFO for normal output, logging.WARNING for quiet)
 
     Returns:
@@ -31,13 +31,7 @@ def merge_training_sets(
     # Auto-generate output filename if not provided
     if output_csv is None:
         if config is None:
-            # Try to infer experiment from original CSV path
-            parent_dir = os.path.dirname(original_csv)
-            if parent_dir.startswith("training_sets_"):
-                experiment_name = parent_dir.replace("training_sets_", "")
-                config = AudioLoopConfig(experiment_name=experiment_name)
-            else:
-                config = AudioLoopConfig()
+            raise ValueError("config is required when output_csv is not provided")
 
         # Get version from original CSV and increment
         from pathlib import Path
@@ -183,7 +177,7 @@ if __name__ == "__main__":
     print()
     print("For experiments, use matching directories:")
     print(
-        "   python -m audioloop.merge_labels training_sets_exp/training_set_v1.csv outputs_exp/labeling_candidates_v1.csv"
+        "   python -m audioloop.merge_labels training_sets/exp/training_set_v1.csv outputs/exp/labeling_candidates_v1.csv --experiment exp"
     )
     print()
 

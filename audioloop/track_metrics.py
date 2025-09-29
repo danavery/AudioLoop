@@ -18,6 +18,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 
+from .config import AudioLoopConfig
 from .utils.metrics_utils import (
     calculate_binary_metrics,
     calculate_class_balance_metrics,
@@ -461,8 +462,9 @@ Notes:
 
     args = parser.parse_args()
 
-    # Determine output directory based on experiment name
-    output_dir = f"outputs/{args.experiment}" if args.experiment else "outputs"
+    # Use config to determine output directory
+    config = AudioLoopConfig(experiment_name=args.experiment)
+    output_dir = str(config.output_dir)
 
     try:
         metrics_results = track_metrics_across_versions(output_dir)

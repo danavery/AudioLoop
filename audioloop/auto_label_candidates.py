@@ -47,7 +47,7 @@ Examples:
   python -m audioloop.auto_label_candidates outputs/labeling_candidates_v1.csv --verbose
 
   # Auto-label candidates from specific experiment
-  python -m audioloop.auto_label_candidates outputs_myexp/labeling_candidates_v2.csv
+  python -m audioloop.auto_label_candidates outputs/myexp/labeling_candidates_v2.csv
 
 Note: This tool requires ground truth data (ground_truth column) in the CSV.
 For production workflows without ground truth, use 'python -m audioloop.label_audio' instead.
