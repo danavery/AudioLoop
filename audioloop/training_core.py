@@ -92,7 +92,7 @@ def run_training(
         log_level: Logging level (logging.INFO for normal output, logging.WARNING for quiet)
 
     Returns:
-        Final training accuracy
+        Tuple of (final training accuracy, number of epochs trained)
     """
     # Set up logging for this training run
     logger.setLevel(log_level)
@@ -110,6 +110,11 @@ def run_training(
     labels = [train_dataset[i]["label"] for i in range(len(train_dataset))]
     num_classes = len(set(labels))
     logger.info(f"Number of classes: {num_classes}")
+
+    # Display training set composition (always visible, not just at INFO level)
+    positive_count = sum(1 for label in labels if label == 1)
+    negative_count = sum(1 for label in labels if label == 0)
+    print(f"Training set: {len(train_dataset)} total ({positive_count} positive, {negative_count} negative)")
 
     # Optimize data loader for better performance
     # num_workers=2 enables parallel data loading
@@ -211,6 +216,7 @@ def run_training(
     epoch_times = []
     accuracy = 0.0
     best_accuracy = None  # Track accuracy of best saved model
+    num_epochs = 0  # Track actual number of epochs trained
     for epoch in range(config.max_epochs):
         epoch_start_time = time.time()
         avg_loss, accuracy = train_epoch(model, train_loader, optimizer, criterion, device)
@@ -238,10 +244,11 @@ def run_training(
 
         # Stop if criterion says to stop
         if should_stop:
+            num_epochs = epoch + 1
             logger.info("")
             logger.info("=" * 60)
             logger.info(f"🛑 Stopping criterion met ({stopping_criterion.__class__.__name__})")
-            logger.info(f"Training completed in {epoch + 1} epochs")
+            logger.info(f"Training completed in {num_epochs} epochs")
 
             # Report best accuracy if available, otherwise final epoch accuracy
             if best_accuracy is not None:
@@ -251,14 +258,15 @@ def run_training(
             logger.info("=" * 60)
             break
     else:
+        num_epochs = config.max_epochs
         # Report best accuracy if available, otherwise final epoch accuracy
         if best_accuracy is not None:
             logger.info(
-                f"\nTraining completed {config.max_epochs} epochs. Final accuracy: {best_accuracy:.4f} (best saved model)"
+                f"\nTraining completed {num_epochs} epochs. Final accuracy: {best_accuracy:.4f} (best saved model)"
             )
         else:
             logger.info(
-                f"\nTraining completed {config.max_epochs} epochs. Final accuracy: {accuracy:.4f} (final epoch)"
+                f"\nTraining completed {num_epochs} epochs. Final accuracy: {accuracy:.4f} (final epoch)"
             )
 
     # Save the best model state if available, otherwise save final model
@@ -298,5 +306,5 @@ def run_training(
     del model
     torch.cuda.empty_cache() if torch.cuda.is_available() else None
 
-    # Return the accuracy of the best saved model, not the final epoch
-    return best_accuracy if best_accuracy is not None else accuracy
+    # Return the accuracy and epoch count of the best saved model, not the final epoch
+    return (best_accuracy if best_accuracy is not None else accuracy, num_epochs)

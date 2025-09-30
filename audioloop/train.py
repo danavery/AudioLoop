@@ -164,14 +164,14 @@ def main():
     log_level = logging.WARNING if args.quiet else logging.INFO
 
     # Run training with clean signature
-    accuracy = run_training(
+    accuracy, num_epochs = run_training(
         config=config,
         labels_file=args.labels_file,
         version=args.version,
         model_path=args.output,
         log_level=log_level,
     )
-    print(f"\nFinal training accuracy: {accuracy:.4f}")
+    print(f"\nFinal training accuracy: {accuracy:.4f} ({num_epochs} epochs)")
 
 
 if __name__ == "__main__":

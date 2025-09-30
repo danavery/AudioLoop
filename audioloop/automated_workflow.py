@@ -136,6 +136,16 @@ def run_automated_workflow(
     print(f"Training epochs: {config.max_epochs}")
     print(f"Candidates per cycle: {config.total_candidates}")
     print(f"Selection strategy: {config.selection_mode}")
+
+    # Format class weighting for display
+    if config.class_weighting is None:
+        class_weighting_str = "none"
+    elif config.class_weighting == "adaptive":
+        class_weighting_str = "adaptive"
+    else:
+        class_weighting_str = f"fixed ({config.class_weighting:.2f} target positive ratio)"
+    print(f"Class weighting: {class_weighting_str}")
+
     print("=" * 80)
 
     # Check that initial training set exists
@@ -173,14 +183,14 @@ def run_automated_workflow(
         try:
             import logging
 
-            final_accuracy = run_training(
+            final_accuracy, num_epochs = run_training(
                 config=config,
                 labels_file=current_training_set,
                 version=cycle,
                 model_path=current_model,
                 log_level=logging.WARNING,  # Quiet mode
             )
-            print(f"├─ Training model... ✓ ({final_accuracy * 100:.1f}% accuracy)")
+            print(f"├─ Training model... ✓ ({final_accuracy * 100:.1f}% accuracy, {num_epochs} epochs)")
         except Exception as e:
             print(f"├─ Training model... ❌ ({e})")
             break
@@ -560,8 +570,10 @@ Prerequisites:
 
             # Suggest next steps
             print("\n💡 NEXT STEPS:")
-            print("   • Run metrics: python -m audioloop.track_metrics --plot")
-            print("   • Clean outputs: python -m audioloop.clean_outputs")
+            # Include --experiment flag in suggestions if using an experiment
+            experiment_flag = f" --experiment {config.experiment_name}" if config.experiment_name else ""
+            print(f"   • Run metrics: python -m audioloop.track_metrics --plot{experiment_flag}")
+            print(f"   • Clean outputs: python -m audioloop.clean_outputs{experiment_flag}")
             return 0
         print("❌ Workflow failed to complete any cycles")
         return 1

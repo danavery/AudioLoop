@@ -362,9 +362,13 @@ Examples:
     print(f"📊 Predictions: {predictions_file}")
     print(f"🏷️  Candidates: {candidates_file}")
     print("\nNext steps:")
+
+    # Include --experiment flag in suggestions if using an experiment
+    experiment_flag = f" --experiment {config.experiment_name}" if config.experiment_name else ""
+
     print(f"1. Label candidates: python -m audioloop.label_audio {candidates_file}")
     print(
-        f"2. Merge labels: python -m audioloop.merge_labels {config.get_training_set_path(args.run_number)} {candidates_file}"
+        f"2. Merge labels: python -m audioloop.merge_labels {config.get_training_set_path(args.run_number)} {candidates_file}{experiment_flag}"
     )
 
 

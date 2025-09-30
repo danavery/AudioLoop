@@ -130,6 +130,9 @@ def merge_training_sets(
         f"Label distribution: {label_counts[0]} negative class, {label_counts[1]} positive class"
     )
 
+    # Display final training set composition (always visible, not just at INFO level)
+    print(f"New training set: {len(all_data)} total ({label_counts[1]} positive, {label_counts[0]} negative)")
+
     return output_csv
 
 
