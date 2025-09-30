@@ -114,7 +114,9 @@ def run_training(
     # Display training set composition (always visible, not just at INFO level)
     positive_count = sum(1 for label in labels if label == 1)
     negative_count = sum(1 for label in labels if label == 0)
-    print(f"Training set: {len(train_dataset)} total ({positive_count} positive, {negative_count} negative)")
+    print(
+        f"Training set: {len(train_dataset)} total ({positive_count} positive, {negative_count} negative)"
+    )
 
     # Optimize data loader for better performance
     # num_workers=2 enables parallel data loading

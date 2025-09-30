@@ -190,7 +190,9 @@ def run_automated_workflow(
                 model_path=current_model,
                 log_level=logging.WARNING,  # Quiet mode
             )
-            print(f"├─ Training model... ✓ ({final_accuracy * 100:.1f}% accuracy, {num_epochs} epochs)")
+            print(
+                f"├─ Training model... ✓ ({final_accuracy * 100:.1f}% accuracy, {num_epochs} epochs)"
+            )
         except Exception as e:
             print(f"├─ Training model... ❌ ({e})")
             break
@@ -571,7 +573,9 @@ Prerequisites:
             # Suggest next steps
             print("\n💡 NEXT STEPS:")
             # Include --experiment flag in suggestions if using an experiment
-            experiment_flag = f" --experiment {config.experiment_name}" if config.experiment_name else ""
+            experiment_flag = (
+                f" --experiment {config.experiment_name}" if config.experiment_name else ""
+            )
             print(f"   • Run metrics: python -m audioloop.track_metrics --plot{experiment_flag}")
             print(f"   • Clean outputs: python -m audioloop.clean_outputs{experiment_flag}")
             return 0
