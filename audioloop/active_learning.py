@@ -1,10 +1,12 @@
 import argparse
+import glob
 import logging
 import os
 import re
 
 from .active_learning_core import run_active_learning_cycle
 from .config import AudioLoopConfig
+from .track_metrics import calculate_core_metrics, extract_version_number
 
 
 def run_active_learning_for_class(
@@ -95,7 +97,7 @@ def run_active_learning_for_class(
     )
 
     # Call the main function with clean signature
-    return run_active_learning_cycle(
+    result = run_active_learning_cycle(
         config=active_learning_config,
         positive_class_id=positive_class_id,
         positive_class_name=positive_class_name,
@@ -107,6 +109,122 @@ def run_active_learning_for_class(
         seed=seed,
         log_level=log_level,
     )
+
+    # Display cycle summary after active learning completes
+    display_cycle_summary(active_learning_config, run_number)
+
+    return result
+
+
+def display_cycle_summary(config: AudioLoopConfig, current_version: int):
+    """
+    Display metrics summary for recent cycles (last 3 versions) and overall progress.
+
+    Args:
+        config: AudioLoopConfig with experiment settings
+        current_version: The current cycle version number
+    """
+    output_dir = str(config.output_dir)
+    pattern = os.path.join(output_dir, "predictions_v*.csv")
+    prediction_files = sorted(glob.glob(pattern), key=extract_version_number)
+
+    if not prediction_files:
+        return  # No predictions to display
+
+    # Get versions and determine which ones to show
+    all_versions = [extract_version_number(f) for f in prediction_files]
+
+    # Filter to versions up to and including current_version
+    versions_up_to_current = [(v, f) for v, f in zip(all_versions, prediction_files, strict=False) if v <= current_version]
+    if not versions_up_to_current:
+        return  # Current version not found
+
+    # Show last 3 versions up to current (or fewer if not enough cycles)
+    num_recent = min(3, len(versions_up_to_current))
+    recent_pairs = versions_up_to_current[-num_recent:]
+    recent_versions = [v for v, _ in recent_pairs]
+    recent_files = [f for _, f in recent_pairs]
+
+    # Calculate metrics for recent versions
+    recent_metrics = {}
+    for version, filepath in zip(recent_versions, recent_files, strict=False):
+        try:
+            recent_metrics[version] = calculate_core_metrics(filepath)
+        except Exception:
+            continue  # Skip files with errors
+
+    if not recent_metrics:
+        return  # No valid metrics to display
+
+    # Detect if we have ground truth
+    first_version = min(recent_metrics.keys())
+    has_ground_truth = recent_metrics[first_version].get("has_ground_truth", False)
+
+    # Display header
+    print("\n" + "=" * 80)
+    print(f"Cycle {current_version} Summary")
+    print("=" * 80)
+
+    # Display recent performance table
+    print("\nRecent Performance:")
+    if has_ground_truth:
+        print(f"{'Cycle':<7} {'F1':<6} {'Precision':<10} {'Recall':<8} {'Pred Ratio':<12} {'Confidence':<15}")
+        print("-" * 80)
+    else:
+        print(f"{'Cycle':<7} {'Pred Ratio':<12} {'Confidence':<15} {'Total Samples':<15}")
+        print("-" * 80)
+
+    for version in sorted(recent_metrics.keys()):
+        m = recent_metrics[version]
+        confidence_str = f"{m['mean_confidence']:.3f} (±{m['std_confidence']:.3f})"
+
+        if has_ground_truth:
+            pred_ratio_str = f"{m['predicted_positive_ratio']:.1%}"
+            warning = " ⚠️" if (
+                abs(m['predicted_positive_ratio'] - m['actual_positive_ratio']) > 0.15
+            ) else ""
+
+            print(
+                f"v{version:<5} {m['f1_score']:<6.3f} {m['precision']:<10.3f} "
+                f"{m['recall']:<8.3f} {pred_ratio_str:<12} {confidence_str:<15}{warning}"
+            )
+        else:
+            pred_ratio_str = f"{m['predicted_positive_ratio']:.1%}"
+            print(
+                f"v{version:<5} {pred_ratio_str:<12} {confidence_str:<15} "
+                f"{m['total_samples']:<15}"
+            )
+
+    # Display overall progress (first vs current version)
+    if len(versions_up_to_current) >= 2:
+        first_file = versions_up_to_current[0][1]  # Get file from first pair
+        try:
+            first_metrics = calculate_core_metrics(first_file)
+            current_metrics = recent_metrics[current_version]
+
+            print(f"\nOverall Progress (v1 → v{current_version})")
+            print("-" * 80)
+
+            # Confidence trends
+            conf_change = current_metrics['mean_confidence'] - first_metrics['mean_confidence']
+            conf_arrow = "↑" if conf_change > 0 else "↓"
+            print(f"{conf_arrow} Mean Confidence:  {first_metrics['mean_confidence']:.3f} → {current_metrics['mean_confidence']:.3f} ({conf_change:+.3f})")
+
+            # F1 trends (if available)
+            if has_ground_truth:
+                f1_change = current_metrics['f1_score'] - first_metrics['f1_score']
+                f1_arrow = "↑" if f1_change > 0 else "↓"
+                print(f"{f1_arrow} F1 Score:         {first_metrics['f1_score']:.3f} → {current_metrics['f1_score']:.3f} ({f1_change:+.3f})")
+
+                # Prediction ratio vs actual
+                pred_ratio_diff = abs(current_metrics['predicted_positive_ratio'] - current_metrics['actual_positive_ratio'])
+                pred_arrow = "→" if pred_ratio_diff < 0.05 else "❌"
+                print(f"{pred_arrow} Predicted Ratio:  {first_metrics['predicted_positive_ratio']:.1%} → {current_metrics['predicted_positive_ratio']:.1%} (target: {current_metrics['actual_positive_ratio']:.1%})")
+
+        except Exception:
+            pass  # Skip overall progress if we can't calculate it
+
+    print("=" * 80 + "\n")
 
 
 def main():
@@ -256,6 +374,12 @@ Examples:
         action="store_true",
         help="Include ground truth evaluation columns (ground_truth, correct) in predictions CSV. Use for evaluation with labeled datasets.",
     )
+    parser.add_argument(
+        "--quiet",
+        "-q",
+        action="store_true",
+        help="Suppress cycle summary display",
+    )
 
     args = parser.parse_args()
 
@@ -357,6 +481,10 @@ Examples:
         training_set_csv=args.training_set,
         seed=args.seed,
     )
+
+    # Display cycle summary unless --quiet flag is set
+    if not args.quiet:
+        display_cycle_summary(config, args.run_number)
 
     print("\n✅ Active learning cycle completed!")
     print(f"📊 Predictions: {predictions_file}")

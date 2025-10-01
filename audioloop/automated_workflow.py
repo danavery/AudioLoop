@@ -105,6 +105,7 @@ def run_automated_workflow(
     config,
     class_name,
     num_cycles=3,
+    start_cycle=1,
     auto_label=True,
     evaluation_mode=False,
     audio_dir=None,
@@ -116,7 +117,8 @@ def run_automated_workflow(
     Args:
         config: AudioLoopConfig instance with all configuration parameters
         class_name: Target class name (e.g., "siren", "dog_bark")
-        num_cycles: Number of active learning cycles
+        num_cycles: Number of active learning cycles to run through
+        start_cycle: Cycle number to start from (default: 1, for resuming workflows)
         auto_label: Whether to auto-label (True) or prompt for manual labeling (False)
         evaluation_mode: Whether to enable evaluation mode with ground truth access (False)
         audio_dir: Custom audio directory (optional)
@@ -130,7 +132,10 @@ def run_automated_workflow(
     print("=" * 80)
     print(f"Target class: {class_name}")
     print(f"Dataset: {config.dataset}")
-    print(f"Cycles: {num_cycles}")
+    if start_cycle == 1:
+        print(f"Cycles: 1 to {num_cycles}")
+    else:
+        print(f"Cycles: {start_cycle} to {num_cycles} (resuming)")
     print(f"Evaluation mode: {evaluation_mode}")
     print(f"Auto-label: {auto_label}")
     print(f"Training epochs: {config.max_epochs}")
@@ -148,35 +153,50 @@ def run_automated_workflow(
 
     print("=" * 80)
 
-    # Check that initial training set exists
-    initial_training_set = config.get_training_set_path(1)
+    # Verify the starting training set exists
+    initial_training_set = config.get_training_set_path(start_cycle)
     if not os.path.exists(initial_training_set):
-        print(f"❌ Initial training set not found: {initial_training_set}")
-        print("💡 Create it first with:")
-        if config.experiment_name:
-            print(
-                f"   python -m audioloop.utils.create_bootstrap_set --class-name {class_name} --n 40 --experiment {config.experiment_name}"
-            )
+        if start_cycle == 1:
+            print(f"❌ Initial training set not found: {initial_training_set}")
+            print("💡 Create it first with:")
+            if config.experiment_name:
+                print(
+                    f"   python -m audioloop.utils.create_bootstrap_set --class-name {class_name} --n 40 --experiment {config.experiment_name}"
+                )
+            else:
+                print(
+                    f"   python -m audioloop.utils.create_bootstrap_set --class-name {class_name} --n 40"
+                )
         else:
-            print(
-                f"   python -m audioloop.utils.create_bootstrap_set --class-name {class_name} --n 40"
-            )
+            # Find the last existing training set to suggest the right cycle
+            last_existing_training_set = 0
+            for i in range(1, start_cycle):
+                if os.path.exists(config.get_training_set_path(i)):
+                    last_existing_training_set = i
+                else:
+                    break
+
+            print(f"❌ Cannot start at cycle {start_cycle}: {initial_training_set} not found")
+            if last_existing_training_set > 0:
+                print(f"💡 Last available training set is v{last_existing_training_set}. Retry with --start-cycle {last_existing_training_set}")
+            else:
+                print("💡 No training sets found. Start with cycle 1 or create initial training set.")
         return []
 
+    if start_cycle > 1:
+        print(f"📂 Resuming from cycle {start_cycle}")
+        print()
+
+    # Track training sets created during this workflow run
     training_sets = [initial_training_set]
 
-    for cycle in range(1, num_cycles + 1):
+    for cycle in range(start_cycle, num_cycles + 1):
         print("\n" + "█" * 80)
         print(f"🔄 CYCLE {cycle} of {num_cycles}")
         print("█" * 80)
 
         current_training_set = config.get_training_set_path(cycle)
         current_model = config.get_model_path(cycle)
-
-        # Use the training set from the previous cycle if current doesn't exist
-        if not os.path.exists(current_training_set) and len(training_sets) > 0:
-            current_training_set = training_sets[-1]
-            print(f"Using previous training set: {current_training_set}")
 
         # Step 1: Train model
         print("├─ Training model...")
@@ -283,9 +303,9 @@ def run_automated_workflow(
     print("✅ WORKFLOW COMPLETE")
     print("=" * 80)
     print(f"Completed {len(training_sets) - 1} cycles")
-    print("Training sets created:")
-    for i, ts in enumerate(training_sets):
-        print(f"   v{i + 1}: {ts}")
+    print("Training sets from this run:")
+    for i, ts in enumerate(training_sets, start=start_cycle):
+        print(f"   v{i}: {ts}")
     print("=" * 80)
 
     return training_sets
@@ -321,6 +341,9 @@ Examples:
   # Use entropy-based selection (production)
   python -m audioloop.automated_workflow --class-name Speech --cycles 2 --selection-mode entropy
 
+  # Resume interrupted workflow from cycle 16 (run cycles 16-30)
+  python -m audioloop.automated_workflow --class-name Drill --cycles 30 --start-cycle 16 --experiment myexp --evaluation-mode --auto-label
+
 Prerequisites:
   1. Run: python -m audioloop.create_specs  (one-time setup)
   2. Run: python -m audioloop.utils.create_bootstrap_set --class-name <CLASS_NAME> --n 50
@@ -333,7 +356,15 @@ Prerequisites:
     )
 
     # Workflow parameters
-    parser.add_argument("--cycles", type=int, help="Number of active learning cycles (default: 3)")
+    parser.add_argument(
+        "--cycles", type=int, help="Number of active learning cycles to run through (default: 3)"
+    )
+    parser.add_argument(
+        "--start-cycle",
+        type=int,
+        default=1,
+        help="Cycle number to start from (default: 1). Use this to resume interrupted workflows.",
+    )
     parser.add_argument(
         "--evaluation-mode",
         action="store_true",
@@ -552,12 +583,23 @@ Prerequisites:
         print("💡 Run this first: python -m audioloop.create_specs")
         return 1
 
+    # Validate start_cycle
+    if args.start_cycle < 1:
+        print("❌ --start-cycle must be >= 1")
+        return 1
+
+    num_cycles = args.cycles if args.cycles is not None else 3
+    if args.start_cycle > num_cycles:
+        print(f"❌ --start-cycle ({args.start_cycle}) must be <= --cycles ({num_cycles})")
+        return 1
+
     # Run the workflow
     try:
         training_sets = run_automated_workflow(
             config=config,
             class_name=args.class_name,
-            num_cycles=args.cycles if args.cycles is not None else 3,
+            num_cycles=num_cycles,
+            start_cycle=args.start_cycle,
             auto_label=args.auto_label,
             evaluation_mode=args.evaluation_mode,
             audio_dir=args.audio_dir,
