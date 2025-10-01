@@ -3,10 +3,21 @@ import glob
 import logging
 import os
 import re
+from dataclasses import dataclass
 
 from .active_learning_core import run_active_learning_cycle
 from .config import AudioLoopConfig
 from .track_metrics import calculate_core_metrics, extract_version_number
+
+
+@dataclass
+class CycleWarning:
+    """Structured warning data for cycle monitoring."""
+
+    version: int
+    warning_type: str  # "ratio_jump", "overconfident_conservative", "f1_drop"
+    message: str
+    severity: str  # "high", "medium", "low"
 
 
 def run_active_learning_for_class(
@@ -116,6 +127,81 @@ def run_active_learning_for_class(
     return result
 
 
+def detect_warnings(
+    recent_metrics: dict[int, dict], current_version: int, has_ground_truth: bool
+) -> list[CycleWarning]:
+    """
+    Detect potential issues in model performance across cycles.
+
+    Args:
+        recent_metrics: Dict mapping version numbers to their metrics
+        current_version: The current cycle version
+        has_ground_truth: Whether ground truth data is available
+
+    Returns:
+        List of CycleWarning objects for detected issues
+    """
+    warnings = []
+
+    if current_version not in recent_metrics:
+        return warnings
+
+    current = recent_metrics[current_version]
+    versions = sorted(recent_metrics.keys())
+
+    # Find previous version for comparison
+    current_idx = versions.index(current_version)
+    previous_version = versions[current_idx - 1] if current_idx > 0 else None
+
+    if previous_version:
+        previous = recent_metrics[previous_version]
+
+        # Warning 1: Prediction ratio jump (works in production mode)
+        ratio_change = abs(
+            current["predicted_positive_ratio"] - previous["predicted_positive_ratio"]
+        )
+        if ratio_change > 0.15:  # 15% absolute jump
+            ratio_multiplier = (
+                current["predicted_positive_ratio"] / previous["predicted_positive_ratio"]
+                if previous["predicted_positive_ratio"] > 0
+                else float("inf")
+            )
+            warnings.append(
+                CycleWarning(
+                    version=current_version,
+                    warning_type="ratio_jump",
+                    message=f"Prediction ratio jumped {previous['predicted_positive_ratio']:.1%} → {current['predicted_positive_ratio']:.1%} ({ratio_multiplier:.1f}x)",
+                    severity="high",
+                )
+            )
+
+        # Warning 3: F1 drop (evaluation mode only)
+        if has_ground_truth and "f1_score" in current and "f1_score" in previous:
+            f1_drop = previous["f1_score"] - current["f1_score"]
+            if f1_drop > 0.2:  # 20% absolute drop
+                warnings.append(
+                    CycleWarning(
+                        version=current_version,
+                        warning_type="f1_drop",
+                        message=f"F1 dropped by {f1_drop:.3f} ({previous['f1_score']:.3f} → {current['f1_score']:.3f})",
+                        severity="high",
+                    )
+                )
+
+    # Warning 2: Overconfident-conservative pattern (works in production mode)
+    if current["std_confidence"] < 0.05 and current["predicted_positive_ratio"] < 0.02:
+        warnings.append(
+            CycleWarning(
+                version=current_version,
+                warning_type="overconfident_conservative",
+                message=f"Model overconfident and conservative (std={current['std_confidence']:.3f}, pred={current['predicted_positive_ratio']:.1%})",
+                severity="medium",
+            )
+        )
+
+    return warnings
+
+
 def display_cycle_summary(config: AudioLoopConfig, current_version: int):
     """
     Display metrics summary for recent cycles (last 3 versions) and overall progress.
@@ -223,6 +309,20 @@ def display_cycle_summary(config: AudioLoopConfig, current_version: int):
 
         except Exception:
             pass  # Skip overall progress if we can't calculate it
+
+    # Detect and display warnings
+    warnings = detect_warnings(recent_metrics, current_version, has_ground_truth)
+    if warnings:
+        print("\n⚠️  WARNINGS DETECTED:")
+        for warning in warnings:
+            severity_icon = "🔴" if warning.severity == "high" else "🟡"
+            print(f"  {severity_icon} v{warning.version}: {warning.message}")
+
+        # Add actionable advice
+        if any(w.severity == "high" for w in warnings):
+            print("\n💡 Recommendation: Model instability detected.")
+            print("   Consider retraining this cycle with a different seed,")
+            print("   or use the previous cycle's model.")
 
     print("=" * 80 + "\n")
 
@@ -461,11 +561,15 @@ Examples:
     print(f"Negative class: {negative_class_name}")
     print(f"Model: {args.model}")
     print(f"Run number: {args.run_number}")
-    num_positive = int(args.total_candidates * args.positive_pct)
-    num_negative = args.total_candidates - num_positive
-    print(
-        f"Candidates: {num_positive} positive, {num_negative} negative ({args.positive_pct:.0%} positive)"
-    )
+
+    # Only print candidate information if both parameters are specified
+    if args.total_candidates is not None and args.positive_pct is not None:
+        num_positive = int(args.total_candidates * args.positive_pct)
+        num_negative = args.total_candidates - num_positive
+        print(
+            f"Candidates: {num_positive} positive, {num_negative} negative ({args.positive_pct:.0%} positive)"
+        )
+
     print(f"Min confidence: {args.min_confidence}")
     print(f"Ground truth evaluation: {'enabled' if config.with_ground_truth else 'disabled'}")
 
