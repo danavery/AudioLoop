@@ -107,7 +107,7 @@ def run_training(
     logger.info(f"Dataset size: {len(train_dataset)}")
 
     # Determine number of classes from the dataset
-    labels = [train_dataset[i]["label"] for i in range(len(train_dataset))]
+    labels = [sample["label"] for sample in train_dataset.samples]
     num_classes = len(set(labels))
     logger.info(f"Number of classes: {num_classes}")
 
@@ -186,7 +186,7 @@ def run_training(
 
     elif config.class_weighting == "adaptive":
         # Adaptive class weighting mode (calculates from training set)
-        labels = [train_dataset[i]["label"] for i in range(len(train_dataset))]
+        labels = [sample["label"] for sample in train_dataset.samples]
         class_counts = torch.bincount(torch.tensor(labels))
         total_samples = len(train_dataset)
         class_weights = total_samples / (len(class_counts) * class_counts.float())
