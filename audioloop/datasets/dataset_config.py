@@ -104,11 +104,12 @@ class DatasetConfig(ABC):
         pass
 
     @abstractmethod
-    def parse_metadata_row(self, row: dict[str, str]) -> dict[str, Any]:
+    def parse_metadata_row(self, row: dict[str, str], split: str | None = None) -> dict[str, Any]:
         """Parse a single CSV row into standardized metadata format.
 
         Args:
             row: Raw CSV row as dict
+            split: Optional split information (some datasets need this for path resolution)
 
         Returns:
             Standardized metadata dict with consistent keys
@@ -224,6 +225,47 @@ class DatasetConfig(ABC):
             Tuple of (success: bool, original_length: int | None)
         """
         pass
+
+    # === Dataset Subsetting ===
+    def create_subset(
+        self,
+        output_path: Path,
+        class_name: str,
+        max_samples: int,
+        positive_ratio: float = 0.5,
+        split: str | None = None,
+        seed: int = 42,
+    ) -> Path:
+        """Create a training-ready subset CSV for binary classification.
+
+        Creates a CSV file with columns: filename, label, original_class, split, audio_path
+        This CSV can be used directly for training and supports lazy spectrogram generation.
+
+        Args:
+            output_path: Where to write the subset CSV
+            class_name: Class name to use as positive class for binary classification
+            max_samples: Maximum total samples (positive + negative combined)
+            positive_ratio: Target ratio of positive samples (0.0-1.0, default 0.5)
+            split: Dataset split to sample from (unified split/fold parameter):
+                   - FSD50K: "dev" or "eval"
+                   - UrbanSound8K: "all", "fold1", ..., "fold10"
+                   - AudioSet: "balanced_train", "unbalanced_train", "eval"
+                   If None, uses get_default_split()
+            seed: Random seed for reproducibility (default 42)
+
+        Returns:
+            Path to created CSV file (same as output_path)
+
+        Raises:
+            ValueError: If class_name not found in dataset vocabulary
+            ValueError: If split not in get_available_splits()
+            NotImplementedError: If dataset doesn't support subsetting yet
+        """
+        raise NotImplementedError(
+            f"{self.__class__.__name__} doesn't support create_subset(). "
+            "Dataset subsetting may not be necessary for datasets that are small enough "
+            "to use in their entirety."
+        )
 
     # === Custom Metadata Support ===
     def supports_custom_csv(self) -> bool:

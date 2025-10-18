@@ -27,6 +27,7 @@ import logging
 import os
 import sys
 import time
+from pathlib import Path
 
 from audioloop.active_learning import run_active_learning_for_class
 from audioloop.config import AudioLoopConfig
@@ -132,6 +133,8 @@ def run_automated_workflow(
     print("=" * 80)
     print(f"Target class: {class_name}")
     print(f"Dataset: {config.dataset}")
+    if config.subset_csv:
+        print(f"Subset: {config.subset_csv.name}")
     if start_cycle == 1:
         print(f"Cycles: 1 to {num_cycles}")
     else:
@@ -178,9 +181,13 @@ def run_automated_workflow(
 
             print(f"❌ Cannot start at cycle {start_cycle}: {initial_training_set} not found")
             if last_existing_training_set > 0:
-                print(f"💡 Last available training set is v{last_existing_training_set}. Retry with --start-cycle {last_existing_training_set}")
+                print(
+                    f"💡 Last available training set is v{last_existing_training_set}. Retry with --start-cycle {last_existing_training_set}"
+                )
             else:
-                print("💡 No training sets found. Start with cycle 1 or create initial training set.")
+                print(
+                    "💡 No training sets found. Start with cycle 1 or create initial training set."
+                )
         return []
 
     if start_cycle > 1:
@@ -240,6 +247,7 @@ def run_automated_workflow(
                 seed=seed,
                 with_ground_truth=evaluation_mode,
                 log_level=logging.WARNING,  # Quiet mode
+                subset_csv=str(config.subset_csv) if config.subset_csv else None,
             )
             # Count candidates for clean reporting
             try:
@@ -335,6 +343,10 @@ Examples:
   # UrbanSound8K dataset with evaluation mode
   python -m audioloop.automated_workflow --class-name siren --cycles 2 --dataset urbansound8k --evaluation-mode --auto-label
 
+  # Use AudioSet subset for efficient workflow
+  python -m audioloop.automated_workflow --dataset audioset --class-name Dog \\
+      --subset-csv subsets/audioset_dog_10k.csv --cycles 5 --evaluation-mode --auto-label
+
   # Use basic transition strategy with evaluation
   python -m audioloop.automated_workflow --class-name Drill --cycles 3 --evaluation-mode --selection-mode basic_transition --auto-label
 
@@ -381,6 +393,11 @@ Prerequisites:
         "--dataset",
         choices=None,  # Will be validated dynamically using registry
         help="Dataset name (default from config: fsd50k)",
+    )
+    parser.add_argument(
+        "--subset-csv",
+        type=str,
+        help="Path to subset CSV to restrict active learning to specific files (e.g., from create_subset)",
     )
     parser.add_argument(
         "--audio-dir", help="Custom audio directory (uses dataset default if not specified)"
@@ -504,6 +521,7 @@ Prerequisites:
         for key, value in {
             "experiment_name": args.experiment,
             "dataset": args.dataset,
+            "subset_csv": Path(args.subset_csv) if args.subset_csv else None,
             "max_epochs": args.epochs,
             "batch_size": args.batch_size,
             "learning_rate": args.learning_rate,

@@ -29,8 +29,13 @@ def load_training_set_filenames(training_set_csv):
     with open(training_set_csv) as f:
         reader = csv.DictReader(f)
         for row in reader:
-            if row.get("filename"):
-                training_filenames.add(row["filename"])
+            # Handle both 'filename' and 'filepath' columns (extract filename from filepath)
+            filename = row.get("filename")
+            if not filename and row.get("filepath"):
+                # Extract filename from filepath (e.g., "foo.pt" from "data/specs/foo.pt")
+                filename = os.path.basename(row["filepath"])
+            if filename:
+                training_filenames.add(filename)
 
     return training_filenames
 
@@ -123,8 +128,11 @@ def run_binary_inference(
             filtered_count += 1
             continue
 
-        # Skip if spectrogram file doesn't exist
-        if not spec_path.exists():
+        # Get audio_path for lazy generation
+        audio_path = item.get("audio_path") or dataset_config.get_audio_path(item["filename"])
+
+        # Skip if both spec and audio are missing (can't process this file)
+        if not spec_path.exists() and not audio_path.exists():
             continue
 
         # Use dataset config's binary classification method
@@ -141,11 +149,14 @@ def run_binary_inference(
                 "label": int(is_positive),
                 "original_class": original_class,
                 "filename": spec_filename,
+                "audio_path": str(audio_path),
             }
         )
 
-    # Load dataset directly from entries
-    dataset = SpectrogramDataset(data=dataset_entries, specs_dir=str(config.specs_dir))
+    # Load dataset directly from entries with lazy generation support
+    dataset = SpectrogramDataset(
+        data=dataset_entries, specs_dir=str(config.specs_dir), dataset_config=dataset_config
+    )
     if filtered_count > 0:
         logger.info(f"Filtered out {filtered_count} files already in training set")
     logger.info(f"Running inference on {len(dataset)} files")

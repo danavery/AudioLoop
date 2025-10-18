@@ -102,8 +102,15 @@ def run_training(
 
     set_seed(config.seed)
 
-    # Create dataset from precomputed spectrograms
-    train_dataset = SpectrogramDataset(csv_file=labels_file, specs_dir=str(config.specs_dir))
+    # Get dataset config for lazy spec generation
+    dataset_config = config.get_dataset_config()
+
+    # Create dataset with lazy spec generation support
+    train_dataset = SpectrogramDataset(
+        csv_file=labels_file,
+        specs_dir=str(config.specs_dir),
+        dataset_config=dataset_config,  # Enable lazy generation from audio_path
+    )
     logger.info(f"Dataset size: {len(train_dataset)}")
 
     # Determine number of classes from the dataset
@@ -141,7 +148,6 @@ def run_training(
     ).to(device)
 
     # Check dataset/model compatibility
-    dataset_config = config.get_dataset_config()
     dataset_shape = dataset_config.get_output_shape()
 
     if not model.can_handle_shape(dataset_shape):
@@ -168,8 +174,9 @@ def run_training(
 
     # Print basic model info
     sample = train_dataset[0]
-    sample_shape = sample["data"].shape
-    logger.info(f"Sample spectrogram shape: {sample_shape}")
+    if sample is not None:
+        sample_shape = sample["data"].shape
+        logger.info(f"Sample spectrogram shape: {sample_shape}")
     logger.info(f"Model created with {sum(p.numel() for p in model.parameters())} parameters")
 
     # Create loss criterion with optional class weighting

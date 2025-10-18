@@ -45,12 +45,27 @@ def variable_length_collate_fn(batch):
     This enables training with natural spectrogram lengths while maintaining
     consistent batch tensor shapes for PyTorch.
 
+    Filters out None values from failed samples (missing/corrupted files).
+
     Args:
         batch: List of dataset items with keys: data, label, filename, filepath
+               (or None for failed samples)
 
     Returns:
         dict: Batched data with tensors padded to max length in batch
     """
+    # Filter out None values from failed samples (missing/corrupted files)
+    batch = [item for item in batch if item is not None]
+
+    # If entire batch failed, return empty batch
+    if len(batch) == 0:
+        return {
+            "data": torch.empty(0),
+            "label": torch.empty(0, dtype=torch.long),
+            "filename": [],
+            "filepath": [],
+        }
+
     # Extract data and other fields
     data_list = [item["data"] for item in batch]
     labels = torch.tensor([item["label"] for item in batch])
@@ -73,12 +88,18 @@ def variable_length_collate_fn(batch):
     # Stack the padded spectrograms (now all same size)
     data_tensor = torch.stack(padded_data)
 
-    return {
+    result = {
         "data": data_tensor,
         "label": labels,
         "filename": [item["filename"] for item in batch],
         "filepath": [item["filepath"] for item in batch],
     }
+
+    # Include optional fields if present in any item
+    if any("original_class" in item for item in batch):
+        result["original_class"] = [item.get("original_class") for item in batch]
+
+    return result
 
 
 def get_device():

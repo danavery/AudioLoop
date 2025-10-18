@@ -175,7 +175,7 @@ class UrbanSound8KConfig(DatasetConfig):
 
         return audio_files
 
-    def parse_metadata_row(self, row: dict[str, str]) -> dict[str, Any]:
+    def parse_metadata_row(self, row: dict[str, str], split: str | None = None) -> dict[str, Any]:
         """Parse a single CSV row into standardized metadata format."""
         class_name = row["class"]
         return {

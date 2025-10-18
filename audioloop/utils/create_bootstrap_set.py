@@ -6,20 +6,26 @@ from audioloop.config import AudioLoopConfig
 
 
 def get_matching_samples(
-    dataset_name: str, class_name: str | None = None, invert: bool = False, **kwargs
-) -> list[str]:
+    dataset_name: str,
+    class_name: str | None = None,
+    invert: bool = False,
+    config: AudioLoopConfig | None = None,
+    **kwargs,
+) -> list[dict]:
     """Get matching samples for any supported dataset.
 
     Args:
         dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
         class_name: Class name to filter by (if None, returns all)
         invert: If True, return samples NOT matching the class
+        config: Optional AudioLoopConfig (for subset_csv support)
         **kwargs: Additional dataset-specific parameters
 
     Returns:
-        List of spectrogram filenames (not full paths)
+        List of sample dictionaries with 'spec_filename' and 'audio_path' keys
     """
-    config = AudioLoopConfig(dataset=dataset_name)
+    if config is None:
+        config = AudioLoopConfig(dataset=dataset_name)
     dataset_config = config.get_dataset_config()
 
     # Get split parameter or use dataset's default
@@ -36,7 +42,7 @@ def get_matching_samples(
                 f"Invalid class name: '{class_name}'. Valid names: {list(dataset_config.name_to_id.keys())}"
             ) from None
 
-    matching_filenames = []
+    matching_samples = []
 
     for item in metadata:
         # Determine if this sample matches our criteria
@@ -57,9 +63,14 @@ def get_matching_samples(
             if audio_path.exists():
                 # Use config's method to get spectrogram path
                 spec_path = dataset_config.get_spectrogram_path(item["filename"], config.specs_dir)
-                matching_filenames.append(spec_path.name)
+                matching_samples.append(
+                    {
+                        "spec_filename": spec_path.name,
+                        "audio_path": str(audio_path),
+                    }
+                )
 
-    return matching_filenames
+    return matching_samples
 
 
 def write_starting_labels(
@@ -67,8 +78,9 @@ def write_starting_labels(
     n_negative: int = 10,
     class_name: str = "siren",
     dataset_name: str = "urbansound8k",
+    config: AudioLoopConfig | None = None,
     **kwargs,
-) -> tuple[list[str], list[str]]:
+) -> tuple[list[dict], list[dict]]:
     """Create initial training set for any dataset and class.
 
     Args:
@@ -76,19 +88,20 @@ def write_starting_labels(
         n_negative: Number of negative samples
         class_name: Class name for positive class
         dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
+        config: Optional AudioLoopConfig (for subset_csv support)
         **kwargs: Additional dataset-specific parameters
 
     Returns:
-        (positives, negatives): Lists of file paths
+        (positives, negatives): Lists of sample dictionaries with 'spec_filename' and 'audio_path'
     """
     # Get positive samples
     positive_candidates = get_matching_samples(
-        dataset_name, class_name=class_name, invert=False, **kwargs
+        dataset_name, class_name=class_name, invert=False, config=config, **kwargs
     )
 
     # Get negative samples
     negative_candidates = get_matching_samples(
-        dataset_name, class_name=class_name, invert=True, **kwargs
+        dataset_name, class_name=class_name, invert=True, config=config, **kwargs
     )
 
     # Report dataset distribution
@@ -124,8 +137,9 @@ def create_training_set(
     output_path: str | None = None,
     positive_percentage: float = 0.5,
     experiment_name: str | None = None,
+    config: AudioLoopConfig | None = None,
     **kwargs,
-) -> tuple[list[str], list[str]]:
+) -> tuple[list[dict], list[dict]]:
     """Create training set CSV file for any dataset and class.
 
     Args:
@@ -135,25 +149,31 @@ def create_training_set(
         output_path: Path to save training set CSV
         positive_percentage: Percentage of samples that should be positive (0.0-1.0)
         experiment_name: Optional experiment name to adjust output path
+        config: Optional AudioLoopConfig (for subset_csv support)
         **kwargs: Additional dataset-specific parameters
     """
     # Generate output path using config if not provided
     if output_path is None:
-        from audioloop.config import AudioLoopConfig
+        if config is None:
+            from audioloop.config import AudioLoopConfig
 
-        config = AudioLoopConfig(experiment_name=experiment_name)
+            config = AudioLoopConfig(experiment_name=experiment_name)
+        else:
+            # Config was provided (e.g., with subset_csv) - update experiment if needed
+            if experiment_name and config.experiment_name != experiment_name:
+                config.experiment_name = experiment_name
         output_path = str(config.get_training_set_path(1))
 
     n_positive = int(n * positive_percentage)
     n_negative = n - n_positive
 
     positives, negatives = write_starting_labels(
-        n_positive, n_negative, class_name, dataset_name, **kwargs
+        n_positive, n_negative, class_name, dataset_name, config=config, **kwargs
     )
 
-    # Format entries
-    positive_entries = [f"{p},1" for p in positives]
-    negative_entries = [f"{n},0" for n in negatives]
+    # Format entries with audio_path for lazy generation
+    positive_entries = [f"{p['spec_filename']},1,{p['audio_path']}" for p in positives]
+    negative_entries = [f"{n['spec_filename']},0,{n['audio_path']}" for n in negatives]
     all_entries = positive_entries + negative_entries
 
     # Shuffle and write
@@ -165,7 +185,7 @@ def create_training_set(
         os.makedirs(output_dir, exist_ok=True)
 
     with open(output_path, "w") as f:
-        f.write("filepath,label\n")
+        f.write("filepath,label,audio_path\n")
         f.write("\n".join(all_entries))
 
     print(f"Created training set: {output_path}")
@@ -314,6 +334,11 @@ Examples:
         default=None,
         help="Dataset split to use (varies by dataset, use --list-splits to see options)",
     )
+    parser.add_argument(
+        "--subset-csv",
+        type=str,
+        help="Path to subset CSV to restrict sampling to specific files (e.g., from create_subset)",
+    )
 
     # Utility options
     parser.add_argument(
@@ -333,7 +358,10 @@ Examples:
 
     # Resolve dataset choice from CLI and environment variable
     try:
-        config = AudioLoopConfig(dataset=args.dataset)
+        from pathlib import Path
+
+        subset_csv = Path(args.subset_csv) if args.subset_csv else None
+        config = AudioLoopConfig(dataset=args.dataset, subset_csv=subset_csv)
         dataset_name = config.dataset
     except ValueError as e:
         print(f"Error: {e}")
@@ -378,6 +406,7 @@ Examples:
                 output_path=args.output,
                 positive_percentage=args.positive_pct,
                 experiment_name=args.experiment,
+                config=config,
                 **dataset_kwargs,
             )
         except ValueError as e:

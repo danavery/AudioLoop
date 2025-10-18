@@ -100,25 +100,25 @@ def test_get_device_returns_valid_device():
     assert device.type in ["cpu", "cuda", "mps"]
 
 
-def test_get_device_prefers_cuda(mocker):
+def test_get_device_prefers_cuda(monkeypatch):
     """Test that CUDA is preferred when available."""
-    mocker.patch("torch.cuda.is_available", return_value=True)
+    monkeypatch.setattr("torch.cuda.is_available", lambda: True)
     device = get_device()
     assert device.type == "cuda"
 
 
-def test_get_device_falls_back_to_mps(mocker):
+def test_get_device_falls_back_to_mps(monkeypatch):
     """Test that MPS is used when CUDA unavailable."""
-    mocker.patch("torch.cuda.is_available", return_value=False)
-    mocker.patch("torch.backends.mps.is_available", return_value=True)
+    monkeypatch.setattr("torch.cuda.is_available", lambda: False)
+    monkeypatch.setattr("torch.backends.mps.is_available", lambda: True)
     device = get_device()
     assert device.type == "mps"
 
 
-def test_get_device_falls_back_to_cpu(mocker):
+def test_get_device_falls_back_to_cpu(monkeypatch):
     """Test that CPU is used as final fallback."""
-    mocker.patch("torch.cuda.is_available", return_value=False)
-    mocker.patch("torch.backends.mps.is_available", return_value=False)
+    monkeypatch.setattr("torch.cuda.is_available", lambda: False)
+    monkeypatch.setattr("torch.backends.mps.is_available", lambda: False)
     device = get_device()
     assert device.type == "cpu"
 

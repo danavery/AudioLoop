@@ -43,13 +43,72 @@ AudioLoop automatically organizes files by experiment:
 
 ## Data Preparation
 
-### Generate Spectrograms (One-time Setup)
+### Create Dataset Subsets (For Large Datasets)
+
+For large datasets like AudioSet (2M+ files), create manageable subsets for binary classification tasks:
+
+```bash
+# Create subset with default 50% positive ratio
+python -m audioloop.create_subset --dataset audioset --class-name "Dog" --max-samples 1000
+
+# Create imbalanced subset (5% positive for rare classes)
+python -m audioloop.create_subset --dataset audioset --class-name "Speech" \
+    --max-samples 100000 --positive-ratio 0.05
+
+# Specify dataset split
+python -m audioloop.create_subset --dataset audioset --class-name "Music" \
+    --max-samples 50000 --split unbalanced_train
+
+# Custom output location
+python -m audioloop.create_subset --dataset audioset --class-name "Dog" \
+    --max-samples 1000 --output subsets/custom_dog.csv
+
+# Reproducible subset with custom seed
+python -m audioloop.create_subset --dataset audioset --class-name "Dog" \
+    --max-samples 1000 --seed 123
+
+# List available classes
+python -m audioloop.create_subset --dataset audioset --list-classes
+```
+
+**Subset Parameters:**
+```bash
+--dataset {audioset}           # Dataset to create subset from
+--class-name CLASS_NAME        # Class name for positive samples (required)
+--max-samples N                # Maximum total samples (positive + negative)
+--positive-ratio 0.5           # Target ratio of positive samples (0.0-1.0)
+--split SPLIT                  # Dataset split to sample from (default: dataset-specific)
+--output OUTPUT_PATH           # Output CSV path (default: subsets/DATASET_CLASS_SAMPLES.csv)
+--seed 42                      # Random seed for reproducibility
+--list-classes                 # List available classes and exit
+```
+
+**Output Format**: Generated CSV includes:
+- `filename`: Audio filename
+- `label`: Binary label (0 or 1)
+- `original_class`: Original class name from dataset
+- `split`: Dataset split (for reproducibility)
+- `audio_path`: Full path to audio file (enables lazy spec generation)
+
+**Notes:**
+- Automatically filters out missing files (e.g., deleted YouTube videos)
+- Creates `subsets/` directory if it doesn't exist
+- CSV is training-ready and supports lazy spectrogram generation
+
+### Generate Spectrograms (Optional)
+
+Spectrograms can be pre-generated or generated on-demand during training. Pre-generation is recommended for datasets used repeatedly, while lazy generation is simpler for initial experiments.
+
+**Pre-Generate All Spectrograms:**
 ```bash
 # Generate spectrograms for FSD50K dataset (default)
 python -m audioloop.create_specs
 
 # Generate spectrograms for UrbanSound8K dataset
 python -m audioloop.create_specs --dataset urbansound8k
+
+# Generate for AudioSet (if using entire dataset)
+python -m audioloop.create_specs --dataset audioset
 
 # With environment variable set (fallback when no explicit --dataset)
 export AUDIOLOOP_DATASET=urbansound8k
@@ -59,6 +118,21 @@ python -m audioloop.create_specs  # Uses environment variable
 export AUDIOLOOP_DATASET=urbansound8k
 python -m audioloop.create_specs --dataset fsd50k  # Uses fsd50k despite env var
 ```
+
+**Lazy Generation (Automatic):**
+When training CSVs include an `audio_path` column (like those from `create_subset`), spectrograms are generated automatically during training if missing. No pre-processing needed.
+
+```bash
+# Create subset (includes audio_path column)
+python -m audioloop.create_subset --dataset audioset --class-name "Dog" --max-samples 1000
+
+# Train directly - specs generated as needed
+python -m audioloop.train subsets/audioset_dog_1000.csv
+```
+
+**When to Use Each Approach:**
+- **Pre-generation**: Large datasets used repeatedly, saves time across multiple experiments
+- **Lazy generation**: Small subsets, quick experiments, changing spectrogram parameters
 
 ### Creating Initial Training Sets
 

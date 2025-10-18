@@ -55,15 +55,15 @@ class AudiosetConfig(DatasetConfig):
 
     # Specific files
     ontology_json: Path = Path("/mnt/audioset/audioset/metadata/ontology.json")
-    # AudioSet has multiple CSV files - we'll use the balanced train set by default
-    _dataset_csv: Path = Path("subsets/audioset_subset_brass_instrument_100000.csv")
-    eval_csv: Path = Path("/mnt/audioset/audioset/metadata/eval_segments.csv")
+    balanced_csv: Path = Path("/mnt/audioset/audioset/metadata/balanced_train_segments.csv")
     unbalanced_csv: Path = Path("/mnt/audioset/audioset/metadata/unbalanced_train_segments.csv")
+    eval_csv: Path = Path("/mnt/audioset/audioset/metadata/eval_segments.csv")
+    # Default to balanced train (smallest dataset)
+    _dataset_csv: Path = Path("/mnt/audioset/audioset/metadata/balanced_train_segments.csv")
 
     # Cached ontology to avoid repeated loading
     _ontology: dict[int, str] | None = None
     _name_to_mid: dict[str, int] | None = None
-    _current_split: str = "bal_train"  # Track current split for path construction
 
     # Custom CSV support
     _custom_csv_path: Path | None = None
@@ -163,22 +163,21 @@ class AudiosetConfig(DatasetConfig):
 
     def _load_metadata_for_split(self, split: str) -> list[dict]:
         """Load metadata for specified split."""
+        # Map logical split name to (CSV path, filesystem directory)
         if split == "balanced_train":
-            csv_path = self._dataset_csv
-            self._current_split = "unbal_train"  # Subset files are from unbalanced dataset
+            csv_path = self.balanced_csv
+            dir_split = "bal_train"
+        elif split == "unbalanced_train":
+            csv_path = self.unbalanced_csv
+            dir_split = "unbal_train"
+        elif split == "eval":
+            csv_path = self.eval_csv
+            dir_split = "eval"
         elif split == "custom":
             if self._custom_csv_path is None:
                 raise ValueError("Custom CSV path not set. Call set_custom_csv() first.")
-            csv_path = self._custom_csv_path  # Use the internal custom CSV path
-            self._current_split = (
-                "unbal_train"  # Custom files are typically from unbalanced dataset
-            )
-        elif split == "eval":
-            csv_path = self.eval_csv
-            self._current_split = "eval"
-        elif split == "unbalanced_train":
-            csv_path = self.unbalanced_csv
-            self._current_split = "unbal_train"
+            # Custom CSV is in subset format - load it differently
+            return self._load_subset_csv(self._custom_csv_path)
         else:
             # This shouldn't happen due to validation in base class, but keep for safety
             raise ValueError(
@@ -202,14 +201,54 @@ class AudiosetConfig(DatasetConfig):
                                 "start_seconds": parts[1],
                                 "end_seconds": parts[2],
                                 "positive_labels": parts[3],
-                            }
+                            },
+                            split=dir_split,  # Pass filesystem directory to parser
                         )
                         audio_files.append(parsed)
 
         return audio_files
 
-    def parse_metadata_row(self, row: dict[str, str]) -> dict[str, Any]:
-        """Parse a single CSV row into standardized metadata format."""
+    def _load_subset_csv(self, csv_path: Path) -> list[dict]:
+        """Load metadata from a subset CSV created by create_subset().
+
+        Subset CSV format: filename,label,original_class,split,audio_path
+        """
+        import csv
+
+        audio_files = []
+        with csv_path.open("r") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                # Extract filename without extension to get YTID
+                filename = row["filename"]
+                ytid = filename.replace(".flac", "").split("_")[0]
+
+                # Reconstruct metadata format expected by the rest of the system
+                audio_files.append(
+                    {
+                        "filename": filename,
+                        "ytid": ytid,
+                        "start_seconds": 0.0,  # Not available in subset CSV
+                        "end_seconds": 10.0,  # AudioSet default clip length
+                        "labels": [row["original_class"]],  # Use original_class as the label
+                        "mids": [],  # MIDs not available in subset format
+                        "split": row["split"],
+                        "audio_path": Path(row["audio_path"]),
+                    }
+                )
+
+        return audio_files
+
+    def parse_metadata_row(self, row: dict[str, str], split: str | None = None) -> dict[str, Any]:
+        """Parse a single CSV row into standardized metadata format.
+
+        Args:
+            row: Raw CSV row data
+            split: Filesystem directory split (bal_train, unbal_train, eval).
+                   If None, defaults to unbal_train.
+        """
+        if split is None:
+            split = "unbal_train"
         ytid = row["YTID"]
         start_seconds = float(row["start_seconds"])
         end_seconds = float(row["end_seconds"])
@@ -236,22 +275,36 @@ class AudiosetConfig(DatasetConfig):
             "end_seconds": end_seconds,
             "labels": label_names,  # Display names for consistency with other datasets
             "mids": label_mids,  # Keep original MIDs for reference
-            "audio_path": self.get_audio_path(filename),
+            "split": split,  # Include split in metadata
+            "audio_path": self.get_audio_path(filename, split=split),
         }
 
-    def get_audio_path(self, filename: str, fold: int | None = None) -> Path:
+    def get_audio_path(
+        self, filename: str, fold: int | None = None, split: str | None = None
+    ) -> Path:
         """Get full path to audio file.
 
         AudioSet organizes files in subdirectories by first 2 characters of YTID.
+
+        Args:
+            filename: Audio filename (e.g., "Y123.flac")
+            fold: Ignored for AudioSet (kept for interface compatibility)
+            split: Filesystem directory (bal_train, unbal_train, eval).
+                   Should be provided from metadata['split'].
+
+        Returns:
+            Full path to audio file
         """
-        ytid = filename.split("_")[0]  # Extract YTID from filename
+        if split is None:
+            # If no split provided, assume unbal_train as most common case
+            # This maintains some backwards compatibility for edge cases
+            split = "unbal_train"
 
-        # Determine which subdirectory based on first 2 characters
-        first_two = ytid[:2]
+        # Extract YTID from filename (remove .flac extension first)
+        ytid = filename.replace(".flac", "")
+        first_two = ytid[:2]  # Determine subdirectory based on first 2 characters
 
-        # Use the current split (set during load_metadata) to construct path
-        # File existence is checked later in process_single_file
-        return self.audio_root / self._current_split / first_two / filename
+        return self.audio_root / split / first_two / filename
 
     def get_spectrogram_path(self, filename: str, specs_dir: Path) -> Path:
         """Get path where spectrogram should be stored."""
@@ -340,6 +393,90 @@ class AudiosetConfig(DatasetConfig):
         except Exception as e:
             logger.error(f"Error processing {file_info['filename']}: {e}")
             return False, None
+
+    # === Dataset Subsetting ===
+    def create_subset(
+        self,
+        output_path: Path,
+        class_name: str,
+        max_samples: int,
+        positive_ratio: float = 0.5,
+        split: str | None = None,
+        seed: int = 42,
+    ) -> Path:
+        """Create a training-ready subset CSV for binary classification.
+
+        Args:
+            output_path: Where to write the subset CSV
+            class_name: Class name to use as positive class
+            max_samples: Maximum total samples (positive + negative)
+            positive_ratio: Target ratio of positive samples (0.0-1.0)
+            split: Dataset split to sample from (default: unbalanced_train)
+            seed: Random seed for reproducibility
+
+        Returns:
+            Path to created CSV file
+        """
+        import csv
+        import random
+
+        random.seed(seed)
+        split = split or "unbalanced_train"
+
+        # Validate class exists
+        if class_name not in self.name_to_id:
+            raise ValueError(
+                f"Class '{class_name}' not found. Use list_classes() to see valid names."
+            )
+
+        # Load and filter
+        all_metadata = self.load_metadata(split=split)
+        positives = [m for m in all_metadata if class_name in m.get("labels", [])]
+        negatives = [m for m in all_metadata if class_name not in m.get("labels", [])]
+
+        # Sample requested amounts (missing files handled by lazy loading during training)
+        target_pos = min(int(max_samples * positive_ratio), len(positives))
+        target_neg = min(max_samples - target_pos, len(negatives))
+
+        sampled_positives = random.sample(positives, target_pos)
+        sampled_negatives = random.sample(negatives, target_neg)
+
+        # Combine samples (no file existence check - lazy loading handles missing files)
+        samples = [(m, 1, class_name) for m in sampled_positives]
+        samples += [(m, 0, m["labels"][0] if m["labels"] else "unknown") for m in sampled_negatives]
+
+        # Calculate actual achieved ratio
+        actual_pos_count = len(sampled_positives)
+        actual_total = len(samples)
+        actual_ratio = actual_pos_count / actual_total if actual_total > 0 else 0
+
+        # Write CSV
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with output_path.open("w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["filename", "label", "original_class", "split", "audio_path"])
+            for item, label, orig_class in samples:
+                writer.writerow(
+                    [
+                        item["filename"],
+                        label,
+                        orig_class,
+                        item["split"],
+                        str(item["audio_path"]),
+                    ]
+                )
+
+        # Log summary
+        print(f"\nSubset created: {output_path}")
+        print(f"  Total samples: {actual_total:,}")
+        print(f"  Positive ({class_name}): {actual_pos_count:,} ({actual_ratio:.2%})")
+        print(f"  Negative: {len(sampled_negatives):,} ({(1 - actual_ratio):.2%})")
+        if abs(actual_ratio - positive_ratio) > 0.01:
+            print(
+                f"  ⚠ Note: Requested {positive_ratio:.1%} positive, but only {len(positives):,} available in dataset"
+            )
+
+        return output_path
 
     # === Binary Classification ===
     def is_positive_class(self, class_name: str, positive_class: str | int) -> bool:

@@ -67,7 +67,8 @@ AudioLoop uses a pluggable strategy pattern for candidate selection:
 - **`training_core.py`**: Core training logic with automatic versioning and pluggable stopping criteria
 - **`label_audio.py`**: Terminal-based audio labeling interface with multi-dataset support
 - **`merge_labels.py`**: Combines human labels with training sets
-- **`create_specs.py`**: Preprocesses audio into spectrograms
+- **`create_specs.py`**: Preprocesses audio into spectrograms (optional with lazy generation)
+- **`create_subset.py`**: CLI tool for creating training-ready dataset subsets with binary classification labels
 - **`track_metrics.py`**: Comprehensive metrics tracking and visualization (accuracy, F1, precision, recall, confidence, entropy) across active learning cycles
 - **`config.py`**: Unified configuration system coordinating paths, datasets, and experiments
 - **`utils/create_bootstrap_set.py`**: Bootstrap training set creation from ground truth (evaluation mode only)
@@ -205,24 +206,26 @@ Customize paths and behavior via environment variables:
 ## Data Flow
 
 ### Production Mode (Default)
-1. **Preprocessing**: Raw audio → spectrograms via `create_specs.py`
-2. **Initial Training Set**: User-provided labeled dataset
-3. **Model Training**: Small labeled set → CNN model via `train.py`
-4. **Active Learning**: Model predictions on ALL files → candidate selection via `active_learning.py`
-5. **Human Labeling**: Audio playback + labeling via `label_audio.py` or web UI
-6. **Label Integration**: Human labels → expanded training set via `merge_labels.py`
-7. **Performance Monitoring**: Prediction and confidence metrics via `track_metrics.py`
-8. **Iteration**: Repeat training with expanded data
+1. **Subset Creation** (optional, for large datasets): Create manageable subsets via `create_subset.py`
+2. **Preprocessing** (optional): Raw audio → spectrograms via `create_specs.py`, or use lazy generation
+3. **Initial Training Set**: User-provided labeled dataset
+4. **Model Training**: Small labeled set → CNN model via `train.py` (with lazy spec generation if audio_path provided)
+5. **Active Learning**: Model predictions on ALL files → candidate selection via `active_learning.py`
+6. **Human Labeling**: Audio playback + labeling via `label_audio.py` or web UI
+7. **Label Integration**: Human labels → expanded training set via `merge_labels.py`
+8. **Performance Monitoring**: Prediction and confidence metrics via `track_metrics.py`
+9. **Iteration**: Repeat training with expanded data
 
 ### Evaluation Mode (Research/Testing)
-1. **Preprocessing**: Raw audio → spectrograms via `create_specs.py` 
-2. **Bootstrap Training Set**: Sample from ground truth via `utils/create_bootstrap_set.py`
-3. **Model Training**: Small labeled set → CNN model via `train.py`
-4. **Active Learning**: Model predictions with ground truth → candidate selection via `active_learning.py --with-ground-truth`
-5. **Auto-Labeling**: Ground truth extraction via `auto_label_candidates.py` (optional)
-6. **Label Integration**: Labels → expanded training set via `merge_labels.py`
-7. **Performance Evaluation**: Full ground truth metrics (F1, precision, recall) via `track_metrics.py`
-8. **Iteration**: Repeat training with expanded data
+1. **Subset Creation** (optional, for large datasets): Create manageable subsets via `create_subset.py`
+2. **Preprocessing** (optional): Raw audio → spectrograms via `create_specs.py`, or use lazy generation
+3. **Bootstrap Training Set**: Sample from ground truth via `utils/create_bootstrap_set.py`
+4. **Model Training**: Small labeled set → CNN model via `train.py` (with lazy spec generation if audio_path provided)
+5. **Active Learning**: Model predictions with ground truth → candidate selection via `active_learning.py --with-ground-truth`
+6. **Auto-Labeling**: Ground truth extraction via `auto_label_candidates.py` (optional)
+7. **Label Integration**: Labels → expanded training set via `merge_labels.py`
+8. **Performance Evaluation**: Full ground truth metrics (F1, precision, recall) via `track_metrics.py`
+9. **Iteration**: Repeat training with expanded data
 
 **Key Difference**: Evaluation mode includes ground truth data for comprehensive performance analysis, while production mode works with truly unknown data.
 
@@ -527,8 +530,100 @@ Active learning prioritizes samples with high model confidence for human review,
 - **Training Control**: Strategy classes handle stopping decisions, training loop handles execution
 - This ensures focused, maintainable code with clear responsibilities
 
+### Dataset Subsetting
+AudioLoop provides a unified interface for creating training-ready subsets from large datasets:
+
+**Purpose**: Large datasets like AudioSet (2M+ files) are impractical to work with in their entirety. The subsetting system creates manageable, labeled subsets for binary classification tasks.
+
+**Key Features**:
+- **Unified Interface**: `DatasetConfig.create_subset()` method provides consistent API across datasets
+- **Training-Ready Output**: Generates CSV with format: `filename,label,original_class,split,audio_path`
+- **Missing File Handling**: Automatically filters out missing files (e.g., deleted YouTube videos)
+- **Reproducible Sampling**: Seed-based random sampling for consistent subsets
+- **Balanced vs Imbalanced**: Configurable positive ratio for dataset balance
+
+**CLI Tool**:
+```bash
+# Create subset with default 50% positive ratio
+python -m audioloop.create_subset --dataset audioset --class-name "Dog" --max-samples 1000
+
+# Create imbalanced subset (5% positive)
+python -m audioloop.create_subset --dataset audioset --class-name "Speech" \
+    --max-samples 100000 --positive-ratio 0.05
+
+# List available classes
+python -m audioloop.create_subset --dataset audioset --list-classes
+```
+
+**Programmatic Usage**:
+```python
+from audioloop.config import AudioLoopConfig
+
+config = AudioLoopConfig(dataset="audioset")
+dataset_config = config.get_dataset_config()
+
+# Create subset
+subset_path = dataset_config.create_subset(
+    output_path=Path("subsets/dog_1000.csv"),
+    class_name="Dog",
+    max_samples=1000,
+    positive_ratio=0.5,
+    split="unbalanced_train",  # Dataset-specific split
+    seed=42
+)
+```
+
+**Output Format**: The generated CSV is self-contained and training-ready:
+- `filename`: Audio filename (e.g., "abc123.flac")
+- `label`: Binary label (0 or 1)
+- `original_class`: Original class name from dataset
+- `split`: Dataset split (preserves split info for reproducibility)
+- `audio_path`: Full path to audio file (enables lazy spec generation)
+
+### Lazy Spectrogram Generation
+AudioLoop supports on-demand spectrogram generation during training:
+
+**How It Works**:
+1. **CSV with audio_path**: Training CSVs can include full path to audio files
+2. **Dataset Config Pass-Through**: `SpectrogramDataset` receives `dataset_config` parameter
+3. **On-Demand Generation**: When `.pt` file missing, generates spec from audio on-the-fly
+4. **Automatic Caching**: Generated specs saved to disk for future use
+
+**Benefits**:
+- **Simpler Workflow**: Fewer pre-processing steps
+- **Storage Efficiency**: Only generate specs for files actually used
+- **Flexibility**: Change spectrogram parameters without regenerating entire dataset
+
+**Implementation**:
+```python
+# In training_core.py
+dataset_config = config.get_dataset_config()
+
+train_dataset = SpectrogramDataset(
+    csv_file=labels_file,
+    specs_dir=str(config.specs_dir),
+    dataset_config=dataset_config,  # Enables lazy generation
+)
+```
+
+**Behavior**:
+- Spectrogram `.pt` file exists → Load from disk (fast path)
+- Spectrogram missing + `audio_path` available + `dataset_config` provided → Generate on-the-fly
+- Spectrogram missing + no lazy generation support → Raise helpful error
+
+**Example Workflows**:
+```bash
+# Approach 1: Pre-generate all specs
+python -m audioloop.create_specs --dataset audioset
+python -m audioloop.train training_set_v1.csv
+
+# Approach 2: Lazy generation
+python -m audioloop.create_subset --dataset audioset --class-name "Dog" --max-samples 1000
+python -m audioloop.train subsets/audioset_dog_1000.csv  # Specs generated as needed
+```
+
 ### Spectrogram Preprocessing
-Audio is converted to fixed-length (993 frames) mel-spectrograms with log normalization, stored as PyTorch tensors for efficient loading.
+Audio is converted to variable-length mel-spectrograms with log normalization, stored as PyTorch tensors for efficient loading. Spectrograms can be pre-generated via `create_specs.py` or generated on-demand during training via lazy generation.
 
 ### Pluggable Training Stopping Criteria
 AudioLoop uses a Strategy pattern for training stopping decisions:

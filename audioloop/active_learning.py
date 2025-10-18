@@ -4,6 +4,7 @@ import logging
 import os
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 from .active_learning_core import run_active_learning_cycle
 from .config import AudioLoopConfig
@@ -71,8 +72,15 @@ def run_active_learning_for_class(
     Returns:
         tuple: (predictions_file, candidates_file)
     """
+    # Extract subset_csv from dataset_kwargs if present
+    subset_csv = dataset_kwargs.pop("subset_csv", None)
+
     # Get unified config
-    config = AudioLoopConfig(experiment_name=experiment_name, dataset=dataset_name)
+    config = AudioLoopConfig(
+        experiment_name=experiment_name,
+        dataset=dataset_name,
+        subset_csv=Path(subset_csv) if subset_csv else None,
+    )
     dataset_config = config.get_dataset_config()
 
     # Auto-detect dataset file if not provided
@@ -91,10 +99,11 @@ def run_active_learning_for_class(
     if negative_class_name is None:
         negative_class_name = f"not_{positive_class_name}"
 
-    # Create config with active learning parameters
+    # Create config with active learning parameters (preserve subset_csv from initial config)
     active_learning_config = AudioLoopConfig(
         experiment_name=experiment_name,
         dataset=dataset_name,
+        subset_csv=Path(subset_csv) if subset_csv else None,
         total_candidates=total_candidates,
         positive_percentage=positive_percentage,
         min_confidence=min_confidence,
@@ -221,7 +230,9 @@ def display_cycle_summary(config: AudioLoopConfig, current_version: int):
     all_versions = [extract_version_number(f) for f in prediction_files]
 
     # Filter to versions up to and including current_version
-    versions_up_to_current = [(v, f) for v, f in zip(all_versions, prediction_files, strict=False) if v <= current_version]
+    versions_up_to_current = [
+        (v, f) for v, f in zip(all_versions, prediction_files, strict=False) if v <= current_version
+    ]
     if not versions_up_to_current:
         return  # Current version not found
 
@@ -254,7 +265,9 @@ def display_cycle_summary(config: AudioLoopConfig, current_version: int):
     # Display recent performance table
     print("\nRecent Performance:")
     if has_ground_truth:
-        print(f"{'Cycle':<7} {'F1':<6} {'Precision':<10} {'Recall':<8} {'Pred Ratio':<12} {'Confidence':<15}")
+        print(
+            f"{'Cycle':<7} {'F1':<6} {'Precision':<10} {'Recall':<8} {'Pred Ratio':<12} {'Confidence':<15}"
+        )
         print("-" * 80)
     else:
         print(f"{'Cycle':<7} {'Pred Ratio':<12} {'Confidence':<15} {'Total Samples':<15}")
@@ -266,9 +279,11 @@ def display_cycle_summary(config: AudioLoopConfig, current_version: int):
 
         if has_ground_truth:
             pred_ratio_str = f"{m['predicted_positive_ratio']:.1%}"
-            warning = " ⚠️" if (
-                abs(m['predicted_positive_ratio'] - m['actual_positive_ratio']) > 0.15
-            ) else ""
+            warning = (
+                " ⚠️"
+                if (abs(m["predicted_positive_ratio"] - m["actual_positive_ratio"]) > 0.15)
+                else ""
+            )
 
             print(
                 f"v{version:<5} {m['f1_score']:<6.3f} {m['precision']:<10.3f} "
@@ -277,8 +292,7 @@ def display_cycle_summary(config: AudioLoopConfig, current_version: int):
         else:
             pred_ratio_str = f"{m['predicted_positive_ratio']:.1%}"
             print(
-                f"v{version:<5} {pred_ratio_str:<12} {confidence_str:<15} "
-                f"{m['total_samples']:<15}"
+                f"v{version:<5} {pred_ratio_str:<12} {confidence_str:<15} {m['total_samples']:<15}"
             )
 
     # Display overall progress (first vs current version)
@@ -292,20 +306,29 @@ def display_cycle_summary(config: AudioLoopConfig, current_version: int):
             print("-" * 80)
 
             # Confidence trends
-            conf_change = current_metrics['mean_confidence'] - first_metrics['mean_confidence']
+            conf_change = current_metrics["mean_confidence"] - first_metrics["mean_confidence"]
             conf_arrow = "↑" if conf_change > 0 else "↓"
-            print(f"{conf_arrow} Mean Confidence:  {first_metrics['mean_confidence']:.3f} → {current_metrics['mean_confidence']:.3f} ({conf_change:+.3f})")
+            print(
+                f"{conf_arrow} Mean Confidence:  {first_metrics['mean_confidence']:.3f} → {current_metrics['mean_confidence']:.3f} ({conf_change:+.3f})"
+            )
 
             # F1 trends (if available)
             if has_ground_truth:
-                f1_change = current_metrics['f1_score'] - first_metrics['f1_score']
+                f1_change = current_metrics["f1_score"] - first_metrics["f1_score"]
                 f1_arrow = "↑" if f1_change > 0 else "↓"
-                print(f"{f1_arrow} F1 Score:         {first_metrics['f1_score']:.3f} → {current_metrics['f1_score']:.3f} ({f1_change:+.3f})")
+                print(
+                    f"{f1_arrow} F1 Score:         {first_metrics['f1_score']:.3f} → {current_metrics['f1_score']:.3f} ({f1_change:+.3f})"
+                )
 
                 # Prediction ratio vs actual
-                pred_ratio_diff = abs(current_metrics['predicted_positive_ratio'] - current_metrics['actual_positive_ratio'])
+                pred_ratio_diff = abs(
+                    current_metrics["predicted_positive_ratio"]
+                    - current_metrics["actual_positive_ratio"]
+                )
                 pred_arrow = "→" if pred_ratio_diff < 0.05 else "❌"
-                print(f"{pred_arrow} Predicted Ratio:  {first_metrics['predicted_positive_ratio']:.1%} → {current_metrics['predicted_positive_ratio']:.1%} (target: {current_metrics['actual_positive_ratio']:.1%})")
+                print(
+                    f"{pred_arrow} Predicted Ratio:  {first_metrics['predicted_positive_ratio']:.1%} → {current_metrics['predicted_positive_ratio']:.1%} (target: {current_metrics['actual_positive_ratio']:.1%})"
+                )
 
         except Exception:
             pass  # Skip overall progress if we can't calculate it
@@ -360,6 +383,10 @@ Examples:
 
   # Include ground truth evaluation columns (for datasets with known labels)
   python -m audioloop.active_learning --class-name Drill --run-number 1 --with-ground-truth
+
+  # Use subset CSV to restrict file pool (useful for large datasets like AudioSet)
+  python -m audioloop.active_learning --dataset audioset --class-name Dog \\
+    --subset-csv subsets/audioset_dog_10k.csv --run-number 1
         """,
     )
 
@@ -470,6 +497,11 @@ Examples:
         help="Random seed for reproducibility (default: None)",
     )
     parser.add_argument(
+        "--subset-csv",
+        type=str,
+        help="Path to subset CSV to restrict active learning to specific files (e.g., from create_subset)",
+    )
+    parser.add_argument(
         "--with-ground-truth",
         action="store_true",
         help="Include ground truth evaluation columns (ground_truth, correct) in predictions CSV. Use for evaluation with labeled datasets.",
@@ -490,6 +522,7 @@ Examples:
             for key, value in {
                 "experiment_name": args.experiment,
                 "dataset": args.dataset,
+                "subset_csv": Path(args.subset_csv) if args.subset_csv else None,
                 "total_candidates": args.total_candidates,
                 "positive_percentage": args.positive_pct,
                 "min_confidence": args.min_confidence,

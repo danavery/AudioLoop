@@ -232,12 +232,60 @@ class TestTrainingParameters:
         assert config2.stopping_criterion_type == "accuracy"
 
 
+class TestSubsetCSVIntegration:
+    """Test subset_csv parameter integration with dataset configs."""
+
+    def test_subset_csv_parameter_default_none(self):
+        """Test that subset_csv defaults to None."""
+        config = AudioLoopConfig()
+        assert config.subset_csv is None
+
+    def test_subset_csv_parameter_can_be_set(self, tmp_path):
+        """Test that subset_csv can be set via constructor."""
+        subset_path = tmp_path / "subset.csv"
+        subset_path.write_text("filename,label\ntest.wav,1\n")
+
+        config = AudioLoopConfig(subset_csv=subset_path)
+        assert config.subset_csv == subset_path
+
+    def test_get_dataset_config_applies_subset_csv(self, tmp_path):
+        """Test that get_dataset_config() applies subset_csv automatically."""
+        # Create a fake subset CSV
+        subset_path = tmp_path / "subset.csv"
+        subset_path.write_text("filename,label\ntest.wav,1\n")
+
+        config = AudioLoopConfig(dataset="audioset", subset_csv=subset_path)
+        dataset_config = config.get_dataset_config()
+
+        # The dataset config should have the custom CSV set
+        assert dataset_config._custom_csv_path == subset_path  # type: ignore[attr-defined]
+
+    def test_get_dataset_config_raises_error_if_subset_csv_missing(self, tmp_path):
+        """Test that error is raised if subset_csv file doesn't exist."""
+        missing_path = tmp_path / "nonexistent.csv"
+
+        config = AudioLoopConfig(dataset="audioset", subset_csv=missing_path)
+
+        with pytest.raises(FileNotFoundError, match="Subset CSV not found"):
+            config.get_dataset_config()
+
+    def test_get_dataset_config_without_subset_csv_works_normally(self):
+        """Test that get_dataset_config() works normally without subset_csv."""
+        config = AudioLoopConfig(dataset="fsd50k")
+        dataset_config = config.get_dataset_config()
+
+        # Should work fine without subset_csv
+        assert dataset_config is not None
+        assert hasattr(dataset_config, "load_metadata")
+
+
 class TestActiveLearningParameters:
     """Test active learning parameter configuration."""
 
     def test_active_learning_parameter_defaults(self):
         """Test that active learning parameters have correct defaults."""
         config = AudioLoopConfig()
+        assert config.subset_csv is None
         assert config.total_candidates == 50
         assert config.positive_percentage == 0.75
         assert config.min_confidence == 0.8

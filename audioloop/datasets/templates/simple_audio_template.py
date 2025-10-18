@@ -269,7 +269,7 @@ class TemplateAudioConfig(DatasetConfig):
         """Get the shape of tensors produced by this dataset."""
         return (self._n_mels, -1)  # -1 indicates variable time dimension
 
-    def parse_metadata_row(self, row: dict[str, str]) -> dict[str, Any]:
+    def parse_metadata_row(self, row: dict[str, str], split: str | None = None) -> dict[str, Any]:
         """Parse a single CSV row into standardized metadata format."""
         filename = row[self._filename_column].strip()
         label = row[self._label_column].strip()

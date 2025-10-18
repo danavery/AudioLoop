@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
+from audioloop.datasets.audioset_config import AudiosetConfig
 from audioloop.datasets.dataset_config import DatasetConfig
 from audioloop.datasets.fsd50k_config import FSD50KConfig
 from audioloop.datasets.urbansound8k_config import UrbanSound8KConfig
@@ -80,7 +81,7 @@ class TestDatasetConfigInterface:
 
                 return nn.Sequential()
 
-            def parse_metadata_row(self, row):
+            def parse_metadata_row(self, row, split=None):
                 return row
 
             def get_binary_label(self, item, positive_class_id, positive_class_name):
@@ -374,3 +375,471 @@ class TestPathGeneration:
             path = config.get_audio_path("test.wav")
             # Should default to fold1 when not found
             assert "fold1" in str(path)
+
+
+class TestAudioSetConfig:
+    """Test AudioSet-specific configuration behavior."""
+
+    def test_audioset_splits(self):
+        """Test that AudioSet returns correct available splits."""
+        config = AudiosetConfig()
+        splits = config.get_available_splits()
+
+        assert "balanced_train" in splits
+        assert "unbalanced_train" in splits
+        assert "eval" in splits
+        assert "custom" in splits
+        assert len(splits) == 4
+
+    def test_audioset_default_split(self):
+        """Test that AudioSet uses balanced_train as default."""
+        config = AudiosetConfig()
+        assert config.get_default_split() == "balanced_train"
+
+    def test_audioset_path_structure(self):
+        """Test AudioSet path generation with subdirectories."""
+        config = AudiosetConfig()
+
+        # AudioSet organizes files by first 2 characters
+        path = config.get_audio_path("abc123.flac", split="bal_train")
+
+        # Should be: audio_root/bal_train/ab/abc123.flac
+        assert "bal_train" in str(path)
+        assert "/ab/" in str(path)
+        assert "abc123.flac" in str(path)
+
+    def test_audioset_path_split_parameter(self):
+        """Test that AudioSet correctly uses split parameter."""
+        config = AudiosetConfig()
+
+        bal_path = config.get_audio_path("test.flac", split="bal_train")
+        eval_path = config.get_audio_path("test.flac", split="eval")
+
+        assert "bal_train" in str(bal_path)
+        assert "eval" in str(eval_path)
+        assert bal_path != eval_path
+
+    def test_audioset_path_fallback_to_unbal_train(self):
+        """Test that AudioSet falls back to unbal_train when split not provided."""
+        config = AudiosetConfig()
+
+        # No split provided - should default to unbal_train
+        path = config.get_audio_path("test.flac")
+        assert "unbal_train" in str(path)
+
+    def test_audioset_parse_metadata_includes_split(self):
+        """Test that parsed metadata includes split information."""
+        config = AudiosetConfig()
+
+        # Mock the ontology loading
+        config._mid_to_name = {"/m/test": "Test Class"}
+
+        row = {
+            "YTID": "abc123",
+            "start_seconds": "1.5",
+            "end_seconds": "11.5",
+            "positive_labels": '"/m/test"',
+        }
+
+        parsed = config.parse_metadata_row(row, split="bal_train")
+
+        assert parsed["split"] == "bal_train"
+        assert parsed["filename"] == "abc123.flac"
+        assert parsed["ytid"] == "abc123"
+        assert "Test Class" in parsed["labels"]
+
+    def test_audioset_parse_metadata_preserves_split_for_audio_path(self):
+        """Test that split is preserved in metadata for correct audio path resolution."""
+        config = AudiosetConfig()
+
+        # Mock ontology
+        config._mid_to_name = {"/m/test": "Test"}
+
+        row = {
+            "YTID": "YT123",
+            "start_seconds": "0.0",
+            "end_seconds": "10.0",
+            "positive_labels": '"/m/test"',
+        }
+
+        # Parse with different splits
+        parsed_bal = config.parse_metadata_row(row, split="bal_train")
+        parsed_unbal = config.parse_metadata_row(row, split="unbal_train")
+        parsed_eval = config.parse_metadata_row(row, split="eval")
+
+        # Audio paths should differ based on split
+        assert "bal_train" in str(parsed_bal["audio_path"])
+        assert "unbal_train" in str(parsed_unbal["audio_path"])
+        assert "eval" in str(parsed_eval["audio_path"])
+
+        # But filename should be the same
+        assert parsed_bal["filename"] == parsed_unbal["filename"] == parsed_eval["filename"]
+
+    def test_audioset_load_metadata_passes_split_to_parser(self):
+        """Test that load_metadata passes correct split to parse_metadata_row."""
+        config = AudiosetConfig()
+
+        # Create minimal CSV content
+        csv_content = '# YTID,start_seconds,end_seconds,positive_labels\nYT123,0.0,10.0,"/m/test"\n'
+
+        # Mock ontology
+        config._mid_to_name = {"/m/test": "Test"}
+        config._name_to_mid = {"Test": 0}  # Integer ID mapping
+
+        # Mock the CSV file reading for different splits
+        with patch("builtins.open", create=True) as mock_open:
+            from io import StringIO
+
+            mock_open.return_value.__enter__.return_value = StringIO(csv_content)
+
+            # Temporarily override CSV paths
+            import tempfile
+
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tmp:
+                tmp.write(csv_content)
+                tmp_path = Path(tmp.name)
+
+            try:
+                config.balanced_csv = tmp_path
+                config.unbalanced_csv = tmp_path
+                config.eval_csv = tmp_path
+
+                # Load from different splits
+                bal_metadata = config.load_metadata(split="balanced_train")
+                unbal_metadata = config.load_metadata(split="unbalanced_train")
+                eval_metadata = config.load_metadata(split="eval")
+
+                # Verify split is in metadata
+                assert bal_metadata[0]["split"] == "bal_train"
+                assert unbal_metadata[0]["split"] == "unbal_train"
+                assert eval_metadata[0]["split"] == "eval"
+
+                # Verify audio paths use correct split
+                assert "bal_train" in str(bal_metadata[0]["audio_path"])
+                assert "unbal_train" in str(unbal_metadata[0]["audio_path"])
+                assert "eval" in str(eval_metadata[0]["audio_path"])
+            finally:
+                tmp_path.unlink()
+
+    def test_audioset_supports_custom_csv(self):
+        """Test that AudioSet supports custom CSV files."""
+        config = AudiosetConfig()
+        assert config.supports_custom_csv() is True
+
+    def test_audioset_create_subset_raises_not_implemented_error(self):
+        """Test that create_subset is implemented for AudioSet."""
+        config = AudiosetConfig()
+
+        # create_subset should be implemented (not raise NotImplementedError)
+        assert hasattr(config, "create_subset")
+        assert callable(config.create_subset)
+
+    def test_audioset_output_shape(self):
+        """Test that AudioSet returns correct output shape."""
+        config = AudiosetConfig()
+        shape = config.get_output_shape()
+
+        # Should be (n_mels, -1) for variable time dimension
+        assert shape[0] == config.n_mels
+        assert shape[1] == -1
+
+
+class TestCreateSubsetInterface:
+    """Test the create_subset interface across datasets."""
+
+    def test_create_subset_default_not_implemented(self):
+        """Test that create_subset raises NotImplementedError by default."""
+
+        # Create a minimal dataset config
+        class MinimalConfig(DatasetConfig):
+            @property
+            def dataset_csv(self) -> Path:
+                return Path("test.csv")
+
+            @property
+            def audio_root(self) -> Path:
+                return Path("test_audio")
+
+            @property
+            def name_to_id(self) -> dict[str, int]:
+                return {"test": 0}
+
+            @property
+            def vocabulary(self) -> dict[int, str]:
+                return {0: "test"}
+
+            def get_available_splits(self) -> list[str]:
+                return ["test"]
+
+            def get_default_split(self) -> str:
+                return "test"
+
+            def _load_metadata_for_split(self, split: str):
+                return []
+
+            def list_classes(self):
+                print("test")
+
+            def get_audio_path(self, filename, fold=None):
+                return Path(filename)
+
+            def get_audio_processing_params(self):
+                return {}
+
+            def is_positive_class(self, class_name, positive_class):
+                return False
+
+            def get_spectrogram_path(self, filename, specs_dir):
+                return specs_dir / f"{filename}.pt"
+
+            def create_spectrogram_transform(self):
+                import torch.nn as nn
+
+                return nn.Sequential()
+
+            def parse_metadata_row(self, row, split=None):
+                return row
+
+            def get_binary_label(self, item, positive_class_id, positive_class_name):
+                return 0
+
+            def fix_spectrogram_length(self, spec):
+                return spec
+
+            def get_output_shape(self) -> tuple[int, ...]:
+                return (128, -1)
+
+            def process_single_file(self, file_info, output_dir):
+                return True, None
+
+        config = MinimalConfig()
+
+        with pytest.raises(NotImplementedError, match="doesn't support create_subset"):
+            config.create_subset(output_path=Path("test.csv"), class_name="test", max_samples=100)
+
+    def test_audioset_implements_create_subset(self):
+        """Test that AudioSet implements create_subset."""
+        config = AudiosetConfig()
+
+        # Should have the method implemented (not just inherited)
+        assert "create_subset" in dir(AudiosetConfig)
+
+        # The method should be callable
+        assert callable(config.create_subset)
+
+    def test_audioset_create_subset_basic_functionality(self, tmp_path):
+        """Test basic create_subset functionality with mocked metadata."""
+        config = AudiosetConfig()
+
+        # Mock the ontology and metadata
+        config._mid_to_name = {"/m/dog": "Dog", "/m/cat": "Cat"}
+        config._name_to_mid = {"Dog": 0, "Cat": 1}  # Integer ID mapping
+
+        # Mock load_metadata to return fake data
+        fake_metadata = [
+            {
+                "filename": "dog1.flac",
+                "labels": ["Dog"],
+                "split": "unbal_train",
+                "audio_path": Path("/fake/dog1.flac"),
+            },
+            {
+                "filename": "dog2.flac",
+                "labels": ["Dog"],
+                "split": "unbal_train",
+                "audio_path": Path("/fake/dog2.flac"),
+            },
+            {
+                "filename": "cat1.flac",
+                "labels": ["Cat"],
+                "split": "unbal_train",
+                "audio_path": Path("/fake/cat1.flac"),
+            },
+            {
+                "filename": "cat2.flac",
+                "labels": ["Cat"],
+                "split": "unbal_train",
+                "audio_path": Path("/fake/cat2.flac"),
+            },
+        ]
+
+        with patch.object(config, "load_metadata", return_value=fake_metadata):
+            output_path = tmp_path / "test_subset.csv"
+            result_path = config.create_subset(
+                output_path=output_path,
+                class_name="Dog",
+                max_samples=3,
+                positive_ratio=0.5,
+                seed=42,
+            )
+
+            # Should return the output path
+            assert result_path == output_path
+
+            # File should exist
+            assert output_path.exists()
+
+            # Read and verify CSV contents
+            import csv
+
+            with open(output_path) as f:
+                reader = csv.DictReader(f)
+                rows = list(reader)
+
+            # Should have requested samples
+            assert len(rows) <= 3
+
+            # Should have expected columns
+            assert "filename" in rows[0]
+            assert "label" in rows[0]
+            assert "original_class" in rows[0]
+            assert "split" in rows[0]
+            assert "audio_path" in rows[0]
+
+            # Count positive and negative samples
+            positives = [r for r in rows if r["label"] == "1"]
+            negatives = [r for r in rows if r["label"] == "0"]
+
+            # Should have some of each (given our fake data)
+            assert len(positives) > 0
+            assert len(negatives) > 0
+
+    def test_audioset_create_subset_respects_positive_ratio(self, tmp_path):
+        """Test that create_subset respects the positive_ratio parameter."""
+        config = AudiosetConfig()
+
+        # Mock with more data to test ratio
+        config._mid_to_name = {"/m/dog": "Dog", "/m/cat": "Cat"}
+        config._name_to_mid = {"Dog": 0, "Cat": 1}  # Integer ID mapping
+
+        fake_metadata = []
+        # Create 20 dog samples and 20 cat samples
+        for i in range(20):
+            fake_metadata.append(
+                {
+                    "filename": f"dog{i}.flac",
+                    "labels": ["Dog"],
+                    "split": "unbal_train",
+                    "audio_path": Path(f"/fake/dog{i}.flac"),
+                }
+            )
+            fake_metadata.append(
+                {
+                    "filename": f"cat{i}.flac",
+                    "labels": ["Cat"],
+                    "split": "unbal_train",
+                    "audio_path": Path(f"/fake/cat{i}.flac"),
+                }
+            )
+
+        with patch.object(config, "load_metadata", return_value=fake_metadata):
+            output_path = tmp_path / "test_ratio.csv"
+            config.create_subset(
+                output_path=output_path,
+                class_name="Dog",
+                max_samples=10,
+                positive_ratio=0.3,  # 30% positive
+                seed=42,
+            )
+
+            # Read and count
+            import csv
+
+            with open(output_path) as f:
+                reader = csv.DictReader(f)
+                rows = list(reader)
+
+            positives = len([r for r in rows if r["label"] == "1"])
+            total = len(rows)
+
+            # Should be close to 30% positive (3 out of 10)
+            assert total == 10
+            assert positives == 3  # 30% of 10
+
+    def test_audioset_create_subset_invalid_class_raises_error(self, tmp_path):
+        """Test that create_subset raises error for invalid class name."""
+        config = AudiosetConfig()
+
+        # Mock ontology
+        config._mid_to_name = {"/m/dog": "Dog"}
+        config._name_to_mid = {"Dog": 0}  # Integer ID mapping
+
+        with pytest.raises(ValueError, match="Class 'InvalidClass' not found"):
+            config.create_subset(
+                output_path=tmp_path / "test.csv", class_name="InvalidClass", max_samples=100
+            )
+
+    def test_audioset_create_subset_creates_parent_directory(self, tmp_path):
+        """Test that create_subset creates parent directories if needed."""
+        config = AudiosetConfig()
+
+        config._mid_to_name = {"/m/dog": "Dog"}
+        config._name_to_mid = {"Dog": 0}  # Integer ID mapping
+
+        fake_metadata = [
+            {
+                "filename": "dog1.flac",
+                "labels": ["Dog"],
+                "split": "unbal_train",
+                "audio_path": Path("/fake/dog1.flac"),
+            },
+        ]
+
+        with patch.object(config, "load_metadata", return_value=fake_metadata):
+            # Use nested path that doesn't exist
+            output_path = tmp_path / "nested" / "dir" / "subset.csv"
+
+            config.create_subset(output_path=output_path, class_name="Dog", max_samples=10, seed=42)
+
+            # Parent directories should be created
+            assert output_path.exists()
+            assert output_path.parent.exists()
+
+    def test_audioset_create_subset_reproducible_with_seed(self, tmp_path):
+        """Test that create_subset produces same results with same seed."""
+        config = AudiosetConfig()
+
+        config._mid_to_name = {"/m/dog": "Dog", "/m/cat": "Cat"}
+        config._name_to_mid = {"Dog": 0, "Cat": 1}  # Integer ID mapping
+
+        # Create larger dataset to test sampling
+        fake_metadata = []
+        for i in range(50):
+            fake_metadata.append(
+                {
+                    "filename": f"dog{i}.flac",
+                    "labels": ["Dog"],
+                    "split": "unbal_train",
+                    "audio_path": Path(f"/fake/dog{i}.flac"),
+                }
+            )
+            fake_metadata.append(
+                {
+                    "filename": f"cat{i}.flac",
+                    "labels": ["Cat"],
+                    "split": "unbal_train",
+                    "audio_path": Path(f"/fake/cat{i}.flac"),
+                }
+            )
+
+        with patch.object(config, "load_metadata", return_value=fake_metadata):
+            # Create two subsets with same seed
+            output1 = tmp_path / "subset1.csv"
+            output2 = tmp_path / "subset2.csv"
+
+            config.create_subset(output1, "Dog", 20, seed=42)
+            config.create_subset(output2, "Dog", 20, seed=42)
+
+            # Read both files
+            import csv
+
+            with open(output1) as f:
+                rows1 = list(csv.DictReader(f))
+            with open(output2) as f:
+                rows2 = list(csv.DictReader(f))
+
+            # Should have identical contents
+            assert len(rows1) == len(rows2)
+            for r1, r2 in zip(rows1, rows2, strict=False):
+                assert r1["filename"] == r2["filename"]
+                assert r1["label"] == r2["label"]

@@ -75,6 +75,7 @@ class AudioLoopConfig:
 
     # Dataset configuration (environment variable support)
     dataset: str = field(default_factory=lambda: os.getenv("AUDIOLOOP_DATASET", "fsd50k"))
+    subset_csv: Path | None = None  # Optional subset CSV to restrict dataset files
 
     # Training parameters (experiment configuration)
     max_epochs: int = 1000
@@ -213,11 +214,22 @@ class AudioLoopConfig:
         return self.output_dir / f"{dataset_name}_files.csv"
 
     def get_dataset_config(self) -> DatasetConfig:
-        """Get the dataset configuration for the current dataset."""
+        """Get the dataset configuration for the current dataset.
+
+        If subset_csv is specified, automatically applies it to restrict the dataset files.
+        """
         from .datasets.dataset_registry import get_dataset_config_class
 
         config_class = get_dataset_config_class(self.dataset)
-        return config_class()
+        dataset_config = config_class()
+
+        # Apply subset restriction if specified
+        if self.subset_csv:
+            if not self.subset_csv.exists():
+                raise FileNotFoundError(f"Subset CSV not found: {self.subset_csv}")
+            dataset_config.set_custom_csv(self.subset_csv)
+
+        return dataset_config
 
     def create_directories(self) -> None:
         """Create all necessary directories for this configuration."""
