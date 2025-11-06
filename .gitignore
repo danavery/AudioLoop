@@ -12,3 +12,7 @@ subsets/
 training_sets*/
 *png
 CLAUDE.md
+ARCHITECTURE.md
+ENSEMBLE_PROPOSAL.md
+TODO.md
+TRAINING_STRATEGIES.md
