@@ -2,12 +2,58 @@ import argparse
 import csv
 import logging
 import os
+from pathlib import Path
 
 from .config import AudioLoopConfig
 from .utils.paths import extract_version_from_filename
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
+
+
+def compute_and_log_candidate_metrics(new_labels_csv, config, log_level=logging.INFO):
+    """
+    Compute candidate metrics for the labeled candidates and save to history.
+
+    Args:
+        new_labels_csv: Path to candidates CSV file
+        config: AudioLoopConfig instance (or None)
+        log_level: Logging level for output
+
+    Returns:
+        Dict of metrics if successful, empty dict otherwise
+    """
+    if config is None:
+        return {}
+
+    from .utils.candidate_metrics import calculate_and_save_candidate_metrics
+
+    # Extract cycle number from candidates filename
+    cycle = extract_version_from_filename(Path(new_labels_csv), "candidates")
+
+    if cycle is None:
+        logger.log(
+            log_level,
+            f"Could not extract cycle number from {Path(new_labels_csv).name}, skipping metrics",
+        )
+        return {}
+
+    # Calculate and save metrics
+    metrics = calculate_and_save_candidate_metrics(
+        Path(new_labels_csv), config.output_dir, cycle
+    )
+
+    if metrics:
+        logger.log(
+            log_level,
+            f"Candidate metrics (cycle {cycle}): "
+            f"F1={metrics['f1_score']:.3f}, "
+            f"Precision={metrics['precision']:.3f}, "
+            f"Recall={metrics['recall']:.3f} "
+            f"({metrics['num_candidates']} candidates)",
+        )
+
+    return metrics
 
 
 def merge_training_sets(
@@ -105,6 +151,9 @@ def merge_training_sets(
     logger.info(
         f"Added {new_count} new labeled samples ({new_positive} positive, {new_negative} negative)"
     )
+
+    # Compute and save candidate metrics
+    compute_and_log_candidate_metrics(new_labels_csv, config, log_level)
 
     # Ensure output directory exists
     os.makedirs(os.path.dirname(output_csv) if os.path.dirname(output_csv) else ".", exist_ok=True)

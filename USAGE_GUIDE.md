@@ -510,6 +510,15 @@ python -m audioloop.automated_workflow --class-name siren --cycles 3 --evaluatio
 
 # Use fixed class weighting to stabilize performance
 python -m audioloop.automated_workflow --class-name "Brass instrument" --cycles 10 --class-weighting 0.05 --evaluation-mode --auto-label
+
+# Auto-stop when candidate F1 plateaus (label mode - good for auto-labeling)
+python -m audioloop.automated_workflow --class-name Drill --cycle-stopping-strategy label --evaluation-mode --auto-label
+
+# Auto-stop when candidate recall plateaus (search mode - good for finding rare positives)
+python -m audioloop.automated_workflow --class-name Gunshot --cycle-stopping-strategy search --evaluation-mode --auto-label
+
+# No auto-stopping (default - run fixed number of cycles)
+python -m audioloop.automated_workflow --class-name Siren --cycles 20 --cycle-stopping-strategy none --evaluation-mode --auto-label
 ```
 
 **Automated Workflow Parameters:**
@@ -521,8 +530,9 @@ python -m audioloop.automated_workflow --class-name "Brass instrument" --cycles 
 --dataset {urbansound8k,fsd50k}  # Dataset choice
 --epochs N                    # Max training epochs per cycle (default: 1000)
 --candidates N                # Number of candidates per cycle (default: 50)
---positive-pct 0.75          # Target percentage of positive samples (default: 0.75)
+--positive-pct FLOAT          # Stratify candidates by prediction (0.0-1.0, default: None for pure entropy)
 --selection-mode {confidence,entropy,basic_transition}  # Selection strategy
+--cycle-stopping-strategy {none,label,search}  # Cycle stopping strategy (default: none)
 --class-weighting {adaptive,0.0-1.0}  # Class weighting mode (default: none)
 --experiment EXPERIMENT       # Experiment name for organization
 --seed SEED                   # Random seed for reproducibility

@@ -5,7 +5,9 @@ This module provides functions for calculating performance metrics
 from predictions, supporting both active learning and evaluation workflows.
 """
 
+import csv
 import statistics
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -240,3 +242,90 @@ def calculate_confidence_percentiles(
         result[key] = np.percentile(confidences, p)
 
     return result
+
+
+def calculate_candidate_metrics(candidates_file: Path) -> dict[str, float]:
+    """
+    Calculate metrics on labeled candidates by comparing model predictions
+    to human-provided labels.
+
+    This function measures model vs. human agreement on the candidate subset,
+    which works identically in evaluation mode (auto-labeled) and production
+    mode (manually labeled). It never uses ground_truth directly, only what
+    the human or auto-labeling script provided in the needs_human_label field.
+
+    Args:
+        candidates_file: Path to candidates CSV file (e.g., labeling_candidates_v1.csv)
+
+    Returns:
+        Dict containing metrics:
+            - f1_score: F1 score (harmonic mean of precision and recall)
+            - precision: Precision (TP / (TP + FP))
+            - recall: Recall (TP / (TP + FN))
+            - accuracy: Accuracy ((TP + TN) / total)
+            - num_candidates: Number of labeled candidates used in calculation
+            - true_positives, false_positives, false_negatives, true_negatives
+
+        Returns empty dict if file doesn't exist or has no labeled candidates.
+
+    Example:
+        >>> metrics = calculate_candidate_metrics(Path("outputs/exp1/labeling_candidates_v1.csv"))
+        >>> print(f"Candidate F1: {metrics['f1_score']:.3f}")
+    """
+    if not candidates_file.exists():
+        return {}
+
+    # Read candidates CSV and filter to labeled rows
+    labeled_candidates = []
+    try:
+        with candidates_file.open("r", encoding="utf-8") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                # Only include candidates that have been labeled
+                human_label = row.get("needs_human_label", "").strip()
+                if human_label in ("0", "1"):
+                    labeled_candidates.append(row)
+    except (OSError, csv.Error):
+        return {}
+
+    if not labeled_candidates:
+        return {}
+
+    # Extract predictions and human labels
+    pred_labels = []
+    human_labels = []
+
+    for row in labeled_candidates:
+        # Get model prediction (Boolean)
+        prediction = row.get("prediction", "")
+        if isinstance(prediction, str):
+            prediction = prediction.lower() == "true"
+        pred_labels.append(int(prediction))
+
+        # Get human-provided label (string "0" or "1")
+        human_label = row.get("needs_human_label", "").strip()
+        human_labels.append(int(human_label))
+
+    # Calculate confusion matrix components
+    tp = sum(1 for h, p in zip(human_labels, pred_labels, strict=False) if h == 1 and p == 1)
+    fp = sum(1 for h, p in zip(human_labels, pred_labels, strict=False) if h == 0 and p == 1)
+    fn = sum(1 for h, p in zip(human_labels, pred_labels, strict=False) if h == 1 and p == 0)
+    tn = sum(1 for h, p in zip(human_labels, pred_labels, strict=False) if h == 0 and p == 0)
+
+    # Calculate metrics
+    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    f1_score = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0.0
+    accuracy = (tp + tn) / (tp + tn + fp + fn) if (tp + tn + fp + fn) > 0 else 0.0
+
+    return {
+        "f1_score": f1_score,
+        "precision": precision,
+        "recall": recall,
+        "accuracy": accuracy,
+        "num_candidates": len(labeled_candidates),
+        "true_positives": tp,
+        "false_positives": fp,
+        "false_negatives": fn,
+        "true_negatives": tn,
+    }

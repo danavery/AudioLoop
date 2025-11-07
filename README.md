@@ -151,6 +151,7 @@ For detailed usage instructions, see **[USAGE_GUIDE.md](USAGE_GUIDE.md)**.
 **Specialized Topics:**
 - **[FSD50K_INTEGRATION.md](FSD50K_INTEGRATION.md)**: FSD50K dataset integration guide
 - **[docs/stopping_criteria_guide.md](docs/stopping_criteria_guide.md)**: Training stopping criteria
+- **[docs/cycle_stopping_criteria.md](docs/cycle_stopping_criteria.md)**: Active learning cycle stopping strategies
 - **[docs/shape_compatibility_and_variable_lengths.md](docs/shape_compatibility_and_variable_lengths.md)**: Variable-length spectrogram support
 - **[webui/README.md](webui/README.md)**: Web-based labeling interface
 

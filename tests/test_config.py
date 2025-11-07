@@ -287,7 +287,7 @@ class TestActiveLearningParameters:
         config = AudioLoopConfig()
         assert config.subset_csv is None
         assert config.total_candidates == 50
-        assert config.positive_percentage == 0.75
+        assert config.positive_percentage is None  # Default is no stratification
         assert config.min_confidence == 0.8
         assert config.selection_mode == "confidence"
         assert config.basic_transition_f1_threshold == 0.2
@@ -330,10 +330,10 @@ class TestActiveLearningParameters:
     def test_active_learning_parameter_validation_ranges(self):
         """Test validation of range-bound active learning parameters."""
         # positive_percentage validation
-        with pytest.raises(ValueError, match="positive_percentage must be between 0.0 and 1.0"):
+        with pytest.raises(ValueError, match="positive_percentage must be None or between 0.0 and 1.0"):
             AudioLoopConfig(positive_percentage=-0.1)
 
-        with pytest.raises(ValueError, match="positive_percentage must be between 0.0 and 1.0"):
+        with pytest.raises(ValueError, match="positive_percentage must be None or between 0.0 and 1.0"):
             AudioLoopConfig(positive_percentage=1.1)
 
         # min_confidence validation

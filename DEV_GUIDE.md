@@ -635,6 +635,20 @@ AudioLoop uses a Strategy pattern for training stopping decisions:
 - **State Management**: `reset()` method for stateful criteria like early stopping
 - **Usage**: Pass `stopping_criterion` parameter to `run_training()` or use default
 
+### Cycle Stopping Criteria
+AudioLoop also supports automatic stopping of active learning cycles based on candidate performance metrics:
+- **Architecture**: Base class `CycleStoppingCriterion` with mode-specific implementations
+- **Strategies**: `LabelModeStoppingCriterion` (optimizes F1), `SearchModeStoppingCriterion` (optimizes recall with precision floor)
+- **Metrics Tracking**: Candidate metrics calculated after each labeling round and persisted to JSON
+- **Rolling Statistics**: Uses rolling averages and stability measures to reduce noise from small sample sizes
+- **State Management**: Tracks patience counter and best cycle across the active learning process
+- **Interface**: `should_stop(current_cycle) -> bool` and `get_best_cycle() -> int`
+- **Integration**: `automated_workflow.py` and `merge_labels.py` handle metric calculation and stopping decisions
+- **Factory**: `create_cycle_stopping_criterion(config, metrics_history)` for instantiation
+- **Limitations**: Experimental feature - candidate metrics (on ~50 high-entropy examples) don't always correlate with corpus performance
+
+See `docs/cycle_stopping_criteria.md` for detailed documentation.
+
 ### Reproducibility and Seed Management
 AudioLoop provides seed management for reproducible experiments:
 

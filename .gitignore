@@ -6,10 +6,10 @@ wheels/
 *.egg-info
 .*/
 
-data/
-outputs*/
-subsets/
-training_sets*/
+data
+outputs
+subsets
+training_sets
 *png
 CLAUDE.md
 ARCHITECTURE.md

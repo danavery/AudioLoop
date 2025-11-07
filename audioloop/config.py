@@ -89,15 +89,24 @@ class AudioLoopConfig:
         None  # "adaptive", float (target positive ratio 0.0-1.0), or None
     )
 
-    # Stopping criteria configuration
+    # Stopping criteria configuration (within-epoch)
     stopping_criterion_type: str = "plateau"
     patience: int = 20
     min_delta: float = 0.01
     accuracy_floor: float | None = None
 
+    # Cross-cycle stopping criteria (for active learning loops)
+    cycle_stopping_strategy: str = "none"  # 'label', 'search', or 'none'
+    cycle_patience: int = 5
+    cycle_min_delta: float = 0.02
+    cycle_min_cycles: int = 10
+    cycle_window: int = 3
+    cycle_std_threshold: float = 0.08
+    precision_floor: float | str = "auto"  # Only used for 'search' mode
+
     # Active learning parameters (experiment configuration)
     total_candidates: int = 50
-    positive_percentage: float = 0.75
+    positive_percentage: float | None = None  # None = no stratification (pure entropy)
     min_confidence: float = 0.8
     selection_mode: str = "confidence"
 
@@ -149,8 +158,8 @@ class AudioLoopConfig:
         """Validate active learning cycle parameters."""
         if self.total_candidates <= 0:
             raise ValueError("total_candidates must be positive")
-        if not (0.0 <= self.positive_percentage <= 1.0):
-            raise ValueError("positive_percentage must be between 0.0 and 1.0")
+        if self.positive_percentage is not None and not (0.0 <= self.positive_percentage <= 1.0):
+            raise ValueError("positive_percentage must be None or between 0.0 and 1.0")
         if not (0.0 <= self.min_confidence <= 1.0):
             raise ValueError("min_confidence must be between 0.0 and 1.0")
         if self.selection_mode not in [

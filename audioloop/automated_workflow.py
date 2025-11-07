@@ -25,6 +25,7 @@ import csv
 import json
 import logging
 import os
+import shutil
 import sys
 import time
 from pathlib import Path
@@ -33,6 +34,8 @@ from audioloop.active_learning import run_active_learning_for_class
 from audioloop.config import AudioLoopConfig
 from audioloop.datasets.dataset_registry import list_available_datasets
 from audioloop.merge_labels import merge_training_sets
+from audioloop.utils.candidate_metrics import load_candidate_metrics_history
+from audioloop.utils.cycle_stopping_criteria import create_cycle_stopping_criterion
 
 # Import the APIs from the existing modules
 from audioloop.training_core import run_training
@@ -197,6 +200,9 @@ def run_automated_workflow(
     # Track training sets created during this workflow run
     training_sets = [initial_training_set]
 
+    # Initialize stopping criterion (will create after first cycle when metrics exist)
+    stopping_criterion = None
+
     for cycle in range(start_cycle, num_cycles + 1):
         print("\n" + "█" * 80)
         print(f"🔄 CYCLE {cycle} of {num_cycles}")
@@ -296,11 +302,127 @@ def run_automated_workflow(
             print(f"├─ Merging labels... ❌ ({e})")
             break
 
+        # Check stopping criterion
+        if config.cycle_stopping_strategy != "none":
+            metrics_history = load_candidate_metrics_history(config.output_dir)
+
+            # Create or update criterion
+            if stopping_criterion is None and metrics_history:
+                stopping_criterion = create_cycle_stopping_criterion(config, metrics_history)
+            elif stopping_criterion:
+                stopping_criterion.metrics_history = metrics_history
+
+            # Check if should stop
+            if stopping_criterion and stopping_criterion.should_stop(cycle):
+                best_cycle = stopping_criterion.get_best_cycle()
+
+                # Copy best model
+                best_model_src = config.get_model_path(best_cycle)
+                best_model_dst = config.output_dir / "model_best.pt"
+                shutil.copy(best_model_src, best_model_dst)
+
+                print(f"\n🛑 STOPPING CRITERION MET")
+                print(f"   Strategy: {config.cycle_stopping_strategy}")
+                print(f"   Best cycle: {best_cycle}")
+                print(f"   Copied model_v{best_cycle}.pt -> model_best.pt")
+                break
+
         # Show progress summary
         print("\n" + "▲" * 50)
         print(f"✅ CYCLE {cycle} COMPLETE")
         print(f"   📊 Added {labeled_count} new labeled samples")
         print(f"   📁 Next training set: {new_training_set}")
+
+        # Helper function to display confusion matrix
+        def display_confusion_matrix(metrics):
+            """Display confusion matrix for candidate metrics with recall/precision"""
+            tp = int(metrics.get('true_positives', 0))
+            fp = int(metrics.get('false_positives', 0))
+            tn = int(metrics.get('true_negatives', 0))
+            fn = int(metrics.get('false_negatives', 0))
+            total = tp + fp + tn + fn
+
+            if total == 0:
+                return
+
+            print(f"      Confusion Matrix ({total} labeled candidates):")
+            print(f"                       Predicted")
+            print(f"                    Positive  Negative")
+            print(f"         Actual Pos    {tp:>4}      {fn:>4}     (recall: {metrics['recall']:.3f})")
+            print(f"                Neg    {fp:>4}      {tn:>4}")
+            print(f"                     -------  -------")
+            print(f"         Precision   {metrics['precision']:.3f}")
+
+        # Display detailed stopping status
+        if stopping_criterion and metrics_history and cycle in metrics_history:
+            current_metrics = metrics_history[cycle]
+
+            if config.cycle_stopping_strategy == "label":
+                # LabelMode: Show F1 tracking
+                rolling_f1 = stopping_criterion._calculate_rolling_avg(
+                    "f1_score", config.cycle_window, cycle
+                )
+                rolling_std = stopping_criterion._calculate_rolling_std(
+                    "f1_score", config.cycle_window, cycle
+                )
+
+                print(f"   📈 Stopping (label mode):")
+                print(f"      F1 (current): {current_metrics['f1_score']:.3f}")
+                print(
+                    f"      F1 (rolling avg): {rolling_f1:.3f} (window={config.cycle_window})"
+                )
+                print(
+                    f"      F1 (stability): std={rolling_std:.3f} (threshold={config.cycle_std_threshold})"
+                )
+                print(
+                    f"      Patience: {stopping_criterion.cycles_without_improvement}/{config.cycle_patience}"
+                )
+                print(
+                    f"      Best cycle: {stopping_criterion.get_best_cycle()} "
+                    f"(rolling avg={stopping_criterion.best_rolling_avg:.3f})"
+                )
+                print()
+                display_confusion_matrix(current_metrics)
+
+            elif config.cycle_stopping_strategy == "search":
+                # SearchMode: Show recall + precision tracking
+                rolling_recall = stopping_criterion._calculate_rolling_avg(
+                    "recall", config.cycle_window, cycle
+                )
+                rolling_precision = stopping_criterion._calculate_rolling_avg(
+                    "precision", config.cycle_window, cycle
+                )
+                rolling_std = stopping_criterion._calculate_rolling_std(
+                    "recall", config.cycle_window, cycle
+                )
+
+                print(f"   📈 Stopping (search mode):")
+                print(f"      Recall (current): {current_metrics['recall']:.3f}")
+                print(
+                    f"      Recall (rolling avg): {rolling_recall:.3f} (window={config.cycle_window})"
+                )
+                print(
+                    f"      Precision (rolling avg): {rolling_precision:.3f} "
+                    f"(floor={stopping_criterion._precision_floor:.3f})"
+                )
+                print(f"      Recall (stability): std={rolling_std:.3f} (threshold=0.10)")
+                print(
+                    f"      Patience: {stopping_criterion.cycles_without_improvement}/{config.cycle_patience}"
+                )
+                print(
+                    f"      Best cycle: {stopping_criterion.get_best_cycle()} "
+                    f"(rolling recall={stopping_criterion.best_rolling_avg:.3f})"
+                )
+                print()
+                display_confusion_matrix(current_metrics)
+
+        # Display confusion matrix even when stopping criteria are disabled
+        elif config.cycle_stopping_strategy == "none":
+            metrics_history = load_candidate_metrics_history(config.output_dir)
+            if metrics_history and cycle in metrics_history:
+                print(f"   📊 Candidate Performance:")
+                display_confusion_matrix(metrics_history[cycle])
+
         print("▲" * 50)
 
         # Brief pause between cycles
@@ -436,6 +558,13 @@ Prerequisites:
         help="Only count plateau patience when accuracy >= this threshold (default from config: None)",
     )
 
+    # Cycle stopping criteria (cross-cycle stopping based on candidate metrics)
+    parser.add_argument(
+        "--cycle-stopping-strategy",
+        choices=["none", "label", "search"],
+        help="Cycle stopping strategy: 'none' (default, no stopping), 'label' (optimize F1), or 'search' (optimize recall with precision floor)",
+    )
+
     # Active learning parameters
     parser.add_argument(
         "--candidates",
@@ -445,7 +574,7 @@ Prerequisites:
     parser.add_argument(
         "--positive-pct",
         type=float,
-        help="Target percentage of positive samples (default from config: 0.75)",
+        help="Stratify candidate selection by predicted class (0.0-1.0). Default: None (pure entropy, no stratification)",
     )
     parser.add_argument(
         "--min-confidence",
@@ -538,6 +667,7 @@ Prerequisites:
             "basic_transition_variance_threshold": args.basic_transition_variance_threshold,
             "estimated_positive_pct": args.estimated_positive_pct,
             "seed": args.seed,
+            "cycle_stopping_strategy": args.cycle_stopping_strategy,
         }.items()
         if value is not None
     }
@@ -587,8 +717,8 @@ Prerequisites:
     print(f"📝 Command line text saved to: {command_txt_file}")
 
     # Validate arguments (use config values for validation since CLI may be None)
-    if config.positive_percentage < 0 or config.positive_percentage > 1:
-        print("❌ --positive-pct must be between 0 and 1")
+    if config.positive_percentage is not None and (config.positive_percentage < 0 or config.positive_percentage > 1):
+        print("❌ --positive-pct must be between 0 and 1 (or omit for no stratification)")
         return 1
 
     if config.min_confidence < 0 or config.min_confidence > 1:
