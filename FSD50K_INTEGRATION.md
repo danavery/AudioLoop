@@ -229,12 +229,12 @@ python -m audioloop.create_specs --dataset urbansound8k
 # Process FSD50K eval split
 python -m audioloop.create_specs --dataset fsd50k --split eval
 
-# Process without clearing existing spectrograms
-python -m audioloop.create_specs --no-clear
+# Clear existing spectrograms before processing
+python -m audioloop.create_specs --clear
 ```
 
 The script automatically:
-- **Clears** the `data/all_specs` directory before processing (unless `--no-clear` is used)
+- **Keeps** existing spectrograms as a cache (use `--clear` to remove all spectrograms first)
 - **Processes** audio files to spectrograms using the appropriate dataset processor
 - **Saves** all spectrograms to the shared `data/all_specs` directory
 

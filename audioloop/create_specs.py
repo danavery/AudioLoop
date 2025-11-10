@@ -144,14 +144,14 @@ class ProcessingStats:
         return histogram
 
 
-def create_specs(config, dataset_config, clear_output=True, limit=None) -> tuple[int, int]:
+def create_specs(config, dataset_config, clear_output=False, limit=None) -> tuple[int, int]:
     """
     Create spectrograms for any dataset using the provided configurations.
 
     Args:
         config: Central AudioLoopConfig for output directory (specs_dir)
         dataset_config: Dataset configuration that handles dataset-specific operations
-        clear_output: Whether to clear existing spectrograms before processing
+        clear_output: Whether to clear existing spectrograms before processing (default: False to cache specs)
         limit: Optional limit on number of files to process (for testing)
 
     Returns:
@@ -276,14 +276,14 @@ if __name__ == "__main__":
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Process FSD50K dataset (default)
+  # Process FSD50K dataset (keeps existing specs as cache)
   python -m audioloop.create_specs
 
   # Process UrbanSound8K dataset
   python -m audioloop.create_specs --dataset urbansound8k
 
-  # Process without clearing existing spectrograms
-  python -m audioloop.create_specs --no-clear
+  # Clear existing spectrograms before processing
+  python -m audioloop.create_specs --clear
 
   # Process only first 100 files (for testing)
   python -m audioloop.create_specs --limit 100
@@ -303,9 +303,9 @@ Examples:
     )
 
     parser.add_argument(
-        "--no-clear",
+        "--clear",
         action="store_true",
-        help="Do not clear existing spectrograms before processing",
+        help="Clear existing spectrograms before processing (default: keep as cache)",
     )
 
     parser.add_argument(
@@ -351,7 +351,7 @@ Examples:
 
     # Create spectrograms
     successful, failed = create_specs(
-        config, dataset_config, clear_output=not args.no_clear, limit=args.limit
+        config, dataset_config, clear_output=args.clear, limit=args.limit
     )
 
     # Create CSV for inference
