@@ -59,7 +59,7 @@ entropy = -sum(p * log(p) for p in probabilities)
 
 AudioLoop supports multiple candidate selection strategies:
 
-#### 4.1 High-Confidence Strategy (Default)
+#### 4.1 High-Confidence Strategy
 The system selects candidates using a **high-confidence approach with randomization**:
 
 1. **Randomize samples first** to prevent bias when many have identical confidence (e.g., 1.0)
@@ -178,6 +178,51 @@ python -m audioloop.active_learning --class-name siren --selection-mode basic_tr
   --basic-transition-confidence-threshold 0.95 \
   --basic-transition-variance-threshold 0.10
 ```
+
+#### 4.4 Mixed-Entropy Strategy (Experimental)
+The mixed-entropy strategy selects candidates **across multiple entropy levels** to balance learning value with representative evaluation.
+
+**Note**: Experimental results show this strategy typically achieves lower peak performance than pure entropy, but may provide more stable candidate metrics in some scenarios.
+
+**How it works**:
+1. Divide predictions into three entropy buckets:
+   - **High entropy** (top 20%): Most uncertain, near decision boundary
+   - **Medium entropy** (next 40%): Moderate uncertainty
+   - **Low entropy** (bottom 40%): Most confident predictions
+
+2. Sample from each bucket with fixed ratios:
+   - **70%** from high-entropy bucket (e.g., 35 of 50 candidates)
+   - **20%** from medium-entropy bucket (e.g., 10 of 50 candidates)
+   - **10%** from low-entropy bucket (e.g., 5 of 50 candidates)
+
+3. Pool multiplier (default: 5x) maintains diversity within each bucket
+
+**Why mixed-entropy?**
+- **More stable metrics**: Including varied difficulty levels reduces volatility in candidate-set performance metrics
+- **Better corpus correlation**: Representative sampling better reflects full dataset performance
+- **Early warning system**: Low-entropy samples catch if model breaks on "easy" examples
+- **Balanced learning**: Still prioritizes boundary cases (70% high) while maintaining evaluation quality
+
+**Comparison to pure entropy sampling**:
+- Pure entropy: 100% from decision boundary → volatile metrics, poor corpus correlation
+- Mixed entropy: Mostly boundary cases (70%) + representative samples (30%) → stable metrics, better tracking
+
+**Small dataset handling** (< 100 predictions):
+- Falls back to pure high-entropy sampling with reduced pool multiplier
+- Ensures focus on informative examples when data is limited
+
+**Usage**:
+```bash
+# Explicit specification (experimental)
+python -m audioloop.active_learning --class-name siren --selection-mode mixed_entropy
+
+# Adjust pool multiplier for more/less diversity
+python -m audioloop.active_learning --class-name siren \
+  --selection-mode mixed_entropy \
+  --candidate-pool-multiplier 10
+```
+
+**Note**: Mixed-entropy is incompatible with `--positive-pct` stratification. The strategy naturally samples across prediction types based on entropy distribution.
 
 ## Customizing Selection
 

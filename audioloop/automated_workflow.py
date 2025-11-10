@@ -585,8 +585,8 @@ Prerequisites:
     # Selection strategy parameters
     parser.add_argument(
         "--selection-mode",
-        choices=["confidence", "entropy", "basic_transition", "stratified_uncertainty"],
-        help="Selection strategy: 'confidence', 'entropy', 'basic_transition', or 'stratified_uncertainty' (default from config: confidence)",
+        choices=["confidence", "entropy", "mixed_entropy", "basic_transition", "stratified_uncertainty"],
+        help="Selection strategy (default: mixed_entropy)",
     )
     parser.add_argument(
         "--basic-transition-f1-threshold",

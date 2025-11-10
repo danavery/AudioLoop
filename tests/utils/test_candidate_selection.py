@@ -20,6 +20,7 @@ from audioloop.utils.candidate_selection import (
     load_predictions,
     save_candidates,
 )
+from audioloop.utils.candidate_selection.mixed_entropy import MixedEntropyStrategy
 
 
 def get_default_thresholds():
@@ -1036,3 +1037,313 @@ def test_basic_transition_relative_behavior():
     assert not strategy._should_transition(just_above_var), (
         "Should not transition with high variance"
     )
+
+# =============================================================================
+# Mixed Entropy Strategy Tests
+# =============================================================================
+
+
+class TestMixedEntropyStrategy:
+    """Tests for MixedEntropyStrategy."""
+
+    def test_basic_distribution(self):
+        """Test that samples are distributed 70/20/10 across entropy levels."""
+        strategy = MixedEntropyStrategy()
+
+        # Create predictions with known entropy distribution
+        predictions = []
+        for i in range(200):
+            predictions.append({
+                "filename": f"file{i}.pt",
+                "prediction": 1 if i % 2 == 0 else 0,
+                "predicted_class": "positive" if i % 2 == 0 else "negative",
+                "confidence": 0.5 + (i / 400),  # 0.5 to 1.0
+                "entropy": 1.0 - (i / 200),  # 1.0 to 0.0 (descending)
+                "filepath": f"path/file{i}.pt",
+            })
+
+        candidates = strategy.select_candidates(predictions, 50)
+
+        assert len(candidates) == 50, "Should return exactly 50 candidates"
+
+        # Check entropy distribution
+        # High: top 20% of 200 = 40 examples (entropy 1.0 to 0.8)
+        # Medium: next 40% = 80 examples (entropy 0.8 to 0.4)
+        # Low: bottom 40% = 80 examples (entropy 0.4 to 0.0)
+
+        high_count = sum(1 for c in candidates if c["entropy"] >= 0.8)
+        medium_count = sum(1 for c in candidates if 0.4 <= c["entropy"] < 0.8)
+        low_count = sum(1 for c in candidates if c["entropy"] < 0.4)
+
+        # Allow some tolerance due to pool multiplier sampling
+        assert 30 <= high_count <= 40, f"Expected ~35 high-entropy, got {high_count}"
+        assert 5 <= medium_count <= 15, f"Expected ~10 medium-entropy, got {medium_count}"
+        assert 3 <= low_count <= 12, f"Expected ~5 low-entropy, got {low_count}"
+
+    def test_entropy_ordering(self):
+        """Test that high bucket has higher entropy than medium, medium > low."""
+        strategy = MixedEntropyStrategy()
+
+        predictions = []
+        for i in range(150):
+            predictions.append({
+                "filename": f"file{i}.pt",
+                "prediction": 1,
+                "predicted_class": "positive",
+                "confidence": 0.9,
+                "entropy": 1.0 - (i / 150),  # Descending from 1.0 to 0.0
+                "filepath": f"path/file{i}.pt",
+            })
+
+        candidates = strategy.select_candidates(predictions, 50)
+
+        # Separate by entropy level based on known distribution
+        high = [c for c in candidates if c["entropy"] >= 0.8]
+        medium = [c for c in candidates if 0.4 <= c["entropy"] < 0.8]
+        low = [c for c in candidates if c["entropy"] < 0.4]
+
+        if high and medium:
+            assert min(c["entropy"] for c in high) >= max(c["entropy"] for c in medium), (
+                "High bucket should have higher entropy than medium"
+            )
+
+        if medium and low:
+            assert min(c["entropy"] for c in medium) >= max(c["entropy"] for c in low), (
+                "Medium bucket should have higher entropy than low"
+            )
+
+    def test_small_dataset_fallback(self):
+        """Test fallback to pure high-entropy sampling for datasets < 100 examples."""
+        strategy = MixedEntropyStrategy()
+
+        # Small dataset (< 100)
+        predictions = []
+        for i in range(50):
+            predictions.append({
+                "filename": f"file{i}.pt",
+                "prediction": 1,
+                "predicted_class": "positive",
+                "confidence": 0.9,
+                "entropy": 1.0 - (i / 50),
+                "filepath": f"path/file{i}.pt",
+            })
+
+        candidates = strategy.select_candidates(predictions, 30)
+
+        assert len(candidates) == 30, "Should return 30 candidates"
+
+        # Should favor high-entropy (fallback mode)
+        avg_entropy = sum(c["entropy"] for c in candidates) / len(candidates)
+        assert avg_entropy > 0.5, "Should favor high-entropy in fallback mode"
+
+    def test_insufficient_high_entropy(self):
+        """Test handling when high-entropy bucket doesn't have enough examples."""
+        strategy = MixedEntropyStrategy()
+
+        # Create predictions where only 10 are in top 20% (should target 35)
+        predictions = []
+        for i in range(100):
+            # First 10 are high entropy, rest are low
+            entropy = 0.9 if i < 10 else 0.1
+            predictions.append({
+                "filename": f"file{i}.pt",
+                "prediction": 1,
+                "predicted_class": "positive",
+                "confidence": 0.8,
+                "entropy": entropy,
+                "filepath": f"path/file{i}.pt",
+            })
+
+        candidates = strategy.select_candidates(predictions, 50)
+
+        # Should still return 50 candidates, pulling from available pools
+        assert len(candidates) == 50, "Should return 50 candidates despite shortage"
+
+    def test_mutual_exclusivity_with_stratification(self):
+        """Test that mixed_entropy rejects positive_percentage parameter."""
+        strategy = MixedEntropyStrategy()
+
+        predictions = [
+            {
+                "filename": "file1.pt",
+                "prediction": 1,
+                "predicted_class": "positive",
+                "confidence": 0.9,
+                "entropy": 0.5,
+                "filepath": "path/file1.pt",
+            }
+        ]
+
+        with pytest.raises(ValueError, match="incompatible with positive_percentage"):
+            strategy.select_candidates(
+                predictions,
+                10,
+                positive_percentage=0.75  # Should raise error
+            )
+
+    def test_pool_multiplier_diversity(self):
+        """Test that pool multiplier maintains diversity in sampling."""
+        strategy = MixedEntropyStrategy()
+
+        predictions = []
+        for i in range(200):
+            predictions.append({
+                "filename": f"file{i}.pt",
+                "prediction": 1,
+                "predicted_class": "positive",
+                "confidence": 0.8,
+                "entropy": 1.0 - (i / 200),
+                "filepath": f"path/file{i}.pt",
+                "unique_id": i,  # Track which were selected
+            })
+
+        # Run multiple times with same seed - should get same results
+        candidates1 = strategy.select_candidates(
+            predictions, 50, candidate_pool_multiplier=5, random_seed=42
+        )
+        candidates2 = strategy.select_candidates(
+            predictions, 50, candidate_pool_multiplier=5, random_seed=42
+        )
+
+        # Same seed should give same results
+        ids1 = sorted([c["unique_id"] for c in candidates1])
+        ids2 = sorted([c["unique_id"] for c in candidates2])
+        assert ids1 == ids2, "Same seed should produce same candidates"
+
+        # Different seed should give different results
+        candidates3 = strategy.select_candidates(
+            predictions, 50, candidate_pool_multiplier=5, random_seed=99
+        )
+        ids3 = sorted([c["unique_id"] for c in candidates3])
+        assert ids1 != ids3, "Different seed should produce different candidates"
+
+    def test_all_same_entropy(self):
+        """Test edge case where all predictions have identical entropy."""
+        strategy = MixedEntropyStrategy()
+
+        predictions = []
+        for i in range(100):
+            predictions.append({
+                "filename": f"file{i}.pt",
+                "prediction": 1,
+                "predicted_class": "positive",
+                "confidence": 0.8,
+                "entropy": 0.5,  # All the same
+                "filepath": f"path/file{i}.pt",
+            })
+
+        candidates = strategy.select_candidates(predictions, 50)
+
+        # Should still select 50 candidates
+        assert len(candidates) == 50, "Should handle uniform entropy distribution"
+
+    def test_get_name(self):
+        """Test that strategy has correct name."""
+        strategy = MixedEntropyStrategy()
+        name = strategy.get_name()
+
+        assert "Mixed" in name, "Name should mention mixed sampling"
+        assert "Entropy" in name or "entropy" in name, "Name should mention entropy"
+
+    def test_shuffling(self):
+        """Test that candidates are shuffled (not sorted by entropy)."""
+        strategy = MixedEntropyStrategy()
+
+        predictions = []
+        for i in range(150):
+            predictions.append({
+                "filename": f"file{i}.pt",
+                "prediction": 1,
+                "predicted_class": "positive",
+                "confidence": 0.8,
+                "entropy": 1.0 - (i / 150),  # Strictly descending
+                "filepath": f"path/file{i}.pt",
+            })
+
+        candidates = strategy.select_candidates(predictions, 50, random_seed=42)
+
+        # Extract entropy values in order
+        entropies = [c["entropy"] for c in candidates]
+
+        # Should NOT be sorted (either ascending or descending)
+        is_sorted_desc = all(entropies[i] >= entropies[i+1] for i in range(len(entropies)-1))
+        is_sorted_asc = all(entropies[i] <= entropies[i+1] for i in range(len(entropies)-1))
+
+        assert not is_sorted_desc and not is_sorted_asc, (
+            "Candidates should be shuffled, not sorted by entropy"
+        )
+
+
+class TestMixedEntropyIntegration:
+    """Integration tests for MixedEntropyStrategy."""
+
+    def test_create_strategy_factory(self):
+        """Test that mixed_entropy can be created via factory function."""
+        strategy = create_strategy("mixed_entropy")
+
+        assert isinstance(strategy, MixedEntropyStrategy), (
+            "Factory should create MixedEntropyStrategy"
+        )
+
+    def test_integration_with_real_workflow(self):
+        """Test integration with active learning workflow."""
+        strategy = create_strategy("mixed_entropy")
+
+        # Simulate realistic predictions
+        predictions = []
+        for i in range(1000):
+            predictions.append({
+                "filename": f"audio{i}.pt",
+                "prediction": 1 if i % 10 < 3 else 0,  # ~30% positive
+                "predicted_class": "positive" if i % 10 < 3 else "negative",
+                "confidence": 0.5 + (i % 50) / 100,  # Varies 0.5-1.0
+                "entropy": abs(0.5 - (i % 100) / 100),  # Varies 0.0-0.5
+                "filepath": f"data/audio{i}.pt",
+            })
+
+        candidates = strategy.select_candidates(
+            predictions,
+            50,
+            candidate_pool_multiplier=5,
+            random_seed=42
+        )
+
+        assert len(candidates) == 50, "Should select correct number"
+        assert all("filename" in c for c in candidates), "Should preserve prediction structure"
+        assert all("entropy" in c for c in candidates), "Should preserve entropy values"
+
+    def test_comparison_with_pure_entropy(self):
+        """Test that mixed entropy gives different distribution than pure entropy."""
+        predictions = []
+        for i in range(200):
+            predictions.append({
+                "filename": f"file{i}.pt",
+                "prediction": 1,
+                "predicted_class": "positive",
+                "confidence": 0.8,
+                "entropy": 1.0 - (i / 200),
+                "filepath": f"path/file{i}.pt",
+            })
+
+        # Pure entropy (use EntropyStrategy)
+        pure_strategy = EntropyStrategy()
+        pure_candidates = pure_strategy.select_candidates(
+            predictions, 50, random_seed=42
+        )
+
+        # Mixed entropy
+        mixed_strategy = MixedEntropyStrategy()
+        mixed_candidates = mixed_strategy.select_candidates(
+            predictions, 50, random_seed=42
+        )
+
+        # Calculate average entropy for each
+        pure_avg = sum(c["entropy"] for c in pure_candidates) / len(pure_candidates)
+        mixed_avg = sum(c["entropy"] for c in mixed_candidates) / len(mixed_candidates)
+
+        # Mixed should have higher average entropy (focuses on top 20% bucket)
+        # Pure entropy with pool_multiplier=5 samples from much broader range
+        assert mixed_avg > pure_avg, (
+            f"Mixed entropy should have higher avg entropy than pure "
+            f"(mixed: {mixed_avg:.4f}, pure: {pure_avg:.4f})"
+        )

@@ -108,7 +108,7 @@ class AudioLoopConfig:
     total_candidates: int = 50
     positive_percentage: float | None = None  # None = no stratification (pure entropy)
     min_confidence: float = 0.8
-    selection_mode: str = "confidence"
+    selection_mode: str = "entropy"
 
     # Selection strategy configuration
     basic_transition_f1_threshold: float = 0.2
@@ -165,6 +165,7 @@ class AudioLoopConfig:
         if self.selection_mode not in [
             "confidence",
             "entropy",
+            "mixed_entropy",
             "basic_transition",
             "stratified_uncertainty",
         ]:
@@ -172,6 +173,13 @@ class AudioLoopConfig:
 
     def _validate_selection_strategy_params(self):
         """Validate parameters for specific selection strategies."""
+        # Validate mutual exclusivity: mixed_entropy and positive_percentage
+        if self.selection_mode == "mixed_entropy" and self.positive_percentage is not None:
+            raise ValueError(
+                "selection_mode='mixed_entropy' is incompatible with positive_percentage stratification. "
+                "Set positive_percentage=None to use mixed entropy sampling."
+            )
+
         if not (0.0 <= self.basic_transition_f1_threshold <= 1.0):
             raise ValueError("basic_transition_f1_threshold must be between 0.0 and 1.0")
         if not (0.0 <= self.basic_transition_confidence_threshold <= 1.0):

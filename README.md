@@ -22,7 +22,7 @@ For detailed usage instructions, see **[USAGE_GUIDE.md](USAGE_GUIDE.md)**.
 
 ## Core Features
 
-- **Strategic Sample Selection**: Confidence-based and entropy-based active learning strategies
+- **Strategic Sample Selection**: Entropy-based (default), confidence, mixed-entropy, and transition-based active learning strategies
 - **Versioned Workflows**: Automatic file versioning for reproducible experiments  
 - **Multiple Datasets**: Built-in support for FSD50K and UrbanSound8K
 - **Flexible Models**: Pluggable CNN architectures with easy extensibility

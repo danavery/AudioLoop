@@ -307,11 +307,16 @@ python -m audioloop.active_learning --dataset urbansound8k --list-classes
 ### Selection Strategies
 
 ```bash
-# High-confidence selection (default)
+# Entropy-based selection (default - focuses on high uncertainty examples)
+python -m audioloop.active_learning --class-name Drill --run-number 1 --selection-mode entropy
+# Or simply omit --selection-mode to use default:
+python -m audioloop.active_learning --class-name Drill --run-number 1
+
+# High-confidence selection
 python -m audioloop.active_learning --class-name Drill --run-number 1 --selection-mode confidence
 
-# Entropy-based selection (uncertainty sampling)
-python -m audioloop.active_learning --class-name Drill --run-number 1 --selection-mode entropy
+# Mixed-entropy selection (experimental - samples 70% high / 20% medium / 10% low entropy)
+python -m audioloop.active_learning --class-name Drill --run-number 1 --selection-mode mixed_entropy
 
 # Basic transition (starts with confidence, switches to entropy when criteria met)
 python -m audioloop.active_learning --class-name Drill --run-number 1 --selection-mode basic_transition
@@ -351,9 +356,9 @@ python -m audioloop.active_learning --class-name dog_bark --run-number 1 \
 **Active Learning Parameters:**
 ```bash
 --total-candidates 20          # Number of samples to select (default: 20)
---positive-pct 0.75           # Percentage positive predictions (default: 0.75)
+--positive-pct 0.75           # Percentage positive predictions (default: None, incompatible with mixed_entropy)
 --min-confidence 0.8          # Minimum confidence threshold (default: 0.8)
---selection-mode {confidence,entropy,basic_transition}  # Selection strategy
+--selection-mode {confidence,entropy,mixed_entropy,basic_transition}  # Selection strategy (default: entropy)
 --with-ground-truth           # Include ground truth evaluation columns
 --auto-thresholds             # Auto-calculate thresholds based on dataset characteristics
 --estimated-positive-pct 0.05 # Estimated positive class percentage (default: 0.05)
@@ -530,8 +535,8 @@ python -m audioloop.automated_workflow --class-name Siren --cycles 20 --cycle-st
 --dataset {urbansound8k,fsd50k}  # Dataset choice
 --epochs N                    # Max training epochs per cycle (default: 1000)
 --candidates N                # Number of candidates per cycle (default: 50)
---positive-pct FLOAT          # Stratify candidates by prediction (0.0-1.0, default: None for pure entropy)
---selection-mode {confidence,entropy,basic_transition}  # Selection strategy
+--positive-pct FLOAT          # Stratify candidates by prediction (0.0-1.0, default: None, incompatible with mixed_entropy)
+--selection-mode {confidence,entropy,mixed_entropy,basic_transition}  # Selection strategy (default: entropy)
 --cycle-stopping-strategy {none,label,search}  # Cycle stopping strategy (default: none)
 --class-weighting {adaptive,0.0-1.0}  # Class weighting mode (default: none)
 --experiment EXPERIMENT       # Experiment name for organization

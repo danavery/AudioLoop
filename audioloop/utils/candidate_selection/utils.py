@@ -206,11 +206,13 @@ def create_strategy(selection_mode: str, **kwargs):
     from .basic_transition import BasicTransitionStrategy
     from .confidence import ConfidenceStrategy
     from .entropy import EntropyStrategy
+    from .mixed_entropy import MixedEntropyStrategy
     from .stratified import StratifiedUncertaintyStrategy
 
     strategies = {
         "confidence": ConfidenceStrategy,
         "entropy": EntropyStrategy,
+        "mixed_entropy": MixedEntropyStrategy,
         "basic_transition": BasicTransitionStrategy,
         "stratified_uncertainty": StratifiedUncertaintyStrategy,
     }
