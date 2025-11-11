@@ -535,6 +535,9 @@ Prerequisites:
     parser.add_argument(
         "--learning-rate", type=float, help="Learning rate (default from config: 0.001)"
     )
+    parser.add_argument(
+        "--model-type", type=str, help="Model architecture to use (default from config: cnn5layer)"
+    )
 
     # Stopping criteria parameters
     parser.add_argument(
@@ -654,6 +657,7 @@ Prerequisites:
             "max_epochs": args.epochs,
             "batch_size": args.batch_size,
             "learning_rate": args.learning_rate,
+            "model_type": args.model_type,
             "stopping_criterion_type": args.stopping_criterion,
             "patience": args.patience,
             "min_delta": args.min_delta,
