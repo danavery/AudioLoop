@@ -220,10 +220,10 @@ Update `active_learning.py` to handle FSD50K class names and binary strategies.
 Use the updated `create_specs.py` script which now supports both datasets:
 
 ```bash
-# Process FSD50K dataset (default, clears directory first)
+# Process FSD50K dataset (default, keeps existing specs as cache)
 python -m audioloop.create_specs
 
-# Process UrbanSound8K dataset (clears directory first)
+# Process UrbanSound8K dataset (keeps existing specs as cache)
 python -m audioloop.create_specs --dataset urbansound8k
 
 # Process FSD50K eval split
