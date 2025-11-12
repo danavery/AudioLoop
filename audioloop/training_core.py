@@ -211,6 +211,21 @@ def run_training(
 
     optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=1e-5)
 
+    # Create learning rate scheduler
+    scheduler = None
+    if config.use_lr_scheduler:
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(
+            optimizer,
+            mode='max',
+            factor=config.lr_scheduler_factor,
+            patience=config.lr_scheduler_patience,
+            min_lr=config.lr_scheduler_min_lr
+        )
+        logger.info("Learning rate scheduler enabled:")
+        logger.info(f"  Factor: {config.lr_scheduler_factor}")
+        logger.info(f"  Patience: {config.lr_scheduler_patience} epochs")
+        logger.info(f"  Min LR: {config.lr_scheduler_min_lr}")
+
     # Create stopping criterion from config
     stopping_criterion = create_stopping_criterion(config)
 
@@ -233,11 +248,17 @@ def run_training(
         epoch_time = time.time() - epoch_start_time
         epoch_times.append(epoch_time)
 
+        # Update learning rate scheduler
+        if scheduler is not None:
+            scheduler.step(accuracy)
+
         # Print progress periodically
         if epoch % 10 == 0 or accuracy >= 1.0 or epoch < 5:
+            current_lr = optimizer.param_groups[0]['lr']
             logger.info(
                 f"Epoch {epoch + 1:4d}/{config.max_epochs} ({epoch_time:.2f}s) - "
-                f"Loss: {avg_loss:.4f} - Accuracy: {accuracy:.4f} ({accuracy * 100:.2f}%)"
+                f"Loss: {avg_loss:.4f} - Accuracy: {accuracy:.4f} ({accuracy * 100:.2f}%) - "
+                f"LR: {current_lr:.2e}"
             )
 
         # Check stopping criterion (this updates internal state)

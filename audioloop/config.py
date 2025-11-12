@@ -82,6 +82,13 @@ class AudioLoopConfig:
     seed: int = 42
     batch_size: int = 32
     learning_rate: float = 0.001
+
+    # Learning rate scheduler parameters
+    use_lr_scheduler: bool = True  # Enable ReduceLROnPlateau scheduler
+    lr_scheduler_factor: float = 0.5  # Multiply LR by this on plateau
+    lr_scheduler_patience: int = 5  # Epochs to wait before reducing LR
+    lr_scheduler_min_lr: float = 1e-6  # Minimum learning rate
+
     model_type: str = "cnn5layer"
     model_kwargs: dict[str, Any] = field(default_factory=dict)
     use_batchnorm: bool | None = None  # None = auto-detect based on dataset size
@@ -145,6 +152,12 @@ class AudioLoopConfig:
             raise ValueError("batch_size must be positive")
         if self.learning_rate <= 0:
             raise ValueError("learning_rate must be positive")
+        if self.lr_scheduler_factor <= 0 or self.lr_scheduler_factor >= 1:
+            raise ValueError("lr_scheduler_factor must be between 0 and 1 (exclusive)")
+        if self.lr_scheduler_patience <= 0:
+            raise ValueError("lr_scheduler_patience must be positive")
+        if self.lr_scheduler_min_lr <= 0 or self.lr_scheduler_min_lr >= self.learning_rate:
+            raise ValueError("lr_scheduler_min_lr must be positive and less than learning_rate")
         if self.stopping_criterion_type not in ["plateau", "accuracy"]:
             raise ValueError(f"Unknown stopping criterion: {self.stopping_criterion_type}")
         if self.stopping_criterion_type == "plateau" and self.patience <= 0:

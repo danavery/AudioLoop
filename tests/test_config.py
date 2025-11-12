@@ -289,7 +289,7 @@ class TestActiveLearningParameters:
         assert config.total_candidates == 50
         assert config.positive_percentage is None  # Default is no stratification
         assert config.min_confidence == 0.8
-        assert config.selection_mode == "confidence"
+        assert config.selection_mode == "entropy"
         assert config.basic_transition_f1_threshold == 0.2
         assert config.basic_transition_confidence_threshold == 0.9
         assert config.basic_transition_variance_threshold == 0.12

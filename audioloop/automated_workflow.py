@@ -536,6 +536,21 @@ Prerequisites:
         "--learning-rate", type=float, help="Learning rate (default from config: 0.001)"
     )
     parser.add_argument(
+        "--no-lr-scheduler",
+        action="store_true",
+        help="Disable learning rate scheduler (enabled by default)"
+    )
+    parser.add_argument(
+        "--lr-scheduler-factor",
+        type=float,
+        help="LR reduction factor for scheduler (default: 0.5)"
+    )
+    parser.add_argument(
+        "--lr-scheduler-patience",
+        type=int,
+        help="Scheduler patience in epochs (default: 5)"
+    )
+    parser.add_argument(
         "--model-type", type=str, help="Model architecture to use (default from config: cnn5layer)"
     )
 
@@ -657,6 +672,9 @@ Prerequisites:
             "max_epochs": args.epochs,
             "batch_size": args.batch_size,
             "learning_rate": args.learning_rate,
+            "use_lr_scheduler": not args.no_lr_scheduler,
+            "lr_scheduler_factor": args.lr_scheduler_factor,
+            "lr_scheduler_patience": args.lr_scheduler_patience,
             "model_type": args.model_type,
             "stopping_criterion_type": args.stopping_criterion,
             "patience": args.patience,
