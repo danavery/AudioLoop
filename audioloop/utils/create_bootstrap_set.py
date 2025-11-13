@@ -10,6 +10,7 @@ def get_matching_samples(
     class_name: str | None = None,
     invert: bool = False,
     config: AudioLoopConfig | None = None,
+    n_needed: int | None = None,
     **kwargs,
 ) -> list[dict]:
     """Get matching samples for any supported dataset.
@@ -19,6 +20,7 @@ def get_matching_samples(
         class_name: Class name to filter by (if None, returns all)
         invert: If True, return samples NOT matching the class
         config: Optional AudioLoopConfig (for subset_csv support)
+        n_needed: If specified, use efficient sampling (sample first, then verify existence)
         **kwargs: Additional dataset-specific parameters
 
     Returns:
@@ -42,8 +44,8 @@ def get_matching_samples(
                 f"Invalid class name: '{class_name}'. Valid names: {list(dataset_config.name_to_id.keys())}"
             ) from None
 
-    matching_samples = []
-
+    # Filter metadata by class match (no I/O yet)
+    matching_metadata = []
     for item in metadata:
         # Determine if this sample matches our criteria
         if class_name is None:
@@ -58,17 +60,59 @@ def get_matching_samples(
             match = not match
 
         if match:
-            # Check if the audio file actually exists before adding to candidates
-            audio_path = item.get("audio_path") or dataset_config.get_audio_path(item["filename"])
-            if audio_path.exists():
-                # Use config's method to get spectrogram path
-                spec_path = dataset_config.get_spectrogram_path(item["filename"], config.specs_dir)
-                matching_samples.append(
-                    {
-                        "spec_filename": spec_path.name,
-                        "audio_path": str(audio_path),
-                    }
+            matching_metadata.append(item)
+
+    # If we know how many we need, use efficient sampling strategy
+    if n_needed is not None:
+        matching_samples = []
+        # Sample more than needed to account for missing files (3x should be safe)
+        oversample_factor = 3
+        candidate_pool = list(matching_metadata)  # Make a copy to avoid modifying original
+
+        while len(matching_samples) < n_needed and candidate_pool:
+            # Sample batch
+            batch_size = min(
+                len(candidate_pool), (n_needed - len(matching_samples)) * oversample_factor
+            )
+            batch = random.sample(candidate_pool, k=batch_size)
+
+            # Remove sampled items from pool to avoid re-checking
+            for item in batch:
+                candidate_pool.remove(item)
+
+            # Check existence only for this batch
+            for item in batch:
+                audio_path = item.get("audio_path") or dataset_config.get_audio_path(
+                    item["filename"]
                 )
+                if audio_path.exists():
+                    spec_path = dataset_config.get_spectrogram_path(
+                        item["filename"], config.specs_dir
+                    )
+                    matching_samples.append(
+                        {
+                            "spec_filename": spec_path.name,
+                            "audio_path": str(audio_path),
+                        }
+                    )
+                    if len(matching_samples) >= n_needed:
+                        break
+
+        return matching_samples
+
+    # Legacy path: check all files (slow but comprehensive)
+    matching_samples = []
+    for item in matching_metadata:
+        audio_path = item.get("audio_path") or dataset_config.get_audio_path(item["filename"])
+        if audio_path.exists():
+            # Use config's method to get spectrogram path
+            spec_path = dataset_config.get_spectrogram_path(item["filename"], config.specs_dir)
+            matching_samples.append(
+                {
+                    "spec_filename": spec_path.name,
+                    "audio_path": str(audio_path),
+                }
+            )
 
     return matching_samples
 
@@ -94,40 +138,48 @@ def write_starting_labels(
     Returns:
         (positives, negatives): Lists of sample dictionaries with 'spec_filename' and 'audio_path'
     """
-    # Get positive samples
+    # Get positive samples (use efficient sampling with n_needed parameter)
     positive_candidates = get_matching_samples(
-        dataset_name, class_name=class_name, invert=False, config=config, **kwargs
+        dataset_name,
+        class_name=class_name,
+        invert=False,
+        config=config,
+        n_needed=n_positive,
+        **kwargs,
     )
 
-    # Get negative samples
+    # Get negative samples (use efficient sampling with n_needed parameter)
     negative_candidates = get_matching_samples(
-        dataset_name, class_name=class_name, invert=True, config=config, **kwargs
+        dataset_name,
+        class_name=class_name,
+        invert=True,
+        config=config,
+        n_needed=n_negative,
+        **kwargs,
     )
 
-    # Report dataset distribution
-    total_available = len(positive_candidates) + len(negative_candidates)
-    positive_pct = len(positive_candidates) / total_available * 100 if total_available > 0 else 0
-    print(f"\nDataset distribution for class '{class_name}':")
-    print(f"  Total available samples: {total_available}")
-    print(f"  Positive ({class_name}): {len(positive_candidates)} ({positive_pct:.1f}%)")
-    print(f"  Negative (non-{class_name}): {len(negative_candidates)} ({100 - positive_pct:.1f}%)")
-
-    # Check availability and sample
+    # Check if we got enough samples (efficient sampling already returned validated files)
     if len(positive_candidates) < n_positive:
         raise ValueError(
             f"Not enough positive samples for class '{class_name}'. "
-            f"Requested: {n_positive}, Available: {len(positive_candidates)}"
+            f"Requested: {n_positive}, Available (with existing audio files): {len(positive_candidates)}"
         )
-    positives = random.sample(positive_candidates, k=n_positive)
 
     if len(negative_candidates) < n_negative:
         raise ValueError(
             f"Not enough negative samples for class '{class_name}'. "
-            f"Requested: {n_negative}, Available: {len(negative_candidates)}"
+            f"Requested: {n_negative}, Available (with existing audio files): {len(negative_candidates)}"
         )
-    negatives = random.sample(negative_candidates, k=n_negative)
 
-    return positives, negatives
+    # Report dataset distribution
+    total_available = len(positive_candidates) + len(negative_candidates)
+    positive_pct = len(positive_candidates) / total_available * 100 if total_available > 0 else 0
+    print(f"\nBootstrap set for class '{class_name}':")
+    print(f"  Total samples: {total_available}")
+    print(f"  Positive ({class_name}): {len(positive_candidates)} ({positive_pct:.1f}%)")
+    print(f"  Negative (non-{class_name}): {len(negative_candidates)} ({100 - positive_pct:.1f}%)")
+
+    return positive_candidates, negative_candidates
 
 
 def create_training_set(
