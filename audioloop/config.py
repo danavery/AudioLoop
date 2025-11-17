@@ -181,6 +181,7 @@ class AudioLoopConfig:
             "mixed_entropy",
             "basic_transition",
             "stratified_uncertainty",
+            "random",
         ]:
             raise ValueError(f"Unknown selection mode: {self.selection_mode}")
 

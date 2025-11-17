@@ -12,6 +12,7 @@ from .base import CandidateSelectionStrategy
 from .basic_transition import BasicTransitionStrategy
 from .confidence import ConfidenceStrategy
 from .entropy import EntropyStrategy
+from .random import RandomStrategy
 from .stratified import StratifiedUncertaintyStrategy
 
 # Import utility functions
@@ -30,6 +31,7 @@ __all__ = [
     # Strategy implementations
     "ConfidenceStrategy",
     "EntropyStrategy",
+    "RandomStrategy",
     "StratifiedUncertaintyStrategy",
     # Utility functions
     "create_strategy",

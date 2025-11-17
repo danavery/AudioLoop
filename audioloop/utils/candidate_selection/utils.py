@@ -207,6 +207,7 @@ def create_strategy(selection_mode: str, **kwargs):
     from .confidence import ConfidenceStrategy
     from .entropy import EntropyStrategy
     from .mixed_entropy import MixedEntropyStrategy
+    from .random import RandomStrategy
     from .stratified import StratifiedUncertaintyStrategy
 
     strategies = {
@@ -215,6 +216,7 @@ def create_strategy(selection_mode: str, **kwargs):
         "mixed_entropy": MixedEntropyStrategy,
         "basic_transition": BasicTransitionStrategy,
         "stratified_uncertainty": StratifiedUncertaintyStrategy,
+        "random": RandomStrategy,
     }
 
     if selection_mode not in strategies:

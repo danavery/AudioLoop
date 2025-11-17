@@ -603,7 +603,7 @@ Prerequisites:
     # Selection strategy parameters
     parser.add_argument(
         "--selection-mode",
-        choices=["confidence", "entropy", "mixed_entropy", "basic_transition", "stratified_uncertainty"],
+        choices=["confidence", "entropy", "mixed_entropy", "basic_transition", "stratified_uncertainty", "random"],
         help="Selection strategy (default: mixed_entropy)",
     )
     parser.add_argument(
