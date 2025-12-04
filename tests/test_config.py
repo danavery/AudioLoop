@@ -162,7 +162,6 @@ class TestTrainingParameters:
         assert config.batch_size == 32
         assert config.learning_rate == 0.001
         assert config.model_type == "cnn5layer"
-        assert config.use_batchnorm is None  # Auto-detect
         assert config.stopping_criterion_type == "plateau"
         assert config.patience == 20
         assert config.min_delta == 0.01
@@ -176,7 +175,6 @@ class TestTrainingParameters:
             batch_size=64,
             learning_rate=0.01,
             model_type="simplecnn",
-            use_batchnorm=False,
             stopping_criterion_type="accuracy",
             patience=30,
             min_delta=0.05,
@@ -187,7 +185,6 @@ class TestTrainingParameters:
         assert config.batch_size == 64
         assert config.learning_rate == 0.01
         assert config.model_type == "simplecnn"
-        assert config.use_batchnorm is False
         assert config.stopping_criterion_type == "accuracy"
         assert config.patience == 30
         assert config.min_delta == 0.05

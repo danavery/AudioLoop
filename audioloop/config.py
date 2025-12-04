@@ -93,7 +93,6 @@ class AudioLoopConfig:
 
     model_type: str = "cnn5layer"
     model_kwargs: dict[str, Any] = field(default_factory=dict)
-    use_batchnorm: bool | None = None  # None = auto-detect based on dataset size
     class_weighting: str | float | None = (
         None  # "adaptive", float (target positive ratio 0.0-1.0), or None
     )

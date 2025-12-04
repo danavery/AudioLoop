@@ -61,11 +61,6 @@ def main():
         "-lr", "--learning-rate", type=float, help="Learning rate (default from config: 0.001)"
     )
     parser.add_argument(
-        "--no-batchnorm",
-        action="store_true",
-        help="Disable BatchNorm (auto-disabled for <100 samples)",
-    )
-    parser.add_argument(
         "--stopping-criterion",
         type=str,
         choices=["accuracy", "plateau"],
@@ -142,7 +137,6 @@ def main():
             "batch_size": args.batch_size,
             "learning_rate": args.learning_rate,
             "model_type": args.model_type,
-            "use_batchnorm": False if args.no_batchnorm else None,
             "stopping_criterion_type": args.stopping_criterion,
             "patience": args.patience,
             "min_delta": args.min_delta,
