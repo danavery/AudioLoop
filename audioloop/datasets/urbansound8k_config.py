@@ -111,10 +111,6 @@ class UrbanSound8KConfig(DatasetConfig):
     top_db: int = 80
     fixed_length: int = 993  # Max length from training data analysis
 
-    # Processing parameters
-    batch_size: int = 32
-    num_workers: int = 4
-
     # Default paths
     metadata_csv: Path = Path("data/urbansound8k/UrbanSound8K.csv")
     _dataset_csv: Path = Path("data/urbansound8k/UrbanSound8K.csv")  # Common interface

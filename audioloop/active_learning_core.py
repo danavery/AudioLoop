@@ -177,11 +177,11 @@ def run_binary_inference(
     # Create data loader
     data_loader = DataLoader(
         dataset,
-        batch_size=32,
+        batch_size=config.batch_size,
         shuffle=False,
-        num_workers=2,  # Enable parallel loading
+        num_workers=config.num_workers,
         pin_memory=torch.cuda.is_available(),  # Enable GPU memory pinning
-        persistent_workers=True,  # Keep workers alive
+        persistent_workers=config.num_workers > 0,  # Only when using workers
         collate_fn=variable_length_collate_fn,
     )
 

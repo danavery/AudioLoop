@@ -81,7 +81,9 @@ class AudioLoopConfig:
     max_epochs: int = 1000
     seed: int = 42
     batch_size: int = 32
+    num_workers: int = 2  # Number of parallel data loading workers
     learning_rate: float = 0.001
+    weight_decay: float = 1e-5  # L2 regularization for optimizer
 
     # Learning rate scheduler parameters
     use_lr_scheduler: bool = True  # Enable ReduceLROnPlateau scheduler
@@ -150,6 +152,8 @@ class AudioLoopConfig:
             raise ValueError("max_epochs must be positive")
         if self.batch_size <= 0:
             raise ValueError("batch_size must be positive")
+        if self.num_workers < 0:
+            raise ValueError("num_workers must be non-negative")
         if self.learning_rate <= 0:
             raise ValueError("learning_rate must be positive")
         if self.lr_scheduler_factor <= 0 or self.lr_scheduler_factor >= 1:

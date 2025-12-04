@@ -156,10 +156,6 @@ class FSD50KConfig(DatasetConfig):
     top_db: int = 80
     fixed_length: int = 2048
 
-    # Processing parameters
-    batch_size: int = 32
-    num_workers: int = 4
-
     # Default paths
     metadata_dir: Path = Path("data/FSD50K/FSD50K.metadata")
     ground_truth_dir: Path = Path("data/FSD50K/FSD50K.ground_truth")

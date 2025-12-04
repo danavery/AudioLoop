@@ -44,10 +44,6 @@ class AudiosetConfig(DatasetConfig):
     top_db: int = 80
     fixed_length: int = 2048  # AudioSet clips are ~10s, so allow longer spectrograms
 
-    # Processing parameters
-    batch_size: int = 32
-    num_workers: int = 4
-
     # Default paths - adjust to your mount point
     metadata_dir: Path = Path("/mnt/audioset/audioset/metadata")
     _audio_root: Path = Path("/mnt/audioset/audioset")

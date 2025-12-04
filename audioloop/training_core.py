@@ -133,8 +133,8 @@ def run_training(
         train_dataset,
         batch_size=config.batch_size,
         shuffle=True,
-        num_workers=2,
-        persistent_workers=True,  # Keep workers alive between epochs
+        num_workers=config.num_workers,
+        persistent_workers=config.num_workers > 0,  # Only when using workers
         pin_memory=torch.cuda.is_available(),
         collate_fn=variable_length_collate_fn,
     )
@@ -209,7 +209,7 @@ def run_training(
         # No class weighting
         criterion = nn.CrossEntropyLoss()
 
-    optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=1e-5)
+    optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
 
     # Create learning rate scheduler
     scheduler = None
