@@ -88,6 +88,11 @@ def main():
         help="Only count plateau patience when accuracy >= this threshold (default from config: None)",
     )
     parser.add_argument(
+        "--dataset",
+        type=str,
+        help="Dataset to use ('fsd50k', 'urbansound8k', 'audioset'). Can also be set via AUDIOLOOP_DATASET environment variable.",
+    )
+    parser.add_argument(
         "--experiment",
         type=str,
         help="Experiment name to customize output directory (default: outputs, with experiment: outputs/experiment)",
@@ -130,6 +135,7 @@ def main():
     config_overrides = {
         key: value
         for key, value in {
+            "dataset": args.dataset,
             "experiment_name": args.experiment,
             "max_epochs": args.epochs,
             "seed": args.seed,
