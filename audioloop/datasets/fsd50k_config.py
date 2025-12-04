@@ -157,8 +157,6 @@ class FSD50KConfig(DatasetConfig):
     fixed_length: int = 2048
 
     # Default paths
-    metadata_dir: Path = Path("data/FSD50K/FSD50K.metadata")
-    ground_truth_dir: Path = Path("data/FSD50K/FSD50K.ground_truth")
     _audio_root: Path = Path("data/FSD50K/FSD50K.dev_audio")
     output_dir: Path = Path("data/all_specs")
 

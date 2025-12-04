@@ -45,7 +45,6 @@ class AudiosetConfig(DatasetConfig):
     fixed_length: int = 2048  # AudioSet clips are ~10s, so allow longer spectrograms
 
     # Default paths - adjust to your mount point
-    metadata_dir: Path = Path("/mnt/audioset/audioset/metadata")
     _audio_root: Path = Path("/mnt/audioset/audioset")
     output_dir: Path = Path("data/all_specs")
 
