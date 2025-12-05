@@ -833,9 +833,9 @@ def test_load_predictions(tmp_path):
     """Test load_predictions function."""
     # Create a temporary CSV file
     csv_file = tmp_path / "test_predictions.csv"
-    csv_content = """filename,confidence,entropy,prediction,predicted_class
-file1.pt,0.95,0.1,1,positive
-file2.pt,0.85,0.3,0,negative
+    csv_content = """filename,confidence,entropy,prediction,predicted_class,target_class
+file1.pt,0.95,0.1,1,positive,positive
+file2.pt,0.85,0.3,0,negative,positive
 """
     csv_file.write_text(csv_content)
 
@@ -863,12 +863,14 @@ def test_save_candidates(tmp_path):
             "filename": "file1.pt",
             "prediction": 1,
             "predicted_class": "positive",
+            "target_class": "positive",
             "confidence": 0.95,
         },
         {
             "filename": "file2.pt",
             "prediction": 0,
             "predicted_class": "negative",
+            "target_class": "positive",
             "confidence": 0.85,
         },
     ]
@@ -881,11 +883,11 @@ def test_save_candidates(tmp_path):
     assert output_file.exists()
     content = output_file.read_text()
     assert (
-        "filename,prediction,predicted_class,confidence,needs_human_label,human_confidence"
+        "filename,prediction,predicted_class,target_class,confidence,needs_human_label,human_confidence"
         in content
     )
-    assert "file1.pt,1,positive,0.95,," in content
-    assert "file2.pt,0,negative,0.85,," in content
+    assert "file1.pt,1,positive,positive,0.95,," in content
+    assert "file2.pt,0,negative,positive,0.85,," in content
 
 
 def test_save_candidates_empty_list(tmp_path, caplog):

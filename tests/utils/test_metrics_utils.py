@@ -27,6 +27,7 @@ class TestCalculateCandidateMetrics:
             "entropy",
             "prob_negative",
             "prob_positive",
+            "target_class",
             "ground_truth",
             "correct",
             "original_class",

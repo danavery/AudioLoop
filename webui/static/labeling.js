@@ -45,6 +45,7 @@ class AudioLabelingInterface {
             candidateInfo: document.getElementById('candidateInfo'),
             currentLabel: document.getElementById('currentLabel'),
             modelPrediction: document.getElementById('modelPrediction'),
+            targetClassName: document.getElementById('targetClassName'),
             progressBar: document.getElementById('progressBar'),
             progressDetails: document.getElementById('progressDetails'),
             progressText: document.getElementById('progressText'),
@@ -235,7 +236,12 @@ class AudioLabelingInterface {
         
         // Update model prediction
         this.elements.modelPrediction.textContent = candidate.prediction;
-        
+
+        // Update target class display
+        if (candidate.target_class) {
+            this.elements.targetClassName.textContent = candidate.target_class;
+        }
+
         // Update jump input max
         this.elements.jumpInput.max = result.total;
         this.elements.jumpInput.value = result.index + 1;

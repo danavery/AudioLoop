@@ -170,6 +170,7 @@ class TestCalculateAndSaveCandidateMetrics:
             "filename",
             "prediction",
             "needs_human_label",
+            "target_class",
             "confidence",
             "entropy",
         ]
@@ -247,6 +248,7 @@ class TestComputeAndLogCandidateMetrics:
             "filename",
             "prediction",
             "needs_human_label",
+            "target_class",
             "confidence",
         ]
 

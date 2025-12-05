@@ -96,6 +96,7 @@ def get_candidate(index):
                 "filename": candidate.get("filename", "Unknown"),
                 "filepath": candidate.get("filepath", "Unknown"),
                 "prediction": candidate.get("predicted_class", "Unknown"),
+                "target_class": candidate.get("target_class", "Unknown"),
                 "confidence": candidate.get("confidence", "Unknown"),
                 "original_class": candidate.get("original_class", "Unknown"),
                 "current_label": candidate.get("needs_human_label", "").strip(),
