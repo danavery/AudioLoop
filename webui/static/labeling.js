@@ -167,9 +167,9 @@ class AudioLabelingInterface {
             // Success - switch to main interface
             this.totalCandidates = result.total_candidates;
             this.isLoaded = true;
-            
+
             this.elements.loadingSection.style.display = 'none';
-            this.elements.mainContent.style.display = 'block';
+            this.elements.mainContent.style.display = 'flex';
             
             // Enable controls
             this.enableControls();

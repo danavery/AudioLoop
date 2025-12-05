@@ -41,6 +41,12 @@ def load_candidates():
     dataset = data.get("dataset", "fsd50k")  # Default to fsd50k
     audio_dir = data.get("audio_dir")
 
+    # Convert relative paths to absolute paths
+    if candidates_csv:
+        candidates_csv = os.path.abspath(candidates_csv)
+    if audio_dir:
+        audio_dir = os.path.abspath(audio_dir)
+
     if not candidates_csv or not os.path.exists(candidates_csv):
         return jsonify({"error": "Candidates CSV file not found"}), 400
 
@@ -89,7 +95,7 @@ def get_candidate(index):
             "candidate": {
                 "filename": candidate.get("filename", "Unknown"),
                 "filepath": candidate.get("filepath", "Unknown"),
-                "prediction": candidate.get("prediction", "Unknown"),
+                "prediction": candidate.get("predicted_class", "Unknown"),
                 "confidence": candidate.get("confidence", "Unknown"),
                 "original_class": candidate.get("original_class", "Unknown"),
                 "current_label": candidate.get("needs_human_label", "").strip(),
@@ -110,7 +116,7 @@ def serve_audio(index):
     if not audio_path or not os.path.exists(audio_path):
         return jsonify({"error": "Audio file not found"}), 404
 
-    return send_file(audio_path)
+    return send_file(audio_path, mimetype="audio/wav")
 
 
 @app.route("/api/label", methods=["POST"])
@@ -171,4 +177,4 @@ def find_next_unlabeled(start_index):
 
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host="0.0.0.0", port=5000)

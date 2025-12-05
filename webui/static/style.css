@@ -91,3 +91,28 @@ body {
     color: #6c757d;
     margin-left: 0.5rem;
 }
+
+/* Ensure main content columns display side-by-side */
+#mainContent.row {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+/* Override when explicitly hidden */
+#mainContent.row[style*="display: none"],
+#mainContent.row[style*="display:none"] {
+    display: none !important;
+}
+
+#mainContent > .col-4,
+#mainContent > .col-8 {
+    flex: 0 0 auto;
+}
+
+#mainContent > .col-4 {
+    width: 33.333333%;
+}
+
+#mainContent > .col-8 {
+    width: 66.666667%;
+}
