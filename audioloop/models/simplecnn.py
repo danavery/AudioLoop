@@ -13,6 +13,8 @@ class SimpleCnn(AudioLoopModel):
     the 5-layer CNN5Layer while maintaining good performance.
     """
 
+    description = "Lightweight 2-layer CNN"
+
     def __init__(self, num_classes=2, **kwargs):
         super().__init__()
         self.num_classes = num_classes

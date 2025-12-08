@@ -6,6 +6,8 @@ from .audio_loop_model import AudioLoopModel
 
 
 class CNN7Layer(AudioLoopModel):
+    description = "7-layer deep CNN with adaptive pooling"
+
     def __init__(self, num_classes, **kwargs):
         super().__init__()
         self.num_classes = num_classes

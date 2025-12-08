@@ -11,15 +11,9 @@ __all__ = ["main", "run_training", "set_seed", "train_epoch"]
 
 
 def get_available_models():
-    """Get a list of available model types."""
-    model_descriptions = {
-        "cnn5layer": "5-layer CNN with adaptive pooling (default)",
-        "simplecnn": "Lightweight 2-layer CNN",
-        # Add more descriptions here as models are added
-    }
-    # Return descriptions for all models discovered dynamically
-    available_models = list_available_models()
-    return {k: model_descriptions.get(k, f"{k} model") for k in available_models}
+    """Get a list of available model types with descriptions."""
+    from .models.model_registry import get_model_descriptions
+    return get_model_descriptions()
 
 
 def list_models():

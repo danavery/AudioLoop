@@ -58,3 +58,28 @@ def list_available_models() -> list[str]:
         available.append(model_name)
 
     return available
+
+
+def get_model_descriptions() -> dict[str, str]:
+    """Get descriptions for all available models.
+
+    Returns:
+        Dict mapping model names to their descriptions.
+
+    Notes:
+        - Accesses class-level description attribute without instantiation
+        - Falls back to generic description if attribute missing or import fails
+        - Safe to call even if some models have errors
+    """
+    descriptions = {}
+    for model_name in list_available_models():
+        try:
+            model_class = get_model_class(model_name)
+            # Access class-level description attribute
+            description = getattr(model_class, "description", f"{model_name} model")
+            descriptions[model_name] = description
+        except (ImportError, ValueError):
+            # If model can't be imported, use generic description
+            descriptions[model_name] = f"{model_name} model"
+
+    return descriptions

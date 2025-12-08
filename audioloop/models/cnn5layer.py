@@ -6,6 +6,8 @@ from .audio_loop_model import AudioLoopModel
 
 
 class CNN5Layer(AudioLoopModel):
+    description = "5-layer CNN with adaptive pooling (default)"
+
     def __init__(self, num_classes, **kwargs):
         super().__init__()
         self.num_classes = num_classes
