@@ -9,6 +9,7 @@ from torch import nn
 from torch.utils.data import DataLoader
 
 from .config import AudioLoopConfig
+from .models.audio_loop_model import AudioLoopModel
 from .models.model_registry import get_model_class, list_available_models
 from .utils.data_utils import get_device, variable_length_collate_fn
 from .utils.spectrogram_dataset import SpectrogramDataset
@@ -72,6 +73,219 @@ def create_model(model_type: str, num_classes: int, dataset_size: int, **kwargs)
 
     # Create model with flexible kwargs - let each model handle its own parameters
     return model_class(num_classes=num_classes, dataset_size=dataset_size, **kwargs)
+
+
+def setup_loss_criterion(
+    config: AudioLoopConfig,
+    train_dataset: SpectrogramDataset,
+    device: torch.device,
+) -> nn.Module:
+    """
+    Create and configure loss criterion with optional class weighting.
+
+    Args:
+        config: AudioLoopConfig with class_weighting setting
+        train_dataset: Training dataset for adaptive weight calculation
+        device: Device to move weights to (CPU or CUDA)
+
+    Returns:
+        nn.CrossEntropyLoss instance (with or without weights)
+
+    Notes:
+        Supports three class weighting modes:
+        - None: Standard unweighted loss
+        - "adaptive": Inverse frequency weighting based on training set
+        - float (0.0-1.0): Fixed target positive ratio
+    """
+    if isinstance(config.class_weighting, float):
+        # Fixed class weighting mode
+        weight_neg = 1.0
+        weight_pos = (1.0 - config.class_weighting) / config.class_weighting
+        class_weights = torch.tensor([weight_neg, weight_pos])
+
+        logger.info(f"Fixed class weighting: target {config.class_weighting:.1%} positive")
+        logger.info(f"  Class weights: [neg={weight_neg:.2f}, pos={weight_pos:.2f}]")
+
+        return nn.CrossEntropyLoss(weight=class_weights.to(device))
+
+    if config.class_weighting == "adaptive":
+        # Adaptive class weighting mode (calculates from training set)
+        labels = [sample["label"] for sample in train_dataset.samples]
+        class_counts = torch.bincount(torch.tensor(labels))
+        total_samples = len(train_dataset)
+        class_weights = total_samples / (len(class_counts) * class_counts.float())
+
+        logger.info("Adaptive class weighting enabled:")
+        logger.info(f"  Class counts: {class_counts.tolist()}")
+        logger.info(f"  Class weights: {class_weights.tolist()}")
+        logger.info(f"  Weight ratio (neg/pos): {class_weights[0] / class_weights[1]:.2f}")
+
+        return nn.CrossEntropyLoss(weight=class_weights.to(device))
+
+    # No class weighting
+    return nn.CrossEntropyLoss()
+
+
+def execute_training_loop(
+    model: AudioLoopModel,
+    train_loader: DataLoader,
+    optimizer: optim.Optimizer,
+    criterion: nn.Module,
+    device: torch.device,
+    stopping_criterion,  # TrainingStoppingCriterion type
+    scheduler: optim.lr_scheduler.ReduceLROnPlateau | None,
+    config: AudioLoopConfig,
+    train_dataset: SpectrogramDataset,
+) -> tuple[float, float | None, int]:
+    """
+    Execute the training loop with stopping criterion and optional LR scheduling.
+
+    Args:
+        model: Neural network model to train
+        train_loader: DataLoader with training batches
+        optimizer: Optimizer (Adam) for parameter updates
+        criterion: Loss function (from setup_loss_criterion)
+        device: Device for training (CPU or CUDA)
+        stopping_criterion: Pluggable stopping strategy
+        scheduler: Optional learning rate scheduler
+        config: AudioLoopConfig with max_epochs setting
+        train_dataset: Training dataset (for stopping criterion kwargs)
+
+    Returns:
+        Tuple of (final_accuracy, best_accuracy, num_epochs):
+        - final_accuracy: Accuracy from last trained epoch
+        - best_accuracy: Accuracy when best model was saved (or None)
+        - num_epochs: Actual number of epochs trained
+
+    Notes:
+        - Updates stopping_criterion's best_model_state internally
+        - Handles for-else logic (natural completion vs early stopping)
+        - Logs progress every 10 epochs, first 5 epochs, or at perfect accuracy
+    """
+    # Pre-allocate timing list to avoid memory allocation during training
+    epoch_times = []
+    accuracy = 0.0
+    best_accuracy = None  # Track accuracy of best saved model
+    num_epochs = 0  # Track actual number of epochs trained
+
+    for epoch in range(config.max_epochs):
+        epoch_start_time = time.time()
+        avg_loss, accuracy = train_epoch(model, train_loader, optimizer, criterion, device)
+
+        epoch_time = time.time() - epoch_start_time
+        epoch_times.append(epoch_time)
+
+        # Update learning rate scheduler
+        if scheduler is not None:
+            scheduler.step(accuracy)
+
+        # Print progress periodically
+        if epoch % 10 == 0 or accuracy >= 1.0 or epoch < 5:
+            current_lr = optimizer.param_groups[0]["lr"]
+            logger.info(
+                f"Epoch {epoch + 1:4d}/{config.max_epochs} ({epoch_time:.2f}s) - "
+                f"Loss: {avg_loss:.4f} - Accuracy: {accuracy:.4f} ({accuracy * 100:.2f}%) - "
+                f"LR: {current_lr:.2e}"
+            )
+
+        # Check stopping criterion (this updates internal state)
+        should_stop = stopping_criterion.should_stop(
+            epoch, accuracy, avg_loss, train_dataset=train_dataset
+        )
+
+        # Update best model state if criterion indicates we should
+        if stopping_criterion.should_update_best_model():
+            stopping_criterion.update_best_model(model.state_dict().copy())
+            best_accuracy = accuracy  # Track best accuracy separately
+            logger.info(f"    💾 Best model updated (epoch {epoch + 1})")
+
+        # Stop if criterion says to stop
+        if should_stop:
+            num_epochs = epoch + 1
+            logger.info("")
+            logger.info("=" * 60)
+            logger.info(f"🛑 Stopping criterion met ({stopping_criterion.__class__.__name__})")
+            logger.info(f"Training completed in {num_epochs} epochs")
+
+            # Report best accuracy if available, otherwise final epoch accuracy
+            if best_accuracy is not None:
+                logger.info(f"Final accuracy: {best_accuracy:.4f} (best saved model)")
+            else:
+                logger.info(f"Final accuracy: {accuracy:.4f} (final epoch)")
+            logger.info("=" * 60)
+            break
+    else:
+        num_epochs = config.max_epochs
+        # Report best accuracy if available, otherwise final epoch accuracy
+        if best_accuracy is not None:
+            logger.info(
+                f"\nTraining completed {num_epochs} epochs. Final accuracy: {best_accuracy:.4f} (best saved model)"
+            )
+        else:
+            logger.info(
+                f"\nTraining completed {num_epochs} epochs. Final accuracy: {accuracy:.4f} (final epoch)"
+            )
+
+    return (accuracy, best_accuracy, num_epochs)
+
+
+def save_trained_model(
+    model: AudioLoopModel,
+    stopping_criterion,  # TrainingStoppingCriterion type
+    config: AudioLoopConfig,
+    version: int,
+    model_path: str | None,
+) -> None:
+    """
+    Save trained model to disk, preferring best model state over final state.
+
+    Args:
+        model: Trained model instance
+        stopping_criterion: Criterion that tracked best model state
+        config: AudioLoopConfig for directory creation
+        version: Model version number
+        model_path: Optional custom save path (uses config if None)
+
+    Side Effects:
+        - Creates output directories if needed
+        - Saves model file to disk with metadata
+        - Logs save location and type (best vs final)
+
+    Notes:
+        - Prefers best_model_state from stopping_criterion
+        - Falls back to final model state if no best tracked
+        - Saves complete metadata from model.get_model_info()
+        - Excludes runtime-only fields (num_parameters)
+    """
+    # Create directories and determine save path
+    config.create_directories()
+    if model_path is None:
+        model_path = str(config.get_model_path(version))
+
+    best_model_state = stopping_criterion.get_best_model_state()
+    if best_model_state is not None:
+        # Save the best model state with complete metadata
+        model.load_state_dict(best_model_state)
+        model_info = model.get_model_info()
+        save_dict = {
+            "model_state_dict": best_model_state,
+            **{
+                k: v for k, v in model_info.items() if k != "num_parameters"
+            },  # Exclude runtime-only fields
+        }
+        torch.save(save_dict, model_path)
+        logger.info(f"✅ Best model saved to: {model_path}")
+    else:
+        # Save the final model state with complete metadata
+        model_info = model.get_model_info()
+        save_dict = {
+            "model_state_dict": model.state_dict(),
+            **{
+                k: v for k, v in model_info.items() if k != "num_parameters"
+            },  # Exclude runtime-only fields
+        }
+        torch.save(save_dict, model_path)
+        logger.info(f"📁 Final model saved to: {model_path}")
 
 
 def run_training(
@@ -180,46 +394,21 @@ def run_training(
     logger.info(f"Model created with {sum(p.numel() for p in model.parameters())} parameters")
 
     # Create loss criterion with optional class weighting
-    if isinstance(config.class_weighting, float):
-        # Fixed class weighting mode
-        weight_neg = 1.0
-        weight_pos = (1.0 - config.class_weighting) / config.class_weighting
-        class_weights = torch.tensor([weight_neg, weight_pos])
+    criterion = setup_loss_criterion(config, train_dataset, device)
 
-        logger.info(f"Fixed class weighting: target {config.class_weighting:.1%} positive")
-        logger.info(f"  Class weights: [neg={weight_neg:.2f}, pos={weight_pos:.2f}]")
-
-        criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
-
-    elif config.class_weighting == "adaptive":
-        # Adaptive class weighting mode (calculates from training set)
-        labels = [sample["label"] for sample in train_dataset.samples]
-        class_counts = torch.bincount(torch.tensor(labels))
-        total_samples = len(train_dataset)
-        class_weights = total_samples / (len(class_counts) * class_counts.float())
-
-        logger.info("Adaptive class weighting enabled:")
-        logger.info(f"  Class counts: {class_counts.tolist()}")
-        logger.info(f"  Class weights: {class_weights.tolist()}")
-        logger.info(f"  Weight ratio (neg/pos): {class_weights[0] / class_weights[1]:.2f}")
-
-        criterion = nn.CrossEntropyLoss(weight=class_weights.to(device))
-
-    else:
-        # No class weighting
-        criterion = nn.CrossEntropyLoss()
-
-    optimizer = optim.Adam(model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay)
+    optimizer = optim.Adam(
+        model.parameters(), lr=config.learning_rate, weight_decay=config.weight_decay
+    )
 
     # Create learning rate scheduler
     scheduler = None
     if config.use_lr_scheduler:
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(
             optimizer,
-            mode='max',
+            mode="max",
             factor=config.lr_scheduler_factor,
             patience=config.lr_scheduler_patience,
-            min_lr=config.lr_scheduler_min_lr
+            min_lr=config.lr_scheduler_min_lr,
         )
         logger.info("Learning rate scheduler enabled:")
         logger.info(f"  Factor: {config.lr_scheduler_factor}")
@@ -236,100 +425,27 @@ def run_training(
     logger.info(f"Stopping criterion: {stopping_criterion.__class__.__name__}")
     logger.info("-" * 50)
 
-    # Pre-allocate timing list to avoid memory allocation during training
-    epoch_times = []
-    accuracy = 0.0
-    best_accuracy = None  # Track accuracy of best saved model
-    num_epochs = 0  # Track actual number of epochs trained
-    for epoch in range(config.max_epochs):
-        epoch_start_time = time.time()
-        avg_loss, accuracy = train_epoch(model, train_loader, optimizer, criterion, device)
-
-        epoch_time = time.time() - epoch_start_time
-        epoch_times.append(epoch_time)
-
-        # Update learning rate scheduler
-        if scheduler is not None:
-            scheduler.step(accuracy)
-
-        # Print progress periodically
-        if epoch % 10 == 0 or accuracy >= 1.0 or epoch < 5:
-            current_lr = optimizer.param_groups[0]['lr']
-            logger.info(
-                f"Epoch {epoch + 1:4d}/{config.max_epochs} ({epoch_time:.2f}s) - "
-                f"Loss: {avg_loss:.4f} - Accuracy: {accuracy:.4f} ({accuracy * 100:.2f}%) - "
-                f"LR: {current_lr:.2e}"
-            )
-
-        # Check stopping criterion (this updates internal state)
-        should_stop = stopping_criterion.should_stop(
-            epoch, accuracy, avg_loss, train_dataset=train_dataset
-        )
-
-        # Update best model state if criterion indicates we should
-        if stopping_criterion.should_update_best_model():
-            stopping_criterion.update_best_model(model.state_dict().copy())
-            best_accuracy = accuracy  # Track best accuracy separately
-            logger.info(f"    💾 Best model updated (epoch {epoch + 1})")
-
-        # Stop if criterion says to stop
-        if should_stop:
-            num_epochs = epoch + 1
-            logger.info("")
-            logger.info("=" * 60)
-            logger.info(f"🛑 Stopping criterion met ({stopping_criterion.__class__.__name__})")
-            logger.info(f"Training completed in {num_epochs} epochs")
-
-            # Report best accuracy if available, otherwise final epoch accuracy
-            if best_accuracy is not None:
-                logger.info(f"Final accuracy: {best_accuracy:.4f} (best saved model)")
-            else:
-                logger.info(f"Final accuracy: {accuracy:.4f} (final epoch)")
-            logger.info("=" * 60)
-            break
-    else:
-        num_epochs = config.max_epochs
-        # Report best accuracy if available, otherwise final epoch accuracy
-        if best_accuracy is not None:
-            logger.info(
-                f"\nTraining completed {num_epochs} epochs. Final accuracy: {best_accuracy:.4f} (best saved model)"
-            )
-        else:
-            logger.info(
-                f"\nTraining completed {num_epochs} epochs. Final accuracy: {accuracy:.4f} (final epoch)"
-            )
+    # Execute training loop
+    accuracy, best_accuracy, num_epochs = execute_training_loop(
+        model=model,
+        train_loader=train_loader,
+        optimizer=optimizer,
+        criterion=criterion,
+        device=device,
+        stopping_criterion=stopping_criterion,
+        scheduler=scheduler,
+        config=config,
+        train_dataset=train_dataset,
+    )
 
     # Save the best model state if available, otherwise save final model
-    # This ensures that when early stopping triggers (e.g., patience exhausted),
-    # we save the model from the epoch with the best performance, not the final epoch
-    config.create_directories()
-    if model_path is None:
-        model_path = str(config.get_model_path(version))
-
-    best_model_state = stopping_criterion.get_best_model_state()
-    if best_model_state is not None:
-        # Save the best model state with complete metadata
-        model.load_state_dict(best_model_state)
-        model_info = model.get_model_info()
-        save_dict = {
-            "model_state_dict": best_model_state,
-            **{
-                k: v for k, v in model_info.items() if k != "num_parameters"
-            },  # Exclude runtime-only fields
-        }
-        torch.save(save_dict, model_path)
-        logger.info(f"✅ Best model saved to: {model_path}")
-    else:
-        # Save the final model state with complete metadata
-        model_info = model.get_model_info()
-        save_dict = {
-            "model_state_dict": model.state_dict(),
-            **{
-                k: v for k, v in model_info.items() if k != "num_parameters"
-            },  # Exclude runtime-only fields
-        }
-        torch.save(save_dict, model_path)
-        logger.info(f"📁 Final model saved to: {model_path}")
+    save_trained_model(
+        model=model,
+        stopping_criterion=stopping_criterion,
+        config=config,
+        version=version,
+        model_path=model_path,
+    )
 
     # Clean up and return the best accuracy if available, otherwise final accuracy
     del train_loader
