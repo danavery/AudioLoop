@@ -3,23 +3,17 @@ import logging
 import re
 
 from .config import AudioLoopConfig
-from .models.model_registry import list_available_models
+from .models.model_registry import get_model_descriptions, list_available_models
 from .training_core import run_training, set_seed, train_epoch
 
 # Re-export for backward compatibility
 __all__ = ["main", "run_training", "set_seed", "train_epoch"]
 
 
-def get_available_models():
-    """Get a list of available model types with descriptions."""
-    from .models.model_registry import get_model_descriptions
-    return get_model_descriptions()
-
-
 def list_models():
     """Print available models and exit."""
     print("Available model types:")
-    for model_type, description in get_available_models().items():
+    for model_type, description in get_model_descriptions().items():
         print(f"  {model_type}: {description}")
 
 
