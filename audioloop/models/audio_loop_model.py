@@ -12,11 +12,8 @@ class AudioLoopModel(nn.Module, ABC):
     Models should implement forward() normally and provide metadata via get_model_info().
 
     Class Attributes:
-        description: Human-readable description of the model (must be defined by subclasses)
+        description: Human-readable description of the model (optional, used for --list-models)
     """
-
-    # Class-level attribute that should be defined by subclasses
-    description: str = NotImplemented
 
     @abstractmethod
     def get_model_info(self) -> dict:

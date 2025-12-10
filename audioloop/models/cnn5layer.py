@@ -71,10 +71,7 @@ class CNN5Layer(AudioLoopModel):
 
         self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc1 = nn.Linear(256, 128)
-        if not self.use_batchnorm:
-            self.dropout = nn.Dropout(
-                0.5
-            )  # Add dropout for regularization when not using BatchNorm
+        self.dropout = nn.Dropout(0.5)  # Only used when not using BatchNorm
         self.fc2 = nn.Linear(in_features=128, out_features=num_classes)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

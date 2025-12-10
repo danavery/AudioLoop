@@ -29,6 +29,8 @@ class TestAudioLoopModel:
         """Test that complete subclasses can be instantiated."""
 
         class CompleteModel(AudioLoopModel):
+            description = "Test model for unit tests"
+
             def __init__(self):
                 super().__init__()
                 self.linear = torch.nn.Linear(10, 1)
