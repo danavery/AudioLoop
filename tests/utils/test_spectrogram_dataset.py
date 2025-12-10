@@ -5,7 +5,6 @@ Tests for SpectrogramDataset with lazy generation support.
 import csv
 from unittest.mock import Mock, patch
 
-import pytest
 import torch
 
 from audioloop.utils.spectrogram_dataset import SpectrogramDataset
@@ -138,19 +137,21 @@ class TestLazySpectrogramGeneration:
         )
 
         # Mock the audio file existence and loading
-        with patch("pathlib.Path.exists", return_value=True):
-            with patch("torchaudio.load") as mock_load:
-                mock_load.return_value = (torch.randn(1, 16000), 44100)
+        with (
+            patch("pathlib.Path.exists", return_value=True),
+            patch("torchaudio.load") as mock_load,
+        ):
+            mock_load.return_value = (torch.randn(1, 16000), 44100)
 
-                # Mock the transform
-                mock_transform = mock_config.create_spectrogram_transform.return_value
-                mock_transform.return_value = torch.randn(1, 128, 100)
+            # Mock the transform
+            mock_transform = mock_config.create_spectrogram_transform.return_value
+            mock_transform.return_value = torch.randn(1, 128, 100)
 
-                # Should generate spec
-                item = dataset[0]
-                assert item is not None
-                assert "data" in item
-                assert item["data"].shape == (1, 128, 100)
+            # Should generate spec
+            item = dataset[0]
+            assert item is not None
+            assert "data" in item
+            assert item["data"].shape == (1, 128, 100)
 
     def test_lazy_generation_caches_to_disk(self, tmp_path):
         """Test that generated specs are cached to disk."""
@@ -179,26 +180,26 @@ class TestLazySpectrogramGeneration:
         )
 
         # Mock the audio loading
-        with patch("pathlib.Path.exists", return_value=True):
-            with patch("torchaudio.load") as mock_load:
-                with patch(
-                    "audioloop.utils.spectrogram_dataset.os.path.exists", return_value=False
-                ):
-                    with patch("audioloop.utils.spectrogram_dataset.os.makedirs"):
-                        mock_load.return_value = (torch.randn(1, 16000), 44100)
+        with (
+            patch("pathlib.Path.exists", return_value=True),
+            patch("torchaudio.load") as mock_load,
+            patch("audioloop.utils.spectrogram_dataset.os.path.exists", return_value=False),
+            patch("audioloop.utils.spectrogram_dataset.os.makedirs"),
+            patch("audioloop.utils.spectrogram_dataset.torch.save") as mock_save,
+        ):
+            mock_load.return_value = (torch.randn(1, 16000), 44100)
 
-                        # Mock the transform
-                        mock_transform = mock_config.create_spectrogram_transform.return_value
-                        mock_transform.return_value = spec_data
+            # Mock the transform
+            mock_transform = mock_config.create_spectrogram_transform.return_value
+            mock_transform.return_value = spec_data
 
-                        with patch("audioloop.utils.spectrogram_dataset.torch.save") as mock_save:
-                            # Generate spec
-                            _ = dataset[0]
+            # Generate spec
+            _ = dataset[0]
 
-                            # Should have saved to disk
-                            mock_save.assert_called_once()
-                            saved_path = mock_save.call_args[0][1]
-                            assert saved_path.endswith("test.pt")
+            # Should have saved to disk
+            mock_save.assert_called_once()
+            saved_path = mock_save.call_args[0][1]
+            assert saved_path.endswith("test.pt")
 
     def test_error_when_spec_missing_and_no_lazy_generation(self, tmp_path):
         """Test that helpful error is raised when spec missing and no lazy generation."""
@@ -243,28 +244,28 @@ class TestLazySpectrogramGeneration:
         )
 
         # Mock stereo audio loading
-        with patch("pathlib.Path.exists", return_value=True):
-            with patch("torchaudio.load") as mock_load:
-                with patch(
-                    "audioloop.utils.spectrogram_dataset.os.path.exists", return_value=False
-                ):
-                    # Return stereo audio (2 channels)
-                    stereo_audio = torch.randn(2, 16000)
-                    mock_load.return_value = (stereo_audio, 44100)
+        with (
+            patch("pathlib.Path.exists", return_value=True),
+            patch("torchaudio.load") as mock_load,
+            patch("audioloop.utils.spectrogram_dataset.os.path.exists", return_value=False),
+            patch("audioloop.utils.spectrogram_dataset.torch.save"),
+        ):
+            # Return stereo audio (2 channels)
+            stereo_audio = torch.randn(2, 16000)
+            mock_load.return_value = (stereo_audio, 44100)
 
-                    # Mock the transform to check what it receives
-                    mock_transform = mock_config.create_spectrogram_transform.return_value
+            # Mock the transform to check what it receives
+            mock_transform = mock_config.create_spectrogram_transform.return_value
 
-                    def check_mono(waveform):
-                        # Should receive mono (1 channel)
-                        assert waveform.shape[0] == 1
-                        return torch.randn(1, 128, 100)
+            def check_mono(waveform):
+                # Should receive mono (1 channel)
+                assert waveform.shape[0] == 1
+                return torch.randn(1, 128, 100)
 
-                    mock_transform.side_effect = check_mono
+            mock_transform.side_effect = check_mono
 
-                    with patch("audioloop.utils.spectrogram_dataset.torch.save"):
-                        # Should convert stereo to mono
-                        _ = dataset[0]
+            # Should convert stereo to mono
+            _ = dataset[0]
 
 
 class TestSpectrogramDatasetReturnValues:
@@ -447,14 +448,16 @@ class TestDatasetConfigIntegration:
         )
 
         # Mock audio loading
-        with patch("pathlib.Path.exists", return_value=True):
-            with patch("torchaudio.load") as mock_load:
-                mock_load.return_value = (torch.randn(1, 16000), 44100)
-                mock_transform = mock_config.create_spectrogram_transform.return_value
-                mock_transform.return_value = spec_data
+        with (
+            patch("pathlib.Path.exists", return_value=True),
+            patch("torchaudio.load") as mock_load,
+        ):
+            mock_load.return_value = (torch.randn(1, 16000), 44100)
+            mock_transform = mock_config.create_spectrogram_transform.return_value
+            mock_transform.return_value = spec_data
 
-                # Generate spec
-                _ = dataset[0]
+            # Generate spec
+            _ = dataset[0]
 
-                # Verify subdirectories were created
-                assert specs_dir.exists()
+            # Verify subdirectories were created
+            assert specs_dir.exists()

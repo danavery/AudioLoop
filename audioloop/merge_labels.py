@@ -39,9 +39,7 @@ def compute_and_log_candidate_metrics(new_labels_csv, config, log_level=logging.
         return {}
 
     # Calculate and save metrics
-    metrics = calculate_and_save_candidate_metrics(
-        Path(new_labels_csv), config.output_dir, cycle
-    )
+    metrics = calculate_and_save_candidate_metrics(Path(new_labels_csv), config.output_dir, cycle)
 
     if metrics:
         logger.log(
@@ -88,24 +86,45 @@ def merge_training_sets(
 
     all_data = []
 
-    # Read original training set
+    # Read original training set (requires headers)
     if os.path.exists(original_csv):
         with open(original_csv) as f:
-            reader = csv.reader(f)
-            for i, row in enumerate(reader):
-                if i == 0 and row[0].lower() in ["filename", "filepath"]:
-                    continue
-                if len(row) >= 2:
-                    # Handle both filename and full filepath
-                    filepath = row[0]
-                    filename = os.path.basename(filepath) if filepath.startswith("/") else filepath
+            # Validate headers
+            first_line = f.readline().strip()
+            f.seek(0)
 
-                    all_data.append(
-                        {
-                            "filename": filename,
-                            "label": int(row[1]),
-                        }
-                    )
+            required_headers = ["filename", "filepath", "label"]
+            has_valid_header = any(header in first_line.lower() for header in required_headers)
+
+            if not has_valid_header:
+                raise ValueError(
+                    f"Original CSV must have headers. Expected columns: filename (or filepath) and label. "
+                    f"First line was: {first_line[:100]}"
+                )
+
+            reader = csv.DictReader(f)
+            for row in reader:
+                # Handle both 'filename' and 'filepath' columns
+                if "filename" in row:
+                    filepath = row["filename"]
+                elif "filepath" in row:
+                    filepath = row["filepath"]
+                else:
+                    continue
+
+                # Get label
+                if "label" not in row:
+                    continue
+
+                # Handle both filename and full filepath
+                filename = os.path.basename(filepath) if filepath.startswith("/") else filepath
+
+                all_data.append(
+                    {
+                        "filename": filename,
+                        "label": int(row["label"]),
+                    }
+                )
         logger.info(f"Loaded {len(all_data)} samples from {original_csv}")
     else:
         logger.warning(f"Warning: {original_csv} not found, starting fresh")

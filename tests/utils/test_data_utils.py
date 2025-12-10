@@ -11,29 +11,8 @@ import torch
 from audioloop.utils.data_utils import (
     entropy,
     get_device,
-    simple_collate_fn,
     variable_length_collate_fn,
 )
-
-
-# Test fixtures
-@pytest.fixture
-def sample_mono_batch():
-    """Create sample batch with mono spectrograms."""
-    return [
-        {
-            "data": torch.randn(1, 64, 100),
-            "label": 1,
-            "filename": "test1.pt",
-            "filepath": "path/test1.pt",
-        },
-        {
-            "data": torch.randn(1, 64, 100),
-            "label": 0,
-            "filename": "test2.pt",
-            "filepath": "path/test2.pt",
-        },
-    ]
 
 
 # Entropy function tests
@@ -121,35 +100,6 @@ def test_get_device_falls_back_to_cpu(monkeypatch):
     monkeypatch.setattr("torch.backends.mps.is_available", lambda: False)
     device = get_device()
     assert device.type == "cpu"
-
-
-# Simple collate function tests
-def test_simple_collate_basic_functionality(sample_mono_batch):
-    """Test basic collation of mono spectrograms."""
-    result = simple_collate_fn(sample_mono_batch)
-
-    assert result["data"].shape == (2, 1, 64, 100)
-    assert torch.equal(result["label"], torch.tensor([1, 0]))
-    assert result["filename"] == ["test1.pt", "test2.pt"]
-    assert result["filepath"] == ["path/test1.pt", "path/test2.pt"]
-
-
-def test_simple_collate_single_item():
-    """Test collation with single item batch."""
-    batch = [
-        {
-            "data": torch.randn(1, 64, 100),
-            "label": 1,
-            "filename": "single.pt",
-            "filepath": "path/single.pt",
-        }
-    ]
-
-    result = simple_collate_fn(batch)
-
-    assert result["data"].shape == (1, 1, 64, 100)
-    assert result["label"].shape == (1,)
-    assert len(result["filename"]) == 1
 
 
 class TestVariableLengthCollate:

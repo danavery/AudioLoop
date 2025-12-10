@@ -237,7 +237,7 @@ def create_training_set(
         os.makedirs(output_dir, exist_ok=True)
 
     with open(output_path, "w") as f:
-        f.write("filepath,label,audio_path\n")
+        f.write("filename,label,audio_path\n")
         f.write("\n".join(all_entries))
 
     print(f"Created training set: {output_path}")

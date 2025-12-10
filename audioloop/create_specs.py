@@ -4,10 +4,8 @@ import logging
 import shutil
 import statistics
 import time
-from collections import defaultdict
 from pathlib import Path
 
-import torchaudio
 from tqdm import tqdm
 
 from .config import AudioLoopConfig
@@ -23,7 +21,6 @@ class ProcessingStats:
     def __init__(self):
         self.successful = 0
         self.failed = 0
-        self.errors_by_type = defaultdict(int)
         self.processing_times = []
         self.spectrogram_lengths = []
         self.start_time = time.time()
@@ -36,10 +33,9 @@ class ProcessingStats:
         if spec_length:
             self.spectrogram_lengths.append(spec_length)
 
-    def record_failure(self, error_type: str = "unknown"):
+    def record_failure(self):
         """Record a failed processing."""
         self.failed += 1
-        self.errors_by_type[error_type] += 1
 
     def summary(self) -> str:
         """Get processing summary."""
@@ -69,11 +65,6 @@ class ProcessingStats:
 
             # Add histogram
             summary.extend(self._create_length_histogram())
-
-        if self.errors_by_type:
-            summary.append("Error breakdown:")
-            for error_type, count in self.errors_by_type.items():
-                summary.append(f"  {error_type}: {count}")
 
         return "\n".join(summary)
 
@@ -159,7 +150,6 @@ def create_specs(config, dataset_config, clear_output=False, limit=None) -> tupl
     """
 
     # Validate inputs
-    # Check if dataset CSV exists (using standardized interface)
     if not dataset_config.dataset_csv.exists():
         raise FileNotFoundError(f"Dataset CSV not found: {dataset_config.dataset_csv}")
 
@@ -180,15 +170,15 @@ def create_specs(config, dataset_config, clear_output=False, limit=None) -> tupl
     # Apply limit if specified
     if limit is not None:
         audio_files = audio_files[:limit]
-        logger.info(f"Limited to first {len(audio_files)} audio files (--limit {limit})")
+        logger.info(f"Processing {len(audio_files)} audio files (limited by --limit {limit})")
     else:
-        logger.info(f"Found {len(audio_files)} audio files in dataset")
+        logger.info(f"Processing {len(audio_files)} audio files")
 
     # Process files
     stats = ProcessingStats()
 
     with tqdm(audio_files, desc="Creating spectrograms") as pbar:
-        for i, file_info in enumerate(pbar):
+        for file_info in pbar:
             start_time = time.time()
 
             success, spec_length = dataset_config.process_single_file(file_info, config.specs_dir)
@@ -197,22 +187,6 @@ def create_specs(config, dataset_config, clear_output=False, limit=None) -> tupl
 
             if success:
                 stats.record_success(processing_time, spec_length)
-
-                # Log sample info for first file
-                if i == 0:
-                    try:
-                        waveform, _ = torchaudio.load(file_info["audio_path"])
-                        spec_transform = dataset_config.create_spectrogram_transform()
-                        sample_spec = spec_transform(waveform)
-                        fixed_spec = dataset_config.fix_spectrogram_length(sample_spec)
-                        logger.info(f"Sample audio_path: {file_info['audio_path']}")
-                        logger.info(f"Sample audio shape: {waveform.shape}")
-                        logger.info(
-                            f"Sample spectrogram shape (before fixing): {sample_spec.shape}"
-                        )
-                        logger.info(f"Sample spectrogram shape (after fixing): {fixed_spec.shape}")
-                    except Exception as e:
-                        logger.warning(f"Could not log sample info: {e}")
             else:
                 stats.record_failure()
 
@@ -231,7 +205,7 @@ def create_specs(config, dataset_config, clear_output=False, limit=None) -> tupl
     return stats.successful, stats.failed
 
 
-def create_inference_csv(config, dataset_config) -> Path:
+def create_inference_csv(config, dataset_config, limit=None) -> Path:
     """
     Create a CSV file listing all dataset files for inference.
     Format: filename,labels (labels as comma-separated string)
@@ -239,12 +213,17 @@ def create_inference_csv(config, dataset_config) -> Path:
     Args:
         config: Central AudioLoopConfig for output path
         dataset_config: Dataset configuration that handles dataset-specific operations
+        limit: Optional limit on number of files to include (should match create_specs limit)
 
     Returns:
         Path to created inference CSV
     """
     # Load metadata
     audio_files = dataset_config.load_metadata()
+
+    # Apply limit if specified (should match what was used in create_specs)
+    if limit is not None:
+        audio_files = audio_files[:limit]
 
     # Prepare data for CSV - use labels arrays consistently
     files_data = []
@@ -323,12 +302,8 @@ Examples:
     args = parser.parse_args()
 
     # Get unified config
-    try:
-        config = AudioLoopConfig(dataset=args.dataset)
-        dataset_name = config.dataset
-    except ValueError as e:
-        logger.error(f"Dataset error: {e}")
-        exit(1)
+    config = AudioLoopConfig(dataset=args.dataset)
+    dataset_name = config.dataset
 
     # Get dataset config using registry approach
     dataset_config = config.get_dataset_config()
@@ -336,16 +311,14 @@ Examples:
     # Handle custom metadata file if provided
     if args.metadata_file:
         if not args.metadata_file.exists():
-            logger.error(f"Metadata file not found: {args.metadata_file}")
-            exit(1)
-        logger.info(f"Using custom metadata file: {args.metadata_file}")
+            raise FileNotFoundError(f"Metadata file not found: {args.metadata_file}")
 
         # Check if dataset supports custom metadata files
-        if dataset_config.supports_custom_csv():
-            dataset_config.set_custom_csv(args.metadata_file)
-        else:
-            logger.error(f"Dataset {dataset_name} doesn't support custom metadata files")
-            exit(1)
+        if not dataset_config.supports_custom_csv():
+            raise ValueError(f"Dataset {dataset_name} doesn't support custom metadata files")
+
+        logger.info(f"Using custom metadata file: {args.metadata_file}")
+        dataset_config.set_custom_csv(args.metadata_file)
 
     logger.info(f"Processing {dataset_name} dataset")
 
@@ -356,7 +329,7 @@ Examples:
 
     # Create CSV for inference
     if successful > 0:
-        inference_csv = create_inference_csv(config, dataset_config)
+        inference_csv = create_inference_csv(config, dataset_config, limit=args.limit)
         logger.info(f"Ready for inference! Use: {inference_csv}")
     else:
         logger.error("No spectrograms were created successfully")

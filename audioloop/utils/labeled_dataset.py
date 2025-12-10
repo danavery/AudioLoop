@@ -11,7 +11,7 @@ class LabeledDataset(torch.utils.data.Dataset):
         Dataset for loading labeled audio files.
 
         Args:
-            labels_file: Path to CSV file with format: filepath,label
+            labels_file: Path to CSV file with headers. Required columns: filename (or filepath) and label
             root_dir: Root directory for audio files (legacy parameter for compatibility)
             meta_csv: Metadata CSV file (legacy parameter for compatibility)
             transform: Transform to apply to audio data
@@ -26,11 +26,37 @@ class LabeledDataset(torch.utils.data.Dataset):
             raise ValueError("Either labels_file or meta_csv must be provided")
 
         with open(csv_file) as f:
-            csv_reader = csv.reader(f)
-            for row in csv_reader:
-                if len(row) >= 2:  # At minimum need filepath and label
-                    filepath, label = row[0], row[1]
-                    self.labels.append((filepath, int(label)))
+            # Validate that file has headers
+            first_line = f.readline().strip()
+            f.seek(0)  # Reset to beginning
+
+            required_headers = ["filename", "filepath", "label"]
+            has_valid_header = any(header in first_line.lower() for header in required_headers)
+
+            if not has_valid_header:
+                raise ValueError(
+                    f"CSV file must have headers. Expected columns: filename (or filepath) and label. "
+                    f"First line was: {first_line[:100]}"
+                )
+
+            # Use DictReader for files with headers
+            reader = csv.DictReader(f)
+            for row in reader:
+                # Get filepath - handle both 'filename' and 'filepath' columns
+                if "filename" in row:
+                    filepath = row["filename"]
+                elif "filepath" in row:
+                    filepath = row["filepath"]
+                else:
+                    continue  # Skip rows without filepath
+
+                # Get label
+                if "label" in row:
+                    label = int(row["label"])
+                else:
+                    continue  # Skip rows without label
+
+                self.labels.append((filepath, label))
 
     def __len__(self):
         return len(self.labels)
