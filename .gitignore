@@ -5,6 +5,7 @@ dist/
 wheels/
 *.egg-info
 .*/
+.vscode/
 
 data
 outputs
