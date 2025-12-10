@@ -13,7 +13,7 @@ from .models.audio_loop_model import AudioLoopModel
 from .models.model_registry import get_model_class, list_available_models
 from .utils.data_utils import get_device, variable_length_collate_fn
 from .utils.spectrogram_dataset import SpectrogramDataset
-from .utils.stopping_criteria import create_stopping_criterion
+from .utils.stopping_criteria import TrainingStoppingCriterion, create_stopping_criterion
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
@@ -132,7 +132,7 @@ def execute_training_loop(
     optimizer: optim.Optimizer,
     criterion: nn.Module,
     device: torch.device,
-    stopping_criterion,  # TrainingStoppingCriterion type
+    stopping_criterion: TrainingStoppingCriterion,
     scheduler: optim.lr_scheduler.ReduceLROnPlateau | None,
     config: AudioLoopConfig,
     train_dataset: SpectrogramDataset,
@@ -162,7 +162,6 @@ def execute_training_loop(
         - Handles for-else logic (natural completion vs early stopping)
         - Logs progress every 10 epochs, first 5 epochs, or at perfect accuracy
     """
-    # Pre-allocate timing list to avoid memory allocation during training
     epoch_times = []
     accuracy = 0.0
     best_accuracy = None  # Track accuracy of best saved model
@@ -231,7 +230,7 @@ def execute_training_loop(
 
 def save_trained_model(
     model: AudioLoopModel,
-    stopping_criterion,  # TrainingStoppingCriterion type
+    stopping_criterion: TrainingStoppingCriterion,
     config: AudioLoopConfig,
     version: int,
     model_path: str | None,
@@ -262,30 +261,25 @@ def save_trained_model(
     if model_path is None:
         model_path = str(config.get_model_path(version))
 
+    # Determine which state to save
     best_model_state = stopping_criterion.get_best_model_state()
     if best_model_state is not None:
-        # Save the best model state with complete metadata
-        model.load_state_dict(best_model_state)
-        model_info = model.get_model_info()
-        save_dict = {
-            "model_state_dict": best_model_state,
-            **{
-                k: v for k, v in model_info.items() if k != "num_parameters"
-            },  # Exclude runtime-only fields
-        }
-        torch.save(save_dict, model_path)
-        logger.info(f"✅ Best model saved to: {model_path}")
+        state_to_save = best_model_state
+        log_message = "✅ Best model saved to: {}"
     else:
-        # Save the final model state with complete metadata
-        model_info = model.get_model_info()
-        save_dict = {
-            "model_state_dict": model.state_dict(),
-            **{
-                k: v for k, v in model_info.items() if k != "num_parameters"
-            },  # Exclude runtime-only fields
-        }
-        torch.save(save_dict, model_path)
-        logger.info(f"📁 Final model saved to: {model_path}")
+        state_to_save = model.state_dict()
+        log_message = "📁 Final model saved to: {}"
+
+    # Save the model with complete metadata
+    model_info = model.get_model_info()
+    save_dict = {
+        "model_state_dict": state_to_save,
+        **{
+            k: v for k, v in model_info.items() if k != "num_parameters"
+        },  # Exclude runtime-only fields
+    }
+    torch.save(save_dict, model_path)
+    logger.info(log_message.format(model_path))
 
 
 def run_training(
