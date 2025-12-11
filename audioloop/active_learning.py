@@ -75,11 +75,21 @@ def run_active_learning_for_class(
     # Extract subset_csv from dataset_kwargs if present
     subset_csv = dataset_kwargs.pop("subset_csv", None)
 
-    # Get unified config
+    # Create unified config with all active learning parameters
     config = AudioLoopConfig(
         experiment_name=experiment_name,
         dataset=dataset_name,
         subset_csv=Path(subset_csv) if subset_csv else None,
+        total_candidates=total_candidates,
+        positive_percentage=positive_percentage,
+        min_confidence=min_confidence,
+        selection_mode=selection_mode,
+        basic_transition_f1_threshold=basic_transition_f1_threshold,
+        basic_transition_confidence_threshold=basic_transition_confidence_threshold,
+        basic_transition_variance_threshold=basic_transition_variance_threshold,
+        auto_thresholds=auto_thresholds,
+        estimated_positive_pct=estimated_positive_pct,
+        with_ground_truth=with_ground_truth,
     )
     dataset_config = config.get_dataset_config()
 
@@ -99,26 +109,9 @@ def run_active_learning_for_class(
     if negative_class_name is None:
         negative_class_name = f"not_{positive_class_name}"
 
-    # Create config with active learning parameters (preserve subset_csv from initial config)
-    active_learning_config = AudioLoopConfig(
-        experiment_name=experiment_name,
-        dataset=dataset_name,
-        subset_csv=Path(subset_csv) if subset_csv else None,
-        total_candidates=total_candidates,
-        positive_percentage=positive_percentage,
-        min_confidence=min_confidence,
-        selection_mode=selection_mode,
-        basic_transition_f1_threshold=basic_transition_f1_threshold,
-        basic_transition_confidence_threshold=basic_transition_confidence_threshold,
-        basic_transition_variance_threshold=basic_transition_variance_threshold,
-        auto_thresholds=auto_thresholds,
-        estimated_positive_pct=estimated_positive_pct,
-        with_ground_truth=with_ground_truth,
-    )
-
     # Call the main function with clean signature
     result = run_active_learning_cycle(
-        config=active_learning_config,
+        config=config,
         positive_class_id=positive_class_id,
         positive_class_name=positive_class_name,
         negative_class_name=negative_class_name,
@@ -131,7 +124,7 @@ def run_active_learning_for_class(
     )
 
     # Display cycle summary after active learning completes
-    display_cycle_summary(active_learning_config, run_number)
+    display_cycle_summary(config, run_number)
 
     return result
 
