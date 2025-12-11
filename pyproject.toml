@@ -33,6 +33,7 @@ line-length = 100
 
 [tool.basedpyright]
 typeCheckingMode = "standard"
+exclude = ["webui"]
 
 [tool.ruff.lint]
 # extend-select = ["I", "B", "SIM", "RET"]

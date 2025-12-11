@@ -38,7 +38,10 @@ from audioloop.merge_labels import merge_training_sets
 # Import the APIs from the existing modules
 from audioloop.training_core import run_training
 from audioloop.utils.candidate_metrics import load_candidate_metrics_history
-from audioloop.utils.cycle_stopping_criteria import create_cycle_stopping_criterion
+from audioloop.utils.cycle_stopping_criteria import (
+    SearchModeStoppingCriterion,
+    create_cycle_stopping_criterion,
+)
 
 
 def auto_label_candidates(
@@ -303,6 +306,7 @@ def run_automated_workflow(
             break
 
         # Check stopping criterion
+        metrics_history = None
         if config.cycle_stopping_strategy != "none":
             metrics_history = load_candidate_metrics_history(config.output_dir)
 
@@ -336,10 +340,10 @@ def run_automated_workflow(
         # Helper function to display confusion matrix
         def display_confusion_matrix(metrics):
             """Display confusion matrix for candidate metrics with recall/precision"""
-            tp = int(metrics.get('true_positives', 0))
-            fp = int(metrics.get('false_positives', 0))
-            tn = int(metrics.get('true_negatives', 0))
-            fn = int(metrics.get('false_negatives', 0))
+            tp = int(metrics.get("true_positives", 0))
+            fp = int(metrics.get("false_positives", 0))
+            tn = int(metrics.get("true_negatives", 0))
+            fn = int(metrics.get("false_negatives", 0))
             total = tp + fp + tn + fn
 
             if total == 0:
@@ -348,7 +352,9 @@ def run_automated_workflow(
             print(f"      Confusion Matrix ({total} labeled candidates):")
             print("                       Predicted")
             print("                    Positive  Negative")
-            print(f"         Actual Pos    {tp:>4}      {fn:>4}     (recall: {metrics['recall']:.3f})")
+            print(
+                f"         Actual Pos    {tp:>4}      {fn:>4}     (recall: {metrics['recall']:.3f})"
+            )
             print(f"                Neg    {fp:>4}      {tn:>4}")
             print("                     -------  -------")
             print(f"         Precision   {metrics['precision']:.3f}")
@@ -368,9 +374,7 @@ def run_automated_workflow(
 
                 print("   📈 Stopping (label mode):")
                 print(f"      F1 (current): {current_metrics['f1_score']:.3f}")
-                print(
-                    f"      F1 (rolling avg): {rolling_f1:.3f} (window={config.cycle_window})"
-                )
+                print(f"      F1 (rolling avg): {rolling_f1:.3f} (window={config.cycle_window})")
                 print(
                     f"      F1 (stability): std={rolling_std:.3f} (threshold={config.cycle_std_threshold})"
                 )
@@ -396,6 +400,13 @@ def run_automated_workflow(
                     "recall", config.cycle_window, cycle
                 )
 
+                # Get precision floor (only exists for SearchModeStoppingCriterion)
+                precision_floor = (
+                    stopping_criterion._precision_floor
+                    if isinstance(stopping_criterion, SearchModeStoppingCriterion)
+                    else 0.0
+                )
+
                 print("   📈 Stopping (search mode):")
                 print(f"      Recall (current): {current_metrics['recall']:.3f}")
                 print(
@@ -403,7 +414,7 @@ def run_automated_workflow(
                 )
                 print(
                     f"      Precision (rolling avg): {rolling_precision:.3f} "
-                    f"(floor={stopping_criterion._precision_floor:.3f})"
+                    f"(floor={precision_floor:.3f})"
                 )
                 print(f"      Recall (stability): std={rolling_std:.3f} (threshold=0.10)")
                 print(
@@ -538,12 +549,12 @@ Prerequisites:
     parser.add_argument(
         "--lr-scheduler-factor",
         type=float,
-        help="LR reduction factor for scheduler (default from config: 0.5)"
+        help="LR reduction factor for scheduler (default from config: 0.5)",
     )
     parser.add_argument(
         "--lr-scheduler-patience",
         type=int,
-        help="Scheduler patience in epochs (default from config: 5)"
+        help="Scheduler patience in epochs (default from config: 5)",
     )
     parser.add_argument(
         "--model-type", type=str, help="Model architecture to use (default from config: cnn5layer)"
@@ -598,7 +609,14 @@ Prerequisites:
     # Selection strategy parameters
     parser.add_argument(
         "--selection-mode",
-        choices=["confidence", "entropy", "mixed_entropy", "basic_transition", "stratified_uncertainty", "random"],
+        choices=[
+            "confidence",
+            "entropy",
+            "mixed_entropy",
+            "basic_transition",
+            "stratified_uncertainty",
+            "random",
+        ],
         help="Selection strategy (default: mixed_entropy)",
     )
     parser.add_argument(
@@ -733,7 +751,9 @@ Prerequisites:
     print(f"📝 Command line text saved to: {command_txt_file}")
 
     # Validate arguments (use config values for validation since CLI may be None)
-    if config.positive_percentage is not None and (config.positive_percentage < 0 or config.positive_percentage > 1):
+    if config.positive_percentage is not None and (
+        config.positive_percentage < 0 or config.positive_percentage > 1
+    ):
         print("❌ --positive-pct must be between 0 and 1 (or omit for no stratification)")
         return 1
 
