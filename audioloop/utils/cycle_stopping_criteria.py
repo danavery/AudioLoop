@@ -90,9 +90,7 @@ class CycleStoppingCriterion:
                 try:
                     values.append(self.metrics_history[cycle][metric_key])
                 except KeyError:
-                    logger.warning(
-                        f"Metric '{metric_key}' not found for cycle {cycle}, skipping"
-                    )
+                    logger.warning(f"Metric '{metric_key}' not found for cycle {cycle}, skipping")
 
         if len(values) < window:
             # Not enough data for full window
@@ -121,9 +119,7 @@ class CycleStoppingCriterion:
                 try:
                     values.append(self.metrics_history[cycle][metric_key])
                 except KeyError:
-                    logger.warning(
-                        f"Metric '{metric_key}' not found for cycle {cycle}, skipping"
-                    )
+                    logger.warning(f"Metric '{metric_key}' not found for cycle {cycle}, skipping")
 
         if len(values) < 2:
             # Need at least 2 values for std
@@ -202,11 +198,8 @@ class LabelModeStoppingCriterion(CycleStoppingCriterion):
             "f1_score", self.config.cycle_window, current_cycle
         )
 
-        if rolling_std >= self.config.cycle_std_threshold:
-            return False  # Not stable yet
-
         # All conditions met - stop!
-        return True
+        return rolling_std < self.config.cycle_std_threshold
 
 
 class SearchModeStoppingCriterion(CycleStoppingCriterion):
@@ -232,7 +225,7 @@ class SearchModeStoppingCriterion(CycleStoppingCriterion):
         Returns:
             Precision floor value (float)
         """
-        if isinstance(self.config.precision_floor, (int, float)):
+        if isinstance(self.config.precision_floor, int | float):
             # Manual precision floor
             return float(self.config.precision_floor)
 
@@ -301,15 +294,10 @@ class SearchModeStoppingCriterion(CycleStoppingCriterion):
 
         # Condition 5: Check stability (more tolerant threshold for search mode)
         # Use 0.10 instead of config value for search mode
-        rolling_std = self._calculate_rolling_std(
-            "recall", self.config.cycle_window, current_cycle
-        )
-
-        if rolling_std >= 0.10:
-            return False  # Not stable yet
+        rolling_std = self._calculate_rolling_std("recall", self.config.cycle_window, current_cycle)
 
         # All conditions met - stop!
-        return True
+        return rolling_std < 0.10
 
 
 def create_cycle_stopping_criterion(config, metrics_history):
@@ -330,12 +318,10 @@ def create_cycle_stopping_criterion(config, metrics_history):
 
     if strategy == "label":
         return LabelModeStoppingCriterion(config, metrics_history)
-    elif strategy == "search":
+    if strategy == "search":
         return SearchModeStoppingCriterion(config, metrics_history)
-    elif strategy == "none":
+    if strategy == "none":
         return None
-    else:
-        raise ValueError(
-            f"Unknown cycle stopping strategy: '{strategy}'. "
-            f"Expected: 'label', 'search', or 'none'"
-        )
+    raise ValueError(
+        f"Unknown cycle stopping strategy: '{strategy}'. Expected: 'label', 'search', or 'none'"
+    )

@@ -27,20 +27,15 @@ from .stratified import StratifiedUncertaintyStrategy
 
 # Public API
 __all__ = [
-    # Base class
-    "CandidateSelectionStrategy",
-    # Strategy implementations
     "BasicTransitionStrategy",
+    "CandidateSelectionStrategy",
     "ConfidenceStrategy",
     "EntropyStrategy",
     "MixedEntropyStrategy",
     "RandomStrategy",
     "StratifiedUncertaintyStrategy",
-    # Factory function
     "create_strategy",
-    # I/O functions
     "load_predictions",
-    "save_candidates",
-    # Statistics/reporting functions
     "print_selection_statistics",
+    "save_candidates",
 ]

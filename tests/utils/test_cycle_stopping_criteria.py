@@ -286,7 +286,7 @@ class TestSearchModeStoppingCriterion:
         # Should eventually stop when stable and above floor
         criterion.should_stop(3)
         criterion.should_stop(4)
-        result = criterion.should_stop(5)
+        criterion.should_stop(5)
 
         # Verify precision floor was calculated correctly
         assert criterion._precision_floor == 0.40

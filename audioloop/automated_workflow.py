@@ -34,11 +34,11 @@ from audioloop.active_learning import run_active_learning_for_class
 from audioloop.config import AudioLoopConfig
 from audioloop.datasets.dataset_registry import list_available_datasets
 from audioloop.merge_labels import merge_training_sets
-from audioloop.utils.candidate_metrics import load_candidate_metrics_history
-from audioloop.utils.cycle_stopping_criteria import create_cycle_stopping_criterion
 
 # Import the APIs from the existing modules
 from audioloop.training_core import run_training
+from audioloop.utils.candidate_metrics import load_candidate_metrics_history
+from audioloop.utils.cycle_stopping_criteria import create_cycle_stopping_criterion
 
 
 def auto_label_candidates(
@@ -321,7 +321,7 @@ def run_automated_workflow(
                 best_model_dst = config.output_dir / "model_best.pt"
                 shutil.copy(best_model_src, best_model_dst)
 
-                print(f"\n🛑 STOPPING CRITERION MET")
+                print("\n🛑 STOPPING CRITERION MET")
                 print(f"   Strategy: {config.cycle_stopping_strategy}")
                 print(f"   Best cycle: {best_cycle}")
                 print(f"   Copied model_v{best_cycle}.pt -> model_best.pt")
@@ -346,11 +346,11 @@ def run_automated_workflow(
                 return
 
             print(f"      Confusion Matrix ({total} labeled candidates):")
-            print(f"                       Predicted")
-            print(f"                    Positive  Negative")
+            print("                       Predicted")
+            print("                    Positive  Negative")
             print(f"         Actual Pos    {tp:>4}      {fn:>4}     (recall: {metrics['recall']:.3f})")
             print(f"                Neg    {fp:>4}      {tn:>4}")
-            print(f"                     -------  -------")
+            print("                     -------  -------")
             print(f"         Precision   {metrics['precision']:.3f}")
 
         # Display detailed stopping status
@@ -366,7 +366,7 @@ def run_automated_workflow(
                     "f1_score", config.cycle_window, cycle
                 )
 
-                print(f"   📈 Stopping (label mode):")
+                print("   📈 Stopping (label mode):")
                 print(f"      F1 (current): {current_metrics['f1_score']:.3f}")
                 print(
                     f"      F1 (rolling avg): {rolling_f1:.3f} (window={config.cycle_window})"
@@ -396,7 +396,7 @@ def run_automated_workflow(
                     "recall", config.cycle_window, cycle
                 )
 
-                print(f"   📈 Stopping (search mode):")
+                print("   📈 Stopping (search mode):")
                 print(f"      Recall (current): {current_metrics['recall']:.3f}")
                 print(
                     f"      Recall (rolling avg): {rolling_recall:.3f} (window={config.cycle_window})"
@@ -420,7 +420,7 @@ def run_automated_workflow(
         elif config.cycle_stopping_strategy == "none":
             metrics_history = load_candidate_metrics_history(config.output_dir)
             if metrics_history and cycle in metrics_history:
-                print(f"   📊 Candidate Performance:")
+                print("   📊 Candidate Performance:")
                 display_confusion_matrix(metrics_history[cycle])
 
         print("▲" * 50)

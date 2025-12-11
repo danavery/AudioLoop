@@ -42,7 +42,7 @@ class MixedEntropyStrategy(CandidateSelectionStrategy):
             ValueError: If positive_percentage is set (incompatible with mixed mode)
         """
         # Validate mutual exclusivity with stratification
-        positive_percentage = kwargs.get("positive_percentage", None)
+        positive_percentage = kwargs.get("positive_percentage")
         if positive_percentage is not None:
             raise ValueError(
                 "mixed_entropy selection mode is incompatible with positive_percentage stratification. "

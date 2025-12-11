@@ -27,7 +27,7 @@ class EntropyStrategy(CandidateSelectionStrategy):
         If positive_percentage is None, selects purely by entropy (no stratification).
         Otherwise, stratifies by predicted class according to the percentage.
         """
-        positive_percentage = kwargs.get("positive_percentage", None)
+        positive_percentage = kwargs.get("positive_percentage")
         candidate_pool_multiplier = kwargs.get("candidate_pool_multiplier", 5)
         random_seed = kwargs.get("random_seed", 42)
 

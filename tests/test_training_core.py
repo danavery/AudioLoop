@@ -32,7 +32,7 @@ class TestClassWeightingConfig:
         try:
             config = AudioLoopConfig(class_weighting="invalid")
             config._validate_training_params()
-            assert False, "Should have raised ValueError"
+            raise AssertionError("Should have raised ValueError")
         except ValueError as e:
             assert "class_weighting must be 'adaptive'" in str(e)
 
@@ -41,7 +41,7 @@ class TestClassWeightingConfig:
         try:
             config = AudioLoopConfig(class_weighting=1.5)
             config._validate_training_params()
-            assert False, "Should have raised ValueError"
+            raise AssertionError("Should have raised ValueError")
         except ValueError as e:
             assert "between 0.0 and 1.0" in str(e)
 
