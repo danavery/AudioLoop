@@ -117,6 +117,7 @@ class AudioLoopConfig:
     positive_percentage: float | None = None  # None = no stratification (pure entropy)
     min_confidence: float = 0.8
     selection_mode: str = "entropy"
+    candidate_pool_multiplier: int = 5  # Pool size multiplier for stratified sampling
 
     # Selection strategy configuration
     basic_transition_f1_threshold: float = 0.2
@@ -187,6 +188,8 @@ class AudioLoopConfig:
             "random",
         ]:
             raise ValueError(f"Unknown selection mode: {self.selection_mode}")
+        if self.candidate_pool_multiplier < 1:
+            raise ValueError("candidate_pool_multiplier must be at least 1")
 
     def _validate_selection_strategy_params(self):
         """Validate parameters for specific selection strategies."""

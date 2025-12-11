@@ -42,7 +42,7 @@ def load_training_set_filenames(training_set_csv):
     return training_filenames
 
 
-def load_model(model_path, num_classes, device):
+def load_model(model_path, device):
     """Load a trained model from disk using all saved constructor args."""
     # Load checkpoint with all metadata
     checkpoint = torch.load(model_path, map_location=device)
@@ -177,7 +177,6 @@ def run_binary_inference(
         )
 
         # Binary classification
-        num_classes = 2
         logger.info(
             f"Binary classification model (2 classes: {negative_class_name}/0, {positive_class_name}/1)"
         )
@@ -186,7 +185,7 @@ def run_binary_inference(
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Model file not found: {model_path}")
 
-        model = load_model(model_path, num_classes, device)
+        model = load_model(model_path, device)
         logger.info(f"Loaded model from: {model_path}")
 
         # Create data loader
@@ -393,7 +392,7 @@ def run_active_learning_cycle(
         positive_class_name=positive_class_name,
         negative_class_name=negative_class_name,
         positive_percentage=config.positive_percentage,
-        candidate_pool_multiplier=5,
+        candidate_pool_multiplier=config.candidate_pool_multiplier,
         random_seed=seed,
     )
     save_candidates(candidates, candidates_file)
