@@ -107,11 +107,11 @@ class AudiosetConfig(DatasetConfig):
     # === Split Management ===
     def get_available_splits(self) -> list[str]:
         """Return list of valid split names for AudioSet dataset."""
-        return ["balanced_train", "unbalanced_train", "eval", "custom"]
+        return ["bal_train", "unbal_train", "eval", "custom"]
 
     def get_default_split(self) -> str:
         """Return the default split name for AudioSet dataset."""
-        return "balanced_train"
+        return "unbal_train"
 
     def supports_custom_csv(self) -> bool:
         """AudioSet supports custom CSV files for subsets."""
@@ -158,16 +158,13 @@ class AudiosetConfig(DatasetConfig):
 
     def _load_metadata_for_split(self, split: str) -> list[dict]:
         """Load metadata for specified split."""
-        # Map logical split name to (CSV path, filesystem directory)
-        if split == "balanced_train":
+        # Map split name to CSV path (split name already matches filesystem directory)
+        if split == "bal_train":
             csv_path = self.balanced_csv
-            dir_split = "bal_train"
-        elif split == "unbalanced_train":
+        elif split == "unbal_train":
             csv_path = self.unbalanced_csv
-            dir_split = "unbal_train"
         elif split == "eval":
             csv_path = self.eval_csv
-            dir_split = "eval"
         elif split == "custom":
             if self._custom_csv_path is None:
                 raise ValueError("Custom CSV path not set. Call set_custom_csv() first.")
@@ -176,8 +173,10 @@ class AudiosetConfig(DatasetConfig):
         else:
             # This shouldn't happen due to validation in base class, but keep for safety
             raise ValueError(
-                f"Unknown split: {split}. Use 'balanced_train', 'eval', 'unbalanced_train', or 'custom'"
+                f"Unknown split: {split}. Use 'bal_train', 'unbal_train', 'eval', or 'custom'"
             )
+
+        dir_split = split  # Split name matches filesystem directory
 
         if not csv_path.exists():
             raise FileNotFoundError(f"Metadata CSV not found: {csv_path}")
@@ -275,7 +274,7 @@ class AudiosetConfig(DatasetConfig):
         }
 
     def get_audio_path(
-        self, filename: str, fold: int | None = None, split: str | None = None
+        self, filename: str, split: str | None = None, fold: int | None = None
     ) -> Path:
         """Get full path to audio file.
 
@@ -283,17 +282,15 @@ class AudiosetConfig(DatasetConfig):
 
         Args:
             filename: Audio filename (e.g., "Y123.flac")
-            fold: Ignored for AudioSet (kept for interface compatibility)
-            split: Filesystem directory (bal_train, unbal_train, eval).
-                   Should be provided from metadata['split'].
+            split: Filesystem directory (bal_train, unbal_train, eval)
+            fold: Ignored for AudioSet (no fold structure)
 
         Returns:
             Full path to audio file
         """
         if split is None:
-            # If no split provided, assume unbal_train as most common case
-            # This maintains some backwards compatibility for edge cases
-            split = "unbal_train"
+            # Use default split from configuration
+            split = self.get_default_split()
 
         # Extract YTID from filename (remove .flac extension first)
         ytid = filename.replace(".flac", "")

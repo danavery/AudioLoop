@@ -136,7 +136,7 @@ def run_binary_inference(
 
                 # Get audio_path for lazy generation
                 audio_path = item.get("audio_path") or dataset_config.get_audio_path(
-                    item["filename"]
+                    item["filename"], split=item.get("split"), fold=item.get("fold")
                 )
 
                 # Skip if both spec and audio are missing (can't process this file)

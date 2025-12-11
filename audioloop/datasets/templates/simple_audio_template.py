@@ -193,12 +193,15 @@ class TemplateAudioConfig(DatasetConfig):
         print(f"\nDataset CSV: {self.dataset_csv}")
         print(f"Audio directory: {self.audio_root}")
 
-    def get_audio_path(self, filename: str, fold: int | None = None) -> Path:
+    def get_audio_path(
+        self, filename: str, split: str | None = None, fold: int | None = None
+    ) -> Path:
         """
         Get full path to audio file, trying multiple extensions if needed.
 
         Args:
             filename: Audio filename from metadata
+            split: Ignored for simple datasets
             fold: Ignored for simple datasets
 
         Returns:

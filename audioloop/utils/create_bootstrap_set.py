@@ -83,7 +83,7 @@ def get_matching_samples(
             # Check existence only for this batch
             for item in batch:
                 audio_path = item.get("audio_path") or dataset_config.get_audio_path(
-                    item["filename"]
+                    item["filename"], split=item.get("split"), fold=item.get("fold")
                 )
                 if audio_path.exists():
                     spec_path = dataset_config.get_spectrogram_path(
@@ -103,7 +103,9 @@ def get_matching_samples(
     # Legacy path: check all files (slow but comprehensive)
     matching_samples = []
     for item in matching_metadata:
-        audio_path = item.get("audio_path") or dataset_config.get_audio_path(item["filename"])
+        audio_path = item.get("audio_path") or dataset_config.get_audio_path(
+            item["filename"], split=item.get("split"), fold=item.get("fold")
+        )
         if audio_path.exists():
             # Use config's method to get spectrogram path
             spec_path = dataset_config.get_spectrogram_path(item["filename"], config.specs_dir)

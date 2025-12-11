@@ -208,15 +208,21 @@ class TestDatasetSplitInterface:
 class TestDatasetConfigBehavior:
     """Test behavioral differences between dataset configurations."""
 
-    def test_fsd50k_ignores_fold_parameter(self):
-        """Test that FSD50K ignores fold parameter in get_audio_path."""
+    def test_fsd50k_uses_split_parameter(self):
+        """Test that FSD50K uses split parameter in get_audio_path."""
         config = FSD50KConfig()
-        path_without_fold = config.get_audio_path("test.wav")
-        path_with_fold = config.get_audio_path("test.wav", fold=5)
+        dev_path = config.get_audio_path("test.wav", split="dev")
+        eval_path = config.get_audio_path("test.wav", split="eval")
 
-        # Should be identical (fold ignored)
+        # Should include split in path
+        assert "dev_audio" in str(dev_path)
+        assert "eval_audio" in str(eval_path)
+        assert dev_path != eval_path
+
+        # Should ignore fold parameter
+        path_without_fold = config.get_audio_path("test.wav", split="dev")
+        path_with_fold = config.get_audio_path("test.wav", split="dev", fold=5)
         assert path_without_fold == path_with_fold
-        assert "fold" not in str(path_without_fold)
 
     def test_urbansound8k_uses_fold_parameter(self):
         """Test that UrbanSound8K uses fold parameter in get_audio_path."""
@@ -351,10 +357,10 @@ class TestPathGeneration:
     def test_fsd50k_path_structure(self):
         """Test FSD50K path generation structure."""
         config = FSD50KConfig()
-        path = config.get_audio_path("100032.wav")
+        path = config.get_audio_path("100032.wav", split="dev")
 
-        # Should be simple: audio_root/filename
-        expected = config.audio_root / "100032.wav"
+        # Should include split subdirectory: audio_root/FSD50K.dev_audio/filename
+        expected = config.audio_root / "FSD50K.dev_audio" / "100032.wav"
         assert path == expected
 
     def test_urbansound8k_path_structure(self):
@@ -385,16 +391,16 @@ class TestAudioSetConfig:
         config = AudiosetConfig()
         splits = config.get_available_splits()
 
-        assert "balanced_train" in splits
-        assert "unbalanced_train" in splits
+        assert "bal_train" in splits
+        assert "unbal_train" in splits
         assert "eval" in splits
         assert "custom" in splits
         assert len(splits) == 4
 
     def test_audioset_default_split(self):
-        """Test that AudioSet uses balanced_train as default."""
+        """Test that AudioSet uses unbal_train as default."""
         config = AudiosetConfig()
-        assert config.get_default_split() == "balanced_train"
+        assert config.get_default_split() == "unbal_train"
 
     def test_audioset_path_structure(self):
         """Test AudioSet path generation with subdirectories."""
@@ -505,8 +511,8 @@ class TestAudioSetConfig:
                 config.eval_csv = tmp_path
 
                 # Load from different splits
-                bal_metadata = config.load_metadata(split="balanced_train")
-                unbal_metadata = config.load_metadata(split="unbalanced_train")
+                bal_metadata = config.load_metadata(split="bal_train")
+                unbal_metadata = config.load_metadata(split="unbal_train")
                 eval_metadata = config.load_metadata(split="eval")
 
                 # Verify split is in metadata

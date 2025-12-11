@@ -84,7 +84,9 @@ def create_spectrograms_example(labels_csv, max_files=100):
                 break
 
             filename = row["filename"]
-            audio_path = dataset_config.get_audio_path(filename)
+            audio_path = dataset_config.get_audio_path(
+                filename, split=row.get("split"), fold=row.get("fold")
+            )
 
             files_to_process.append(
                 {

@@ -117,11 +117,14 @@ class DatasetConfig(ABC):
         pass
 
     @abstractmethod
-    def get_audio_path(self, filename: str, fold: int | None = None) -> Path:
+    def get_audio_path(
+        self, filename: str, split: str | None = None, fold: int | None = None
+    ) -> Path:
         """Get full path to audio file.
 
         Args:
             filename: Audio filename from metadata
+            split: Dataset split (used by datasets with split-based directories like AudioSet)
             fold: Fold number (used by some datasets like UrbanSound8K)
 
         Returns:

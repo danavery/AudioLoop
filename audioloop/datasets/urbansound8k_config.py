@@ -183,8 +183,19 @@ class UrbanSound8KConfig(DatasetConfig):
             "audio_path": self.get_audio_path(row["slice_file_name"], int(row["fold"])),
         }
 
-    def get_audio_path(self, filename: str, fold: int | None = None) -> Path:
-        """Get full path to audio file."""
+    def get_audio_path(
+        self, filename: str, split: str | None = None, fold: int | None = None
+    ) -> Path:
+        """Get full path to audio file.
+
+        Args:
+            filename: Audio filename from metadata
+            split: Ignored for UrbanSound8K (uses fold structure instead)
+            fold: Fold number (1-10) - determines subdirectory
+
+        Returns:
+            Full path to audio file in fold{fold}/ subdirectory
+        """
         if fold is not None:
             return self.audio_root / f"fold{fold}" / filename
         # Try to find the file in any fold (less efficient but works)

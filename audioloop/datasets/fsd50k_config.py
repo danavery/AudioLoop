@@ -157,7 +157,7 @@ class FSD50KConfig(DatasetConfig):
     fixed_length: int = 2048
 
     # Default paths
-    _audio_root: Path = Path("data/FSD50K/FSD50K.dev_audio")
+    _audio_root: Path = Path("data/FSD50K")  # Base directory, split determines subdirectory
     output_dir: Path = Path("data/all_specs")
 
     # Specific files
@@ -235,19 +235,40 @@ class FSD50KConfig(DatasetConfig):
         labels = row["labels"].split(",")
         mids = row["mids"].split(",")
 
+        # Use split from CSV if available, otherwise use provided split parameter
+        metadata_split = row.get("split", split or "eval")
+
         return {
             "filename": row["fname"],
             "labels": labels,  # This contains class names, not IDs
             "mids": mids,
-            "split": row.get("split", "eval"),  # eval.csv doesn't have split column
-            "audio_path": self.get_audio_path(row["fname"]),
+            "split": metadata_split,
+            "audio_path": self.get_audio_path(row["fname"], split=metadata_split),
         }
 
-    def get_audio_path(self, filename: str, fold: int | None = None) -> Path:
-        """Get full path to audio file."""
+    def get_audio_path(
+        self, filename: str, split: str | None = None, fold: int | None = None
+    ) -> Path:
+        """Get full path to audio file.
+
+        Args:
+            filename: Audio filename from metadata
+            split: Dataset split (dev or eval) - determines subdirectory
+            fold: Ignored for FSD50K (no fold structure)
+
+        Returns:
+            Full path to audio file in FSD50K.{split}_audio/ subdirectory
+        """
+        # Default to dev if no split provided
+        if split is None:
+            split = self.get_default_split()
+
+        # Construct path: data/FSD50K/FSD50K.dev_audio/filename.wav
+        audio_dir = self.audio_root / f"FSD50K.{split}_audio"
+
         if filename.endswith(".wav"):
-            return self.audio_root / filename
-        return self.audio_root / f"{filename}.wav"
+            return audio_dir / filename
+        return audio_dir / f"{filename}.wav"
 
     def get_spectrogram_path(self, filename: str, specs_dir: Path) -> Path:
         """Get path where spectrogram should be stored."""
