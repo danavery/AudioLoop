@@ -74,7 +74,6 @@ def run_binary_inference(
     predictions_csv=None,
     positive_class_name="positive",
     negative_class_name="negative",
-    dataset_file=None,
     positive_class_id=8,
     training_set_csv=None,
 ):
@@ -87,7 +86,6 @@ def run_binary_inference(
         predictions_csv: Path for output predictions CSV
         positive_class_name: Name for positive class (for logging and output)
         negative_class_name: Name for negative class (for logging and output)
-        dataset_file: Path to dataset metadata CSV (auto-detected if None)
         positive_class_id: Audio class ID to treat as positive
         training_set_csv: Path to training set CSV (files to exclude from inference)
 
@@ -103,10 +101,6 @@ def run_binary_inference(
 
     # Get dataset config from unified config
     dataset_config = config.get_dataset_config()
-
-    # Auto-detect dataset file if not provided
-    if dataset_file is None:
-        dataset_file = str(dataset_config.dataset_csv)
 
     # Load all available metadata and create binary labels inline
     metadata = dataset_config.load_metadata()
@@ -255,9 +249,7 @@ def run_binary_inference(
                         "prob_negative": prob_negative,
                         "prob_positive": prob_positive,
                         "original_class": original_class if original_class is not None else -1,
-                        "fold": getattr(
-                            batch.get("fold", [None] * len(true_labels))[i], "item", lambda: -1
-                        )(),
+                        "fold": -1,  # Fold information not available in inference mode
                         "filepath": batch["filepath"][i],
                     }
 
@@ -317,7 +309,6 @@ def run_active_learning_cycle(
     negative_class_name,
     run_number,
     model_path=None,
-    dataset_file=None,
     training_set_csv=None,
     seed=None,
     log_level=logging.INFO,
@@ -332,7 +323,6 @@ def run_active_learning_cycle(
         negative_class_name: Human-readable name for negative class
         run_number: Version number for output files (e.g., 1 creates v1 files)
         model_path: Path to trained model (uses config.get_model_path(run_number) if None)
-        dataset_file: Path to dataset metadata CSV (auto-detected from config if None)
         training_set_csv: Path to training set CSV (uses config.get_training_set_path(run_number) if None)
         seed: Random seed for reproducibility (overrides config.seed if provided)
         log_level: Logging level (logging.INFO for normal output, logging.WARNING for quiet)
@@ -370,7 +360,6 @@ def run_active_learning_cycle(
         predictions_csv=predictions_file,
         positive_class_name=positive_class_name,
         negative_class_name=negative_class_name,
-        dataset_file=dataset_file,
         positive_class_id=positive_class_id,
         training_set_csv=training_set_csv,
     )

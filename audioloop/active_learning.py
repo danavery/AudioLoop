@@ -26,7 +26,6 @@ def run_active_learning_for_class(
     model_path,
     negative_class_name=None,
     dataset_name="urbansound8k",
-    dataset_file=None,
     run_number=1,
     training_set_csv=None,
     total_candidates=50,
@@ -52,7 +51,6 @@ def run_active_learning_for_class(
         model_path: Path to trained model
         negative_class_name: Name for negative class (auto-generated if None)
         dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
-        dataset_file: Path to dataset metadata CSV (auto-detected if None)
         run_number: Version number for output files
         training_set_csv: Path to training set CSV (auto-detected if None)
         total_candidates: Total number of candidates to select
@@ -93,10 +91,6 @@ def run_active_learning_for_class(
     )
     dataset_config = config.get_dataset_config()
 
-    # Auto-detect dataset file if not provided
-    if dataset_file is None:
-        dataset_file = str(dataset_config.dataset_csv)
-
     # Validate class name and get class ID
     try:
         positive_class_id = dataset_config.name_to_id[positive_class_name]
@@ -117,7 +111,6 @@ def run_active_learning_for_class(
         negative_class_name=negative_class_name,
         run_number=run_number,
         model_path=model_path,
-        dataset_file=dataset_file,
         training_set_csv=training_set_csv,
         seed=seed,
         log_level=log_level,
@@ -437,11 +430,7 @@ Examples:
         type=float,
         help="Minimum confidence threshold for candidate selection (default from config: 0.8)",
     )
-    parser.add_argument(
-        "--dataset-file",
-        type=str,
-        help="Path to dataset metadata CSV file (auto-detected from dataset if not specified)",
-    )
+
     parser.add_argument(
         "--training-set",
         type=str,
@@ -607,7 +596,6 @@ Examples:
         negative_class_name=negative_class_name,
         run_number=args.run_number,
         model_path=args.model,
-        dataset_file=args.dataset_file,
         training_set_csv=args.training_set,
         seed=args.seed,
     )
