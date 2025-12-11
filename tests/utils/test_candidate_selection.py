@@ -665,26 +665,38 @@ def test_basic_transition_print_analysis_no_crash(capsys):
 # create_strategy function tests
 def test_create_strategy_confidence():
     """Test create_strategy function with confidence mode."""
-    strategy = create_strategy("confidence")
+    from audioloop.config import AudioLoopConfig
+
+    config = AudioLoopConfig(selection_mode="confidence")
+    strategy = create_strategy(config)
     assert isinstance(strategy, ConfidenceStrategy)
 
 
 def test_create_strategy_entropy():
     """Test create_strategy function with entropy mode."""
-    strategy = create_strategy("entropy")
+    from audioloop.config import AudioLoopConfig
+
+    config = AudioLoopConfig(selection_mode="entropy")
+    strategy = create_strategy(config)
     assert isinstance(strategy, EntropyStrategy)
 
 
 def test_create_strategy_basic_transition():
     """Test create_strategy function with basic_transition mode."""
-    strategy = create_strategy("basic_transition")
+    from audioloop.config import AudioLoopConfig
+
+    config = AudioLoopConfig(selection_mode="basic_transition")
+    strategy = create_strategy(config)
     assert isinstance(strategy, BasicTransitionStrategy)
 
 
 def test_create_strategy_invalid_mode():
     """Test create_strategy function with invalid mode."""
+    from audioloop.config import AudioLoopConfig
+
+    # Config validation will catch invalid mode
     with pytest.raises(ValueError, match="Unknown selection mode"):
-        create_strategy("invalid_mode")
+        AudioLoopConfig(selection_mode="invalid_mode")
 
 
 # Parametrized tests
@@ -1040,6 +1052,7 @@ def test_basic_transition_relative_behavior():
         "Should not transition with high variance"
     )
 
+
 # =============================================================================
 # Mixed Entropy Strategy Tests
 # =============================================================================
@@ -1055,14 +1068,16 @@ class TestMixedEntropyStrategy:
         # Create predictions with known entropy distribution
         predictions = []
         for i in range(200):
-            predictions.append({
-                "filename": f"file{i}.pt",
-                "prediction": 1 if i % 2 == 0 else 0,
-                "predicted_class": "positive" if i % 2 == 0 else "negative",
-                "confidence": 0.5 + (i / 400),  # 0.5 to 1.0
-                "entropy": 1.0 - (i / 200),  # 1.0 to 0.0 (descending)
-                "filepath": f"path/file{i}.pt",
-            })
+            predictions.append(
+                {
+                    "filename": f"file{i}.pt",
+                    "prediction": 1 if i % 2 == 0 else 0,
+                    "predicted_class": "positive" if i % 2 == 0 else "negative",
+                    "confidence": 0.5 + (i / 400),  # 0.5 to 1.0
+                    "entropy": 1.0 - (i / 200),  # 1.0 to 0.0 (descending)
+                    "filepath": f"path/file{i}.pt",
+                }
+            )
 
         candidates = strategy.select_candidates(predictions, 50)
 
@@ -1088,14 +1103,16 @@ class TestMixedEntropyStrategy:
 
         predictions = []
         for i in range(150):
-            predictions.append({
-                "filename": f"file{i}.pt",
-                "prediction": 1,
-                "predicted_class": "positive",
-                "confidence": 0.9,
-                "entropy": 1.0 - (i / 150),  # Descending from 1.0 to 0.0
-                "filepath": f"path/file{i}.pt",
-            })
+            predictions.append(
+                {
+                    "filename": f"file{i}.pt",
+                    "prediction": 1,
+                    "predicted_class": "positive",
+                    "confidence": 0.9,
+                    "entropy": 1.0 - (i / 150),  # Descending from 1.0 to 0.0
+                    "filepath": f"path/file{i}.pt",
+                }
+            )
 
         candidates = strategy.select_candidates(predictions, 50)
 
@@ -1121,14 +1138,16 @@ class TestMixedEntropyStrategy:
         # Small dataset (< 100)
         predictions = []
         for i in range(50):
-            predictions.append({
-                "filename": f"file{i}.pt",
-                "prediction": 1,
-                "predicted_class": "positive",
-                "confidence": 0.9,
-                "entropy": 1.0 - (i / 50),
-                "filepath": f"path/file{i}.pt",
-            })
+            predictions.append(
+                {
+                    "filename": f"file{i}.pt",
+                    "prediction": 1,
+                    "predicted_class": "positive",
+                    "confidence": 0.9,
+                    "entropy": 1.0 - (i / 50),
+                    "filepath": f"path/file{i}.pt",
+                }
+            )
 
         candidates = strategy.select_candidates(predictions, 30)
 
@@ -1147,14 +1166,16 @@ class TestMixedEntropyStrategy:
         for i in range(100):
             # First 10 are high entropy, rest are low
             entropy = 0.9 if i < 10 else 0.1
-            predictions.append({
-                "filename": f"file{i}.pt",
-                "prediction": 1,
-                "predicted_class": "positive",
-                "confidence": 0.8,
-                "entropy": entropy,
-                "filepath": f"path/file{i}.pt",
-            })
+            predictions.append(
+                {
+                    "filename": f"file{i}.pt",
+                    "prediction": 1,
+                    "predicted_class": "positive",
+                    "confidence": 0.8,
+                    "entropy": entropy,
+                    "filepath": f"path/file{i}.pt",
+                }
+            )
 
         candidates = strategy.select_candidates(predictions, 50)
 
@@ -1180,7 +1201,7 @@ class TestMixedEntropyStrategy:
             strategy.select_candidates(
                 predictions,
                 10,
-                positive_percentage=0.75  # Should raise error
+                positive_percentage=0.75,  # Should raise error
             )
 
     def test_pool_multiplier_diversity(self):
@@ -1189,15 +1210,17 @@ class TestMixedEntropyStrategy:
 
         predictions = []
         for i in range(200):
-            predictions.append({
-                "filename": f"file{i}.pt",
-                "prediction": 1,
-                "predicted_class": "positive",
-                "confidence": 0.8,
-                "entropy": 1.0 - (i / 200),
-                "filepath": f"path/file{i}.pt",
-                "unique_id": i,  # Track which were selected
-            })
+            predictions.append(
+                {
+                    "filename": f"file{i}.pt",
+                    "prediction": 1,
+                    "predicted_class": "positive",
+                    "confidence": 0.8,
+                    "entropy": 1.0 - (i / 200),
+                    "filepath": f"path/file{i}.pt",
+                    "unique_id": i,  # Track which were selected
+                }
+            )
 
         # Run multiple times with same seed - should get same results
         candidates1 = strategy.select_candidates(
@@ -1225,14 +1248,16 @@ class TestMixedEntropyStrategy:
 
         predictions = []
         for i in range(100):
-            predictions.append({
-                "filename": f"file{i}.pt",
-                "prediction": 1,
-                "predicted_class": "positive",
-                "confidence": 0.8,
-                "entropy": 0.5,  # All the same
-                "filepath": f"path/file{i}.pt",
-            })
+            predictions.append(
+                {
+                    "filename": f"file{i}.pt",
+                    "prediction": 1,
+                    "predicted_class": "positive",
+                    "confidence": 0.8,
+                    "entropy": 0.5,  # All the same
+                    "filepath": f"path/file{i}.pt",
+                }
+            )
 
         candidates = strategy.select_candidates(predictions, 50)
 
@@ -1253,14 +1278,16 @@ class TestMixedEntropyStrategy:
 
         predictions = []
         for i in range(150):
-            predictions.append({
-                "filename": f"file{i}.pt",
-                "prediction": 1,
-                "predicted_class": "positive",
-                "confidence": 0.8,
-                "entropy": 1.0 - (i / 150),  # Strictly descending
-                "filepath": f"path/file{i}.pt",
-            })
+            predictions.append(
+                {
+                    "filename": f"file{i}.pt",
+                    "prediction": 1,
+                    "predicted_class": "positive",
+                    "confidence": 0.8,
+                    "entropy": 1.0 - (i / 150),  # Strictly descending
+                    "filepath": f"path/file{i}.pt",
+                }
+            )
 
         candidates = strategy.select_candidates(predictions, 50, random_seed=42)
 
@@ -1268,8 +1295,8 @@ class TestMixedEntropyStrategy:
         entropies = [c["entropy"] for c in candidates]
 
         # Should NOT be sorted (either ascending or descending)
-        is_sorted_desc = all(entropies[i] >= entropies[i+1] for i in range(len(entropies)-1))
-        is_sorted_asc = all(entropies[i] <= entropies[i+1] for i in range(len(entropies)-1))
+        is_sorted_desc = all(entropies[i] >= entropies[i + 1] for i in range(len(entropies) - 1))
+        is_sorted_asc = all(entropies[i] <= entropies[i + 1] for i in range(len(entropies) - 1))
 
         assert not is_sorted_desc and not is_sorted_asc, (
             "Candidates should be shuffled, not sorted by entropy"
@@ -1281,7 +1308,10 @@ class TestMixedEntropyIntegration:
 
     def test_create_strategy_factory(self):
         """Test that mixed_entropy can be created via factory function."""
-        strategy = create_strategy("mixed_entropy")
+        from audioloop.config import AudioLoopConfig
+
+        config = AudioLoopConfig(selection_mode="mixed_entropy", positive_percentage=None)
+        strategy = create_strategy(config)
 
         assert isinstance(strategy, MixedEntropyStrategy), (
             "Factory should create MixedEntropyStrategy"
@@ -1289,25 +1319,27 @@ class TestMixedEntropyIntegration:
 
     def test_integration_with_real_workflow(self):
         """Test integration with active learning workflow."""
-        strategy = create_strategy("mixed_entropy")
+        from audioloop.config import AudioLoopConfig
+
+        config = AudioLoopConfig(selection_mode="mixed_entropy", positive_percentage=None)
+        strategy = create_strategy(config)
 
         # Simulate realistic predictions
         predictions = []
         for i in range(1000):
-            predictions.append({
-                "filename": f"audio{i}.pt",
-                "prediction": 1 if i % 10 < 3 else 0,  # ~30% positive
-                "predicted_class": "positive" if i % 10 < 3 else "negative",
-                "confidence": 0.5 + (i % 50) / 100,  # Varies 0.5-1.0
-                "entropy": abs(0.5 - (i % 100) / 100),  # Varies 0.0-0.5
-                "filepath": f"data/audio{i}.pt",
-            })
+            predictions.append(
+                {
+                    "filename": f"audio{i}.pt",
+                    "prediction": 1 if i % 10 < 3 else 0,  # ~30% positive
+                    "predicted_class": "positive" if i % 10 < 3 else "negative",
+                    "confidence": 0.5 + (i % 50) / 100,  # Varies 0.5-1.0
+                    "entropy": abs(0.5 - (i % 100) / 100),  # Varies 0.0-0.5
+                    "filepath": f"data/audio{i}.pt",
+                }
+            )
 
         candidates = strategy.select_candidates(
-            predictions,
-            50,
-            candidate_pool_multiplier=5,
-            random_seed=42
+            predictions, 50, candidate_pool_multiplier=5, random_seed=42
         )
 
         assert len(candidates) == 50, "Should select correct number"
@@ -1318,26 +1350,24 @@ class TestMixedEntropyIntegration:
         """Test that mixed entropy gives different distribution than pure entropy."""
         predictions = []
         for i in range(200):
-            predictions.append({
-                "filename": f"file{i}.pt",
-                "prediction": 1,
-                "predicted_class": "positive",
-                "confidence": 0.8,
-                "entropy": 1.0 - (i / 200),
-                "filepath": f"path/file{i}.pt",
-            })
+            predictions.append(
+                {
+                    "filename": f"file{i}.pt",
+                    "prediction": 1,
+                    "predicted_class": "positive",
+                    "confidence": 0.8,
+                    "entropy": 1.0 - (i / 200),
+                    "filepath": f"path/file{i}.pt",
+                }
+            )
 
         # Pure entropy (use EntropyStrategy)
         pure_strategy = EntropyStrategy()
-        pure_candidates = pure_strategy.select_candidates(
-            predictions, 50, random_seed=42
-        )
+        pure_candidates = pure_strategy.select_candidates(predictions, 50, random_seed=42)
 
         # Mixed entropy
         mixed_strategy = MixedEntropyStrategy()
-        mixed_candidates = mixed_strategy.select_candidates(
-            predictions, 50, random_seed=42
-        )
+        mixed_candidates = mixed_strategy.select_candidates(predictions, 50, random_seed=42)
 
         # Calculate average entropy for each
         pure_avg = sum(c["entropy"] for c in pure_candidates) / len(pure_candidates)

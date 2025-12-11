@@ -380,27 +380,10 @@ def run_active_learning_cycle(
     logger.info("\nStep 2: Selecting candidates for human labeling...")
     candidates_file = str(config.get_candidates_path(run_number))
 
-    # Create strategy with parameters from config
-    strategy_kwargs = {}
-    if config.selection_mode == "basic_transition":
-        strategy_kwargs = {
-            "f1_threshold": None
-            if config.auto_thresholds
-            else config.basic_transition_f1_threshold,
-            "confidence_threshold": None
-            if config.auto_thresholds
-            else config.basic_transition_confidence_threshold,
-            "variance_threshold": None
-            if config.auto_thresholds
-            else config.basic_transition_variance_threshold,
-            "auto_thresholds": config.auto_thresholds,
-            "estimated_positive_pct": config.estimated_positive_pct
-            or 0.05,  # Default 5% if not provided
-        }
-
+    # Create strategy from config
     from .utils.candidate_selection import create_strategy
 
-    strategy = create_strategy(config.selection_mode, **strategy_kwargs)
+    strategy = create_strategy(config)
 
     logger.info(f"Using strategy: {strategy.get_active_strategy_name()}")
     predictions = load_predictions(predictions_file)

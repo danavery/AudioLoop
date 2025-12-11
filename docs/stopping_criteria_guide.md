@@ -205,42 +205,56 @@ combined = CombinedCriterion([
 
 ### Factory Pattern
 
-```python
-def create_stopping_criterion(strategy="accuracy", **kwargs):
-    """Factory function to create stopping criteria."""
-    if strategy == "accuracy":
-        return AccuracyCriterion(**kwargs)
-    elif strategy == "plateau":
-        return PlateauCriterion(**kwargs)
-    elif strategy == "early_stopping":
-        return EarlyStoppingCriterion(**kwargs)
-    else:
-        raise ValueError(f"Unknown strategy: {strategy}")
+AudioLoop uses a config-driven factory for consistent criterion creation:
 
-# Usage
-criterion = create_stopping_criterion("plateau", patience=30, min_delta=0.005)
+```python
+from audioloop.config import AudioLoopConfig
+from audioloop.utils.stopping_criteria import create_stopping_criterion
+
+# Create config with desired stopping criterion
+config = AudioLoopConfig(
+    stopping_criterion_type="plateau",
+    patience=30,
+    min_delta=0.005,
+    max_epochs=1000
+)
+
+# Factory reads all parameters from config
+criterion = create_stopping_criterion(config)
+```
+
+**Direct Instantiation** (for testing or custom use):
+```python
+from audioloop.utils.stopping_criteria import PlateauCriterion
+
+# Can still instantiate directly when needed
+criterion = PlateauCriterion(
+    patience=30,
+    min_delta=0.005,
+    max_epochs=1000
+)
 ```
 
 ### Configuration-Driven Criteria
 
 ```python
-import json
+from audioloop.config import AudioLoopConfig
+from audioloop.utils.stopping_criteria import create_stopping_criterion
 
-def load_criterion_from_config(config_path):
-    """Load stopping criterion from JSON configuration."""
-    with open(config_path, 'r') as f:
-        config = json.load(f)
-    
-    strategy = config.pop('strategy')
-    return create_stopping_criterion(strategy, **config)
+# All configuration in one place
+config = AudioLoopConfig(
+    stopping_criterion_type="plateau",
+    patience=30,
+    min_delta=0.005,
+    max_epochs=1000
+)
 
-# Example config.json:
-# {
-#     "strategy": "plateau",
-#     "patience": 25,
-#     "min_delta": 0.008,
-#     "max_epochs": 800
-# }
+# Factory creates the appropriate criterion
+criterion = create_stopping_criterion(config)
+
+# Use in training
+from audioloop.training_core import run_training
+run_training(config, labels_file="training.csv", version=1)
 ```
 
 ## Best Practices

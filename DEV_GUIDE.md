@@ -287,19 +287,39 @@ run_active_learning_cycle(config, positive_class_name="Drill", ...)
 Both training stopping criteria and candidate selection follow the same Strategy pattern:
 - Abstract base class defines the interface
 - Concrete strategy classes implement specific algorithms
-- Direct class imports and instantiation (no factory functions)
+- Config-driven factory functions for consistent instantiation
 - Each strategy has complete control over its domain logic
 
-Example usage:
+**Factory Pattern** (Recommended for Production Code):
 ```python
-# Training stopping criteria
-from audioloop.utils.stopping_criteria import AccuracyCriterion
-criterion = AccuracyCriterion(max_epochs=1000)
+# Training stopping criteria - factory creates from config
+from audioloop.config import AudioLoopConfig
+from audioloop.utils.stopping_criteria import create_stopping_criterion
 
-# Candidate selection strategies
-from audioloop.utils.candidate_selection import ConfidenceStrategy, EntropyStrategy
+config = AudioLoopConfig(stopping_criterion_type="plateau", patience=50)
+criterion = create_stopping_criterion(config)
+
+# Candidate selection strategies - factory creates from config
+config = AudioLoopConfig(selection_mode="basic_transition", auto_thresholds=True)
+from audioloop.utils.candidate_selection import create_strategy
+strategy = create_strategy(config)
+```
+
+**Direct Instantiation** (For Tests or Custom Use):
+```python
+# Can also instantiate strategies directly for testing or custom scenarios
+from audioloop.utils.stopping_criteria import PlateauCriterion
+from audioloop.utils.candidate_selection import ConfidenceStrategy
+
+criterion = PlateauCriterion(patience=50, min_delta=0.01)
 strategy = ConfidenceStrategy()
 ```
+
+**Why Use Factories:**
+- Config validation happens once at config creation
+- Encapsulates strategy-specific parameter mapping
+- Consistent pattern across all modules
+- Single source of truth for configuration
 
 ### Class Weighting Configuration
 AudioLoop supports three class weighting modes for handling imbalanced datasets:
