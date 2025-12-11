@@ -209,8 +209,8 @@ class TestTrainingParameters:
 
     def test_stopping_criterion_validation(self):
         """Test validation of stopping criterion parameters."""
-        with pytest.raises(ValueError, match="Unknown stopping criterion"):
-            AudioLoopConfig(stopping_criterion_type="invalid")
+        # Note: stopping_criterion_type validation moved to create_stopping_criterion()
+        # Only patience validation remains in config
 
         with pytest.raises(ValueError, match="patience must be positive"):
             AudioLoopConfig(stopping_criterion_type="plateau", patience=-1)
@@ -327,10 +327,14 @@ class TestActiveLearningParameters:
     def test_active_learning_parameter_validation_ranges(self):
         """Test validation of range-bound active learning parameters."""
         # positive_percentage validation
-        with pytest.raises(ValueError, match="positive_percentage must be None or between 0.0 and 1.0"):
+        with pytest.raises(
+            ValueError, match="positive_percentage must be None or between 0.0 and 1.0"
+        ):
             AudioLoopConfig(positive_percentage=-0.1)
 
-        with pytest.raises(ValueError, match="positive_percentage must be None or between 0.0 and 1.0"):
+        with pytest.raises(
+            ValueError, match="positive_percentage must be None or between 0.0 and 1.0"
+        ):
             AudioLoopConfig(positive_percentage=1.1)
 
         # min_confidence validation
@@ -396,3 +400,49 @@ class TestActiveLearningParameters:
             ValueError, match="basic_transition_variance_threshold must be between 0.0 and 1.0"
         ):
             AudioLoopConfig(basic_transition_variance_threshold=1.1)
+
+    def test_cycle_stopping_strategy_validation(self):
+        """Test validation of cycle_stopping_strategy parameter."""
+        # Note: cycle_stopping_strategy validation moved to create_cycle_stopping_criterion()
+        # Config accepts any string value
+
+        # Valid strategies should work
+        config1 = AudioLoopConfig(cycle_stopping_strategy="none")
+        assert config1.cycle_stopping_strategy == "none"
+
+        config2 = AudioLoopConfig(cycle_stopping_strategy="label")
+        assert config2.cycle_stopping_strategy == "label"
+
+        config3 = AudioLoopConfig(cycle_stopping_strategy="search")
+        assert config3.cycle_stopping_strategy == "search"
+
+    def test_precision_floor_validation(self):
+        """Test validation of precision_floor parameter."""
+        # Valid: "auto" string
+        config1 = AudioLoopConfig(precision_floor="auto")
+        assert config1.precision_floor == "auto"
+
+        # Valid: float between 0.0 and 1.0
+        config2 = AudioLoopConfig(precision_floor=0.5)
+        assert config2.precision_floor == 0.5
+
+        config3 = AudioLoopConfig(precision_floor=0.0)
+        assert config3.precision_floor == 0.0
+
+        config4 = AudioLoopConfig(precision_floor=1.0)
+        assert config4.precision_floor == 1.0
+
+        # Invalid: string other than "auto"
+        with pytest.raises(ValueError, match="precision_floor must be 'auto' or a float"):
+            AudioLoopConfig(precision_floor="invalid")
+
+        # Invalid: float out of range
+        with pytest.raises(ValueError, match="precision_floor must be between 0.0 and 1.0"):
+            AudioLoopConfig(precision_floor=-0.1)
+
+        with pytest.raises(ValueError, match="precision_floor must be between 0.0 and 1.0"):
+            AudioLoopConfig(precision_floor=1.5)
+
+        # Invalid: wrong type
+        with pytest.raises(ValueError, match="precision_floor must be 'auto' or a float"):
+            AudioLoopConfig(precision_floor=None)  # type: ignore[arg-type]

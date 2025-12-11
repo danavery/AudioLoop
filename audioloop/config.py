@@ -63,8 +63,6 @@ from .utils.paths import (
     get_training_sets_dir,
 )
 
-# Dynamic dataset discovery - no hardcoded registry needed
-
 
 @dataclass
 class AudioLoopConfig:
@@ -101,33 +99,41 @@ class AudioLoopConfig:
     stopping_criterion_type: str = "plateau"
     patience: int = 20
     min_delta: float = 0.01
-    accuracy_floor: float | None = None
+    accuracy_floor: float | None = (
+        None  # Min accuracy before patience counts; None = auto-calc from data
+    )
 
     # Cross-cycle stopping criteria (for active learning loops)
     cycle_stopping_strategy: str = "none"  # 'label', 'search', or 'none'
-    cycle_patience: int = 5
-    cycle_min_delta: float = 0.02
-    cycle_min_cycles: int = 10
-    cycle_window: int = 3
-    cycle_std_threshold: float = 0.08
-    precision_floor: float | str = "auto"  # Only used for 'search' mode
+    cycle_patience: int = 5  # Cycles without improvement before stopping
+    cycle_min_delta: float = 0.02  # Min improvement to reset patience
+    cycle_min_cycles: int = 10  # Min cycles before stopping allowed
+    cycle_window: int = 3  # Cycles to average for rolling metrics
+    cycle_std_threshold: float = 0.08  # Max std dev for "stable" performance
+    precision_floor: float | str = "auto"  # Min precision for 'search' mode; "auto" or 0.0-1.0
 
     # Active learning parameters (experiment configuration)
     total_candidates: int = 50
     positive_percentage: float | None = None  # None = no stratification (pure entropy)
     min_confidence: float = 0.8
     selection_mode: str = "entropy"
-    candidate_pool_multiplier: int = 5  # Pool size multiplier for stratified sampling
+    candidate_pool_multiplier: int = 5  # Select from pool of N*total_candidates before stratifying
 
-    # Selection strategy configuration
-    basic_transition_f1_threshold: float = 0.2
-    basic_transition_confidence_threshold: float = 0.9
-    basic_transition_variance_threshold: float = 0.12
-    auto_thresholds: bool = False
-    estimated_positive_pct: float | None = None
+    # Selection strategy configuration (for 'basic_transition' mode)
+    basic_transition_f1_threshold: float = 0.2  # F1 threshold to trigger strategy switch
+    basic_transition_confidence_threshold: float = 0.9  # Confidence threshold to trigger switch
+    basic_transition_variance_threshold: float = 0.12  # Variance threshold to trigger switch
+    auto_thresholds: bool = (
+        False  # Auto-calculate thresholds from dataset (overrides manual values)
+    )
+    estimated_positive_pct: float | None = (
+        None  # Estimated positive % for auto-threshold calculation
+    )
 
     # Ground truth evaluation configuration
-    with_ground_truth: bool = False  # Include ground truth columns in predictions CSV
+    with_ground_truth: bool = (
+        False  # Evaluation mode: add ground_truth/correct columns to predictions CSV
+    )
 
     def __post_init__(self):
         """Post-initialization validation and setup."""
@@ -162,8 +168,7 @@ class AudioLoopConfig:
             raise ValueError("lr_scheduler_patience must be positive")
         if self.lr_scheduler_min_lr <= 0 or self.lr_scheduler_min_lr >= self.learning_rate:
             raise ValueError("lr_scheduler_min_lr must be positive and less than learning_rate")
-        if self.stopping_criterion_type not in ["plateau", "accuracy"]:
-            raise ValueError(f"Unknown stopping criterion: {self.stopping_criterion_type}")
+        # Note: stopping_criterion_type validation happens in create_stopping_criterion()
         if self.stopping_criterion_type == "plateau" and self.patience <= 0:
             raise ValueError("patience must be positive for plateau criterion")
         if isinstance(self.class_weighting, float) and not (0.0 < self.class_weighting < 1.0):
@@ -190,6 +195,17 @@ class AudioLoopConfig:
             raise ValueError(f"Unknown selection mode: {self.selection_mode}")
         if self.candidate_pool_multiplier < 1:
             raise ValueError("candidate_pool_multiplier must be at least 1")
+        # Note: cycle_stopping_strategy validation happens in create_cycle_stopping_criterion()
+
+        # Validate precision_floor
+        if isinstance(self.precision_floor, str):
+            if self.precision_floor != "auto":
+                raise ValueError("precision_floor must be 'auto' or a float between 0.0 and 1.0")
+        elif isinstance(self.precision_floor, int | float):
+            if not (0.0 <= self.precision_floor <= 1.0):
+                raise ValueError("precision_floor must be between 0.0 and 1.0")
+        else:
+            raise ValueError("precision_floor must be 'auto' or a float between 0.0 and 1.0")
 
     def _validate_selection_strategy_params(self):
         """Validate parameters for specific selection strategies."""
