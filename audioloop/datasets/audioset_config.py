@@ -62,7 +62,6 @@ class AudiosetConfig(DatasetConfig):
 
     # Custom CSV support
     _custom_csv_path: Path | None = None
-    _use_custom: bool = False
 
     # === Core Dataset Properties ===
     @property
@@ -107,7 +106,7 @@ class AudiosetConfig(DatasetConfig):
     # === Split Management ===
     def get_available_splits(self) -> list[str]:
         """Return list of valid split names for AudioSet dataset."""
-        return ["bal_train", "unbal_train", "eval", "custom"]
+        return ["bal_train", "unbal_train", "eval"]
 
     def get_default_split(self) -> str:
         """Return the default split name for AudioSet dataset."""
@@ -130,34 +129,14 @@ class AudiosetConfig(DatasetConfig):
             raise FileNotFoundError(f"Custom CSV file not found: {custom_csv_path}")
 
         self._custom_csv_path = custom_csv_path
-        self._use_custom = True
-
-    def load_metadata(self, split: str | None = None) -> list[dict[str, Any]]:
-        """Load metadata for AudioSet.
-
-        Args:
-            split: Dataset split to load. If None, uses get_default_split()
-                   If custom CSV was set via set_custom_csv(), uses "custom" split
-
-        Returns:
-            List of metadata dictionaries
-        """
-        # If custom CSV is set, override split to use custom
-        if self._use_custom:
-            split = "custom"
-        elif split is None:
-            split = self.get_default_split()
-
-        available = self.get_available_splits()
-        if split not in available:
-            raise ValueError(
-                f"Split '{split}' not available for AudioSet. Valid splits: {available}"
-            )
-
-        return self._load_metadata_for_split(split)
 
     def _load_metadata_for_split(self, split: str) -> list[dict]:
         """Load metadata for specified split."""
+
+        # If custom CSV is set, use it regardless of split parameter
+        if hasattr(self, '_custom_csv_path') and self._custom_csv_path is not None:
+            return self._load_subset_csv(self._custom_csv_path)
+
         # Map split name to CSV path (split name already matches filesystem directory)
         if split == "bal_train":
             csv_path = self.balanced_csv
@@ -165,15 +144,10 @@ class AudiosetConfig(DatasetConfig):
             csv_path = self.unbalanced_csv
         elif split == "eval":
             csv_path = self.eval_csv
-        elif split == "custom":
-            if self._custom_csv_path is None:
-                raise ValueError("Custom CSV path not set. Call set_custom_csv() first.")
-            # Custom CSV is in subset format - load it differently
-            return self._load_subset_csv(self._custom_csv_path)
         else:
             # This shouldn't happen due to validation in base class, but keep for safety
             raise ValueError(
-                f"Unknown split: {split}. Use 'bal_train', 'unbal_train', 'eval', or 'custom'"
+                f"Unknown split: {split}. Use 'bal_train', 'unbal_train', or 'eval'"
             )
 
         dir_split = split  # Split name matches filesystem directory

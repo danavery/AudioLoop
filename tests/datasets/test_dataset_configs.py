@@ -394,8 +394,7 @@ class TestAudioSetConfig:
         assert "bal_train" in splits
         assert "unbal_train" in splits
         assert "eval" in splits
-        assert "custom" in splits
-        assert len(splits) == 4
+        assert len(splits) == 3
 
     def test_audioset_default_split(self):
         """Test that AudioSet uses unbal_train as default."""
