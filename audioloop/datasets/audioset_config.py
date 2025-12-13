@@ -63,6 +63,18 @@ class AudiosetConfig(DatasetConfig):
     # Custom CSV support
     _custom_csv_path: Path | None = None
 
+    # === Bad Files Exclusion ===
+    def get_bad_files(self) -> set[str]:
+        """Return set of filenames known to crash during processing.
+
+        These files have corrupt audio that causes torchaudio to segfault.
+        Add new problematic files here as they're discovered.
+        """
+        return {
+            "Z3YaJ9Vi4lY.flac",  # Corrupt FLAC - crashes torchaudio.load()
+            "lld156ULI5U.flac",  # Corrupt FLAC - empty file (FLAC header, no data)
+        }
+
     # === Core Dataset Properties ===
     @property
     def audio_root(self) -> Path:
@@ -134,7 +146,7 @@ class AudiosetConfig(DatasetConfig):
         """Load metadata for specified split."""
 
         # If custom CSV is set, use it regardless of split parameter
-        if hasattr(self, '_custom_csv_path') and self._custom_csv_path is not None:
+        if hasattr(self, "_custom_csv_path") and self._custom_csv_path is not None:
             return self._load_subset_csv(self._custom_csv_path)
 
         # Map split name to CSV path (split name already matches filesystem directory)
@@ -146,9 +158,7 @@ class AudiosetConfig(DatasetConfig):
             csv_path = self.eval_csv
         else:
             # This shouldn't happen due to validation in base class, but keep for safety
-            raise ValueError(
-                f"Unknown split: {split}. Use 'bal_train', 'unbal_train', or 'eval'"
-            )
+            raise ValueError(f"Unknown split: {split}. Use 'bal_train', 'unbal_train', or 'eval'")
 
         dir_split = split  # Split name matches filesystem directory
 

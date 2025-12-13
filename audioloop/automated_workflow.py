@@ -117,6 +117,7 @@ def run_automated_workflow(
     evaluation_mode=False,
     audio_dir=None,
     seed=None,
+    log_level=logging.WARNING,
 ):
     """
     Run the complete automated active learning workflow.
@@ -224,7 +225,7 @@ def run_automated_workflow(
                 labels_file=current_training_set,
                 version=cycle,
                 model_path=current_model,
-                log_level=logging.WARNING,  # Quiet mode
+                log_level=log_level,
             )
             print(
                 f"├─ Training model... ✓ ({final_accuracy * 100:.1f}% accuracy, {num_epochs} epochs)"
@@ -255,7 +256,7 @@ def run_automated_workflow(
                 experiment_name=config.experiment_name,
                 seed=seed,
                 with_ground_truth=evaluation_mode,
-                log_level=logging.WARNING,  # Quiet mode
+                log_level=log_level,
                 subset_csv=str(config.subset_csv) if config.subset_csv else None,
             )
             # Count candidates for clean reporting
@@ -278,7 +279,7 @@ def run_automated_workflow(
                 candidates_file=candidates_file,
                 dataset_name=config.dataset,
                 audio_dir=audio_dir,
-                log_level=logging.WARNING,
+                log_level=log_level,
             )
             print("├─ Auto-labeling... ✓")
         else:
@@ -297,7 +298,7 @@ def run_automated_workflow(
                 original_csv=current_training_set,
                 new_labels_csv=candidates_file,
                 config=config,
-                log_level=logging.WARNING,
+                log_level=log_level,
             )
             training_sets.append(new_training_set)
             print(f"├─ Merging labels... ✓ (created {os.path.basename(new_training_set)})")
@@ -520,6 +521,11 @@ Prerequisites:
         action="store_true",
         help="Automatically label using ground truth (requires --evaluation-mode)",
     )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="Enable verbose logging (shows detailed progress and file processing)",
+    )
 
     # Dataset parameters
     parser.add_argument(
@@ -662,6 +668,13 @@ Prerequisites:
 
     args = parser.parse_args()
 
+    # Set up logging based on --verbose flag
+    log_level = logging.INFO if args.verbose else logging.WARNING
+    logging.basicConfig(
+        level=log_level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+
     # Validate flag combinations
     if args.auto_label and not args.evaluation_mode:
         parser.error("--auto-label requires --evaluation-mode")
@@ -788,6 +801,7 @@ Prerequisites:
             evaluation_mode=args.evaluation_mode,
             audio_dir=args.audio_dir,
             seed=args.seed,
+            log_level=log_level,
         )
 
         if training_sets:

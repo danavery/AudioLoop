@@ -1,10 +1,14 @@
 import contextlib
 import csv
+import logging
 import os
+import sys
 from pathlib import Path
 
 import torch
 import torchaudio
+
+logger = logging.getLogger(__name__)
 
 
 class SpectrogramDataset(torch.utils.data.Dataset):
@@ -123,9 +127,12 @@ class SpectrogramDataset(torch.utils.data.Dataset):
         if not audio_path.exists():
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
-        # Load audio
-        waveform, sample_rate = torchaudio.load(str(audio_path))
-
+        # Load audio (may fail on corrupt files)
+        try:
+            waveform, sample_rate = torchaudio.load(str(audio_path))
+        except Exception as e:
+            # Corrupt or unsupported audio file
+            raise RuntimeError(f"Failed to load audio file {audio_path}: {e}") from e
         # Convert stereo to mono by averaging channels
         if waveform.shape[0] > 1:
             waveform = waveform.mean(dim=0, keepdim=True)
@@ -146,6 +153,11 @@ class SpectrogramDataset(torch.utils.data.Dataset):
         sample = self.samples[idx]
         spec_filepath = sample["spec_filepath"]
 
+        # Debug mode: log before processing (set AUDIOLOOP_DEBUG_FILES=1 to enable)
+        if os.getenv("AUDIOLOOP_DEBUG_FILES"):
+            # Use print with flush=True to ensure immediate output (bypasses logging buffering)
+            print(f"DEBUG [{idx}] Loading: {sample['filename']}", file=sys.stderr, flush=True)
+
         try:
             # Try to load cached spectrogram
             if os.path.exists(spec_filepath):
@@ -154,6 +166,12 @@ class SpectrogramDataset(torch.utils.data.Dataset):
                 # Try lazy generation if audio_path available
                 audio_path = sample.get("audio_path")
                 if audio_path and self.dataset_config:
+                    # Debug mode: log audio file being loaded for lazy generation
+                    if os.getenv("AUDIOLOOP_DEBUG_FILES"):
+                        logger.info(
+                            f"[{idx}] Generating from audio: {os.path.basename(audio_path)}"
+                        )
+                        sys.stderr.flush()  # Flush immediately to see which file crashes
                     # Generate spectrogram from audio
                     data = self._generate_spec_from_audio(audio_path)
 
@@ -182,7 +200,11 @@ class SpectrogramDataset(torch.utils.data.Dataset):
 
             return result
 
-        except Exception:
+        except Exception as e:
             # File missing, corrupted, or failed to decode - skip this sample
+            # Log warning for debugging
+            import logging
+
+            logging.warning(f"Skipping file {sample['filename']}: {e}")
             # Return None to signal skip (collate_fn will filter these out)
             return None

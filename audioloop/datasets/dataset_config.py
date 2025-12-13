@@ -16,6 +16,15 @@ import torch.nn as nn
 class DatasetConfig(ABC):
     """Common interface for dataset configurations used in active learning."""
 
+    # === Bad Files Exclusion ===
+    def get_bad_files(self) -> set[str]:
+        """Return set of filenames known to crash during processing.
+
+        Override in subclass to exclude corrupt/problematic files.
+        Filenames should be base names only (e.g., 'Z3YaJ9Vi4lY.flac').
+        """
+        return set()
+
     # === Core Dataset Properties ===
     @property
     @abstractmethod

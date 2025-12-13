@@ -106,6 +106,11 @@ def run_binary_inference(
     metadata = dataset_config.load_metadata()
     logger.info(f"Found {len(metadata)} total samples in dataset")
 
+    # Get bad files to exclude
+    bad_files = dataset_config.get_bad_files()
+    if bad_files:
+        logger.info(f"Excluding {len(bad_files)} known bad files: {bad_files}")
+
     # Load training set filenames to exclude
     training_filenames = load_training_set_filenames(training_set_csv)
     if training_filenames:
@@ -125,6 +130,11 @@ def run_binary_inference(
             filtered_count = 0
             row_count = 0
             for item in metadata:
+                # Skip known bad files
+                if item["filename"] in bad_files:
+                    filtered_count += 1
+                    continue
+
                 # Use dataset config's path conversion method
                 spec_path = dataset_config.get_spectrogram_path(item["filename"], config.specs_dir)
                 spec_filename = spec_path.name
