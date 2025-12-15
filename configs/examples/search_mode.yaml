@@ -1,0 +1,32 @@
+# Search Mode Configuration
+# Optimized for recall - finding all positive examples in the dataset
+# Use this when you want to maximize discovery of target class instances
+
+workflow:
+  class_name: "dog_bark"
+  num_cycles: 15
+  auto_label: true
+  evaluation_mode: true
+
+config:
+  # Experiment identification
+  experiment_name: "dog_search"
+  dataset: "urbansound8k"
+
+  # Training parameters
+  max_epochs: 1000
+  batch_size: 32
+  learning_rate: 0.001
+
+  # Active learning - entropy-based selection for exploration
+  total_candidates: 50
+  selection_mode: "entropy"
+  min_confidence: 0.75
+
+  # Cycle stopping - search mode (optimize recall with precision floor)
+  cycle_stopping_strategy: "search"
+  cycle_patience: 5
+  precision_floor: "auto"  # Automatically set based on dataset characteristics
+
+  # Evaluation mode
+  with_ground_truth: true

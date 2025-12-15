@@ -453,6 +453,53 @@ def run_automated_workflow(
     return training_sets
 
 
+def load_workflow_params(yaml_path: str | Path) -> dict:
+    """
+    Load workflow-specific parameters from YAML file.
+
+    Args:
+        yaml_path: Path to YAML config file
+
+    Returns:
+        Dictionary with workflow parameters (class_name, num_cycles, etc.)
+
+    Raises:
+        FileNotFoundError: If yaml_path doesn't exist
+        yaml.YAMLError: If YAML is malformed
+    """
+    import yaml
+    from pathlib import Path
+
+    yaml_path = Path(yaml_path)
+    if not yaml_path.exists():
+        raise FileNotFoundError(f"Config file not found: {yaml_path}")
+
+    try:
+        with open(yaml_path) as f:
+            yaml_data = yaml.safe_load(f)
+    except yaml.YAMLError as e:
+        raise yaml.YAMLError(f"Error parsing YAML file {yaml_path}: {e}") from e
+
+    if not yaml_data:
+        return {}
+
+    # Extract 'workflow' section if present
+    if "workflow" in yaml_data:
+        return yaml_data["workflow"] or {}
+
+    # Flat format - extract workflow params
+    workflow_param_names = {
+        "class_name",
+        "num_cycles",
+        "start_cycle",
+        "auto_label",
+        "evaluation_mode",
+        "audio_dir",
+        "verbose",
+    }
+    return {k: v for k, v in yaml_data.items() if k in workflow_param_names}
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Automated active learning workflow for audio classification",
@@ -496,9 +543,17 @@ Prerequisites:
         """,
     )
 
-    # Required arguments
+    # Configuration file
     parser.add_argument(
-        "--class-name", required=True, help="Target class name (e.g., siren, dog_bark)"
+        "--config",
+        type=str,
+        help="Path to YAML configuration file. CLI arguments override config file values.",
+    )
+
+    # Required arguments (or provided via config)
+    parser.add_argument(
+        "--class-name",
+        help="Target class name (e.g., siren, dog_bark). Required unless provided in --config.",
     )
 
     # Workflow parameters
@@ -668,15 +723,39 @@ Prerequisites:
 
     args = parser.parse_args()
 
-    # Set up logging based on --verbose flag
-    log_level = logging.INFO if args.verbose else logging.WARNING
+    # Load configuration from YAML if provided
+    yaml_workflow_params = {}
+
+    if args.config:
+        # Load workflow params from YAML
+        yaml_workflow_params = load_workflow_params(args.config)
+
+    # Merge workflow params: CLI > YAML > defaults
+    class_name = args.class_name or yaml_workflow_params.get("class_name")
+    if not class_name:
+        parser.error("--class-name is required (either via CLI or --config file)")
+
+    num_cycles = (
+        args.cycles if args.cycles is not None else yaml_workflow_params.get("num_cycles", 3)
+    )
+    start_cycle = (
+        args.start_cycle
+        if args.start_cycle != 1
+        else yaml_workflow_params.get("start_cycle", 1)
+    )
+    auto_label = args.auto_label or yaml_workflow_params.get("auto_label", False)
+    evaluation_mode = args.evaluation_mode or yaml_workflow_params.get("evaluation_mode", False)
+    audio_dir = args.audio_dir or yaml_workflow_params.get("audio_dir")
+    verbose = args.verbose or yaml_workflow_params.get("verbose", False)
+
+    # Set up logging based on --verbose flag or config
+    log_level = logging.INFO if verbose else logging.WARNING
     logging.basicConfig(
-        level=log_level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        level=log_level, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
 
     # Validate flag combinations
-    if args.auto_label and not args.evaluation_mode:
+    if auto_label and not evaluation_mode:
         parser.error("--auto-label requires --evaluation-mode")
 
     # Validate dataset choice using registry
@@ -688,8 +767,8 @@ Prerequisites:
             )
             sys.exit(1)
 
-    # Create config with CLI overrides (config-first approach)
-    config_overrides = {
+    # Build CLI overrides for AudioLoopConfig
+    cli_overrides = {
         key: value
         for key, value in {
             "experiment_name": args.experiment,
@@ -721,24 +800,28 @@ Prerequisites:
 
     # Handle boolean flags separately (they're always provided by argparse)
     if args.auto_thresholds:
-        config_overrides["auto_thresholds"] = True
-    if args.evaluation_mode:
-        config_overrides["with_ground_truth"] = True
+        cli_overrides["auto_thresholds"] = True
+    if evaluation_mode:  # Use merged value
+        cli_overrides["with_ground_truth"] = True
 
     # Handle class_weighting (can be "adaptive", a float, or None)
     if args.class_weighting is not None:
         if args.class_weighting == "adaptive":
-            config_overrides["class_weighting"] = "adaptive"
+            cli_overrides["class_weighting"] = "adaptive"
         else:
             # Try to parse as float
             try:
-                config_overrides["class_weighting"] = float(args.class_weighting)
+                cli_overrides["class_weighting"] = float(args.class_weighting)
             except ValueError:
                 parser.error(
                     f"--class-weighting must be 'adaptive' or a float between 0.0 and 1.0, got: {args.class_weighting}"
                 )
 
-    config = AudioLoopConfig(**config_overrides)
+    # Create AudioLoopConfig: from YAML with CLI overrides, or pure CLI
+    if args.config:
+        config = AudioLoopConfig.from_yaml(args.config, **cli_overrides)
+    else:
+        config = AudioLoopConfig(**cli_overrides)
 
     # Create output directory if it doesn't exist
     os.makedirs(config.output_dir, exist_ok=True)
@@ -747,6 +830,7 @@ Prerequisites:
     command_info = {
         "command": " ".join(sys.argv),
         "arguments": vars(args),
+        "config_file": args.config,
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
     }
 
@@ -781,25 +865,24 @@ Prerequisites:
         return 1
 
     # Validate start_cycle
-    if args.start_cycle < 1:
+    if start_cycle < 1:
         print("❌ --start-cycle must be >= 1")
         return 1
 
-    num_cycles = args.cycles if args.cycles is not None else 3
-    if args.start_cycle > num_cycles:
-        print(f"❌ --start-cycle ({args.start_cycle}) must be <= --cycles ({num_cycles})")
+    if start_cycle > num_cycles:
+        print(f"❌ --start-cycle ({start_cycle}) must be <= --cycles ({num_cycles})")
         return 1
 
     # Run the workflow
     try:
         training_sets = run_automated_workflow(
             config=config,
-            class_name=args.class_name,
+            class_name=class_name,
             num_cycles=num_cycles,
-            start_cycle=args.start_cycle,
-            auto_label=args.auto_label,
-            evaluation_mode=args.evaluation_mode,
-            audio_dir=args.audio_dir,
+            start_cycle=start_cycle,
+            auto_label=auto_label,
+            evaluation_mode=evaluation_mode,
+            audio_dir=audio_dir,
             seed=args.seed,
             log_level=log_level,
         )

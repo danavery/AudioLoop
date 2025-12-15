@@ -1,0 +1,10 @@
+# Minimal Configuration Example
+# Bare minimum settings for quick experimentation
+
+workflow:
+  class_name: "siren"
+  num_cycles: 3
+  evaluation_mode: false
+
+config:
+  experiment_name: "quick_test"

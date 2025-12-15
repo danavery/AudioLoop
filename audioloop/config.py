@@ -227,6 +227,98 @@ class AudioLoopConfig:
         ):
             raise ValueError("estimated_positive_pct must be between 0.0 and 1.0")
 
+    @classmethod
+    def from_yaml(cls, yaml_path: str | Path, **overrides) -> "AudioLoopConfig":
+        """
+        Load AudioLoopConfig from YAML file with optional overrides.
+
+        Args:
+            yaml_path: Path to YAML config file
+            **overrides: Additional parameter overrides (highest precedence)
+
+        Returns:
+            AudioLoopConfig instance with merged configuration
+
+        Raises:
+            FileNotFoundError: If yaml_path doesn't exist
+            yaml.YAMLError: If YAML is malformed
+            ValueError: If YAML contains invalid field names or values
+
+        Precedence (highest to lowest):
+            1. overrides (explicit kwargs)
+            2. YAML file values
+            3. Environment variables (via default_factory)
+            4. Dataclass defaults
+
+        Example:
+            >>> config = AudioLoopConfig.from_yaml("configs/experiment.yaml")
+            >>> config = AudioLoopConfig.from_yaml(
+            ...     "configs/base.yaml",
+            ...     max_epochs=500,  # Override YAML value
+            ...     batch_size=64
+            ... )
+
+        Supported YAML formats:
+            Two-section format (recommended):
+                workflow:
+                    class_name: "Dog"
+                    num_cycles: 10
+                config:
+                    experiment_name: "test"
+                    dataset: "fsd50k"
+                    max_epochs: 500
+
+            Flat format (alternative):
+                experiment_name: "test"
+                dataset: "fsd50k"
+                max_epochs: 500
+        """
+        import dataclasses
+
+        import yaml
+
+        yaml_path = Path(yaml_path)
+        if not yaml_path.exists():
+            raise FileNotFoundError(f"Config file not found: {yaml_path}")
+
+        # Load YAML
+        try:
+            with open(yaml_path) as f:
+                yaml_data = yaml.safe_load(f)
+        except yaml.YAMLError as e:
+            raise yaml.YAMLError(f"Error parsing YAML file {yaml_path}: {e}") from e
+
+        if not yaml_data:
+            yaml_data = {}
+
+        # Extract 'config' section if present (two-section format)
+        # Also support flat format (all fields at root level)
+        if "config" in yaml_data:
+            config_params = yaml_data["config"] or {}
+        else:
+            # Flat format - use entire YAML, but exclude 'workflow' section if present
+            config_params = {k: v for k, v in yaml_data.items() if k != "workflow"}
+
+        # Validate field names
+        valid_fields = {f.name for f in dataclasses.fields(cls)}
+        invalid_fields = set(config_params.keys()) - valid_fields
+        if invalid_fields:
+            raise ValueError(
+                f"Invalid config fields in {yaml_path}: {', '.join(sorted(invalid_fields))}\n"
+                f"Valid fields: {', '.join(sorted(valid_fields))}"
+            )
+
+        # Handle Path conversion for subset_csv
+        if "subset_csv" in config_params and config_params["subset_csv"] is not None:
+            config_params["subset_csv"] = Path(config_params["subset_csv"])
+
+        # Merge: overrides > YAML > defaults (None values filtered from overrides)
+        merged_params = {**config_params}
+        merged_params.update({k: v for k, v in overrides.items() if v is not None})
+
+        # Create config (will use env vars for any fields not in merged_params)
+        return cls(**merged_params)
+
     @property
     def output_dir(self) -> Path:
         """Get the outputs directory for this configuration."""

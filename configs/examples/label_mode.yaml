@@ -1,0 +1,34 @@
+# Label Mode Configuration
+# Optimized for F1 score - balanced precision and recall
+# Use this when you want the best overall classification performance
+
+workflow:
+  class_name: "gun_shot"
+  num_cycles: 20
+  auto_label: true
+  evaluation_mode: true
+
+config:
+  # Experiment identification
+  experiment_name: "gun_label"
+  dataset: "urbansound8k"
+
+  # Training parameters
+  max_epochs: 1000
+  batch_size: 32
+  learning_rate: 0.001
+  class_weighting: "adaptive"  # Adaptive class weights for imbalanced data
+
+  # Active learning - adaptive strategy selection
+  total_candidates: 50
+  selection_mode: "basic_transition"
+  auto_thresholds: true  # Automatically calculate transition thresholds
+
+  # Cycle stopping - label mode (optimize F1 score)
+  cycle_stopping_strategy: "label"
+  cycle_patience: 5
+  cycle_window: 3  # Rolling average window for stability
+  cycle_std_threshold: 0.08  # Maximum std dev for "stable" performance
+
+  # Evaluation mode
+  with_ground_truth: true

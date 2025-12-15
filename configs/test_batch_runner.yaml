@@ -1,0 +1,9 @@
+# Minimal test config for batch runner
+workflow:
+  class_name: "siren"
+  num_cycles: 1
+  evaluation_mode: false
+
+config:
+  experiment_name: "batch_test"
+  max_epochs: 10
