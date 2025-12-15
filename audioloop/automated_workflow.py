@@ -118,6 +118,7 @@ def run_automated_workflow(
     audio_dir=None,
     seed=None,
     log_level=logging.WARNING,
+    initial_training_set=None,
 ):
     """
     Run the complete automated active learning workflow.
@@ -131,6 +132,9 @@ def run_automated_workflow(
         evaluation_mode: Whether to enable evaluation mode with ground truth access (False)
         audio_dir: Custom audio directory (optional)
         seed: Random seed for reproducibility (default: None)
+        log_level: Logging level (logging.INFO for verbose, logging.WARNING for quiet)
+        initial_training_set: Optional path to initial training_set_v1.csv to copy into
+                             experiment directory (only used if start_cycle=1)
 
     Returns:
         list: Paths to training sets created during the workflow
@@ -163,11 +167,23 @@ def run_automated_workflow(
 
     print("=" * 80)
 
+    # Copy initial training set if provided
+    if initial_training_set and start_cycle == 1:
+        training_set_v1 = config.get_training_set_path(1)
+        training_set_v1.parent.mkdir(parents=True, exist_ok=True)
+
+        if not training_set_v1.exists():
+            print(f"📋 Copying initial training set: {initial_training_set} -> {training_set_v1}")
+            shutil.copy2(initial_training_set, training_set_v1)
+        else:
+            print(f"   Using existing training set: {training_set_v1}")
+
     # Verify the starting training set exists
-    initial_training_set = config.get_training_set_path(start_cycle)
-    if not os.path.exists(initial_training_set):
+    training_set_path = config.get_training_set_path(start_cycle)
+    if not os.path.exists(training_set_path):
         if start_cycle == 1:
-            print(f"❌ Initial training set not found: {initial_training_set}")
+            # Training set v1 doesn't exist - error or create it
+            print(f"❌ Initial training set not found: {training_set_path}")
             print("💡 Create it first with:")
             if config.experiment_name:
                 print(
@@ -218,7 +234,6 @@ def run_automated_workflow(
         # Step 1: Train model
         print("├─ Training model...")
         try:
-            import logging
 
             final_accuracy, num_epochs = run_training(
                 config=config,
@@ -237,7 +252,6 @@ def run_automated_workflow(
         # Step 2: Run active learning
         print("├─ Selecting candidates...")
         try:
-            import logging
 
             predictions_file, candidates_file = run_active_learning_for_class(
                 positive_class_name=class_name,
@@ -467,8 +481,9 @@ def load_workflow_params(yaml_path: str | Path) -> dict:
         FileNotFoundError: If yaml_path doesn't exist
         yaml.YAMLError: If YAML is malformed
     """
-    import yaml
     from pathlib import Path
+
+    import yaml
 
     yaml_path = Path(yaml_path)
     if not yaml_path.exists():
@@ -483,9 +498,19 @@ def load_workflow_params(yaml_path: str | Path) -> dict:
     if not yaml_data:
         return {}
 
+    # Validate yaml_data is a dict
+    if not isinstance(yaml_data, dict):
+        raise ValueError(f"YAML file {yaml_path} must contain a dictionary, got {type(yaml_data).__name__}")
+
     # Extract 'workflow' section if present
     if "workflow" in yaml_data:
-        return yaml_data["workflow"] or {}
+        workflow_section = yaml_data["workflow"]
+        # Validate workflow section is a dict (or None/empty)
+        if workflow_section is not None and not isinstance(workflow_section, dict):
+            raise ValueError(
+                f"'workflow' section in {yaml_path} must be a dictionary, got {type(workflow_section).__name__}"
+            )
+        return workflow_section or {}
 
     # Flat format - extract workflow params
     workflow_param_names = {
@@ -580,6 +605,11 @@ Prerequisites:
         "--verbose",
         action="store_true",
         help="Enable verbose logging (shows detailed progress and file processing)",
+    )
+    parser.add_argument(
+        "--initial-training-set",
+        type=str,
+        help="Path to initial training_set_v1.csv to copy into experiment directory",
     )
 
     # Dataset parameters
@@ -885,6 +915,7 @@ Prerequisites:
             audio_dir=audio_dir,
             seed=args.seed,
             log_level=log_level,
+            initial_training_set=args.initial_training_set,
         )
 
         if training_sets:
