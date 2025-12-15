@@ -172,7 +172,7 @@ def run_binary_inference(
                 row_count += 1
 
         if filtered_count > 0:
-            logger.info(f"Filtered out {filtered_count} files already in training set")
+            logger.info(f"Filtered out {filtered_count} files")
         logger.info(f"Running inference on {row_count} files")
 
         # Load dataset from temporary CSV with lazy generation support

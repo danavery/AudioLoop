@@ -127,6 +127,16 @@ class SpectrogramDataset(torch.utils.data.Dataset):
         if not audio_path.exists():
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
+        # Check minimum file size if configured (catches corrupt files)
+        min_size = self.dataset_config.min_audio_file_size
+        if min_size is not None:
+            file_size = audio_path.stat().st_size
+            if file_size < min_size:
+                raise RuntimeError(
+                    f"Audio file too small ({file_size} bytes, min {min_size}): {audio_path}. "
+                    f"Likely corrupt (e.g., FLAC header with no data)."
+                )
+
         # Load audio (may fail on corrupt files)
         try:
             waveform, sample_rate = torchaudio.load(str(audio_path))
@@ -202,9 +212,9 @@ class SpectrogramDataset(torch.utils.data.Dataset):
 
         except Exception as e:
             # File missing, corrupted, or failed to decode - skip this sample
-            # Log warning for debugging
+            # Log at info level (only visible with --verbose)
             import logging
 
-            logging.warning(f"Skipping file {sample['filename']}: {e}")
+            logging.info(f"Skipping file {sample['filename']}: {e}")
             # Return None to signal skip (collate_fn will filter these out)
             return None

@@ -69,11 +69,18 @@ class AudiosetConfig(DatasetConfig):
 
         These files have corrupt audio that causes torchaudio to segfault.
         Add new problematic files here as they're discovered.
+        This is in addition to (and in this case, somewhat redundant to) the min_audio_file_size check
         """
         return {
-            "Z3YaJ9Vi4lY.flac",  # Corrupt FLAC - crashes torchaudio.load()
-            "lld156ULI5U.flac",  # Corrupt FLAC - empty file (FLAC header, no data)
+            "Z3YaJ9Vi4lY.flac",
+            "lld156ULI5U.flac",
+            "PXnzhGJctVA.flac",
         }
+
+    @property
+    def min_audio_file_size(self) -> int | None:
+        """Minimum audio file size - files under 9KB are corrupt FLAC headers."""
+        return 9000  # AudioSet clips are ~10s, corrupt files are 8288 bytes
 
     # === Core Dataset Properties ===
     @property

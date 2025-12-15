@@ -25,6 +25,18 @@ class DatasetConfig(ABC):
         """
         return set()
 
+    @property
+    def min_audio_file_size(self) -> int | None:
+        """Minimum audio file size in bytes (files smaller are considered corrupt).
+
+        Override in subclass to filter out suspiciously small files.
+        Default: None (no size filtering).
+
+        Example: AudioSet 10-second clips should be ~80KB+, so min_audio_file_size=9000
+        catches corrupt FLAC files with headers but no data (typically 8288 bytes).
+        """
+        return None
+
     # === Core Dataset Properties ===
     @property
     @abstractmethod
