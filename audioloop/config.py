@@ -70,6 +70,7 @@ class AudioLoopConfig:
 
     # Experiment identification (environment variable support)
     experiment_name: str | None = field(default_factory=lambda: os.getenv("AUDIOLOOP_EXPERIMENT"))
+    batch_prefix: str | None = None  # Optional prefix for batch runs (only affects output_dir)
 
     # Dataset configuration (environment variable support)
     dataset: str = field(default_factory=lambda: os.getenv("AUDIOLOOP_DATASET", "fsd50k"))
