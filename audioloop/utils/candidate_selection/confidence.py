@@ -23,10 +23,27 @@ class ConfidenceStrategy(CandidateSelectionStrategy):
         **kwargs,
     ) -> list[dict[str, Any]]:
         """Select high-confidence candidates using existing algorithm."""
-        positive_percentage = kwargs.get("positive_percentage", 0.8)
+        positive_percentage = kwargs.get("positive_percentage")
         candidate_pool_multiplier = kwargs.get("candidate_pool_multiplier", 5)
         random_seed = kwargs.get("random_seed", 42)
 
+        # Pure confidence sampling (no stratification)
+        if positive_percentage is None:
+            # Sort all predictions by confidence (highest first)
+            sorted_preds = sorted(predictions, key=lambda x: x["confidence"], reverse=True)
+
+            # Create broader pool for diversity
+            pool_size = min(len(sorted_preds), num_candidates * candidate_pool_multiplier)
+            pool = sorted_preds[:pool_size]
+
+            # Randomly sample from pool
+            random.seed(random_seed)
+            candidates = random.sample(pool, min(num_candidates, len(pool)))
+            random.shuffle(candidates)
+
+            return candidates
+
+        # Stratified sampling by predicted class
         # Calculate numbers based on percentage
         num_positive = int(num_candidates * positive_percentage)
         num_negative = num_candidates - num_positive
