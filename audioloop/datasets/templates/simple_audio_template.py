@@ -324,7 +324,7 @@ class TemplateAudioConfig(DatasetConfig):
                 return False, None
 
             # Load audio
-            waveform, sample_rate = torchaudio.load(audio_path)
+            waveform, sample_rate = torchaudio.load(str(audio_path))
 
             # Convert stereo to mono by averaging channels
             if waveform.shape[0] > 1:

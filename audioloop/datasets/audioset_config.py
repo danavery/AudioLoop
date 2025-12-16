@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+import soundfile as sf
 import torch
 import torchaudio
 from torch import nn
@@ -75,6 +77,7 @@ class AudiosetConfig(DatasetConfig):
             "Z3YaJ9Vi4lY.flac",
             "lld156ULI5U.flac",
             "PXnzhGJctVA.flac",
+            "k-g2CuGv12I.flac",  # Corrupt audio causing segfault in brass subset
         }
 
     @property
@@ -200,12 +203,22 @@ class AudiosetConfig(DatasetConfig):
         """
         import csv
 
+        bad_files = self.get_bad_files()
         audio_files = []
+        skipped_bad = 0
+
         with csv_path.open("r") as f:
             reader = csv.DictReader(f)
             for row in reader:
                 # Extract filename without extension to get YTID
                 filename = row["filename"]
+
+                # Skip known bad files that cause segfaults (fast set lookup)
+                if filename in bad_files:
+                    skipped_bad += 1
+                    continue
+
+                audio_path = Path(row["audio_path"])
                 ytid = filename.replace(".flac", "").split("_")[0]
 
                 # Reconstruct metadata format expected by the rest of the system
@@ -218,9 +231,12 @@ class AudiosetConfig(DatasetConfig):
                         "labels": [row["original_class"]],  # Use original_class as the label
                         "mids": [],  # MIDs not available in subset format
                         "split": row["split"],
-                        "audio_path": Path(row["audio_path"]),
+                        "audio_path": audio_path,
                     }
                 )
+
+        if skipped_bad > 0:
+            logger.info(f"Skipped {skipped_bad} known bad files that cause segfaults")
 
         return audio_files
 
@@ -343,14 +359,36 @@ class AudiosetConfig(DatasetConfig):
             audio_path = file_info["audio_path"]
             filename = file_info["filename"]
 
+            # Check if spec already exists (lazy creation for resumable runs)
+            output_filename = filename.replace(".flac", "") + ".pt"
+            output_path = output_dir / output_filename
+            if output_path.exists():
+                # Spec already exists, skip processing
+                return True, None
+
             # Check if audio file exists
             if not audio_path.exists():
                 # Don't log individual missing files to avoid disrupting tqdm progress bar
                 # Failure count will be shown in progress bar postfix and final summary
                 return False, None
 
-            # Load audio
-            waveform, sample_rate = torchaudio.load(audio_path)
+            # Skip known bad files that cause segfaults
+            if filename in self.get_bad_files():
+                return False, None
+
+            # Skip files that are too small (corrupt FLAC headers)
+            min_size = self.min_audio_file_size
+            if min_size is not None and audio_path.stat().st_size < min_size:
+                return False, None
+
+            # Load audio using soundfile (torchaudio's sox backend segfaults on some AudioSet FLAC files)
+            audio_data, sample_rate = sf.read(str(audio_path), dtype='float32')
+            # soundfile returns (samples, channels) or (samples,) for mono
+            # Convert to torch tensor with shape (channels, samples)
+            if audio_data.ndim == 1:
+                waveform = torch.from_numpy(audio_data).unsqueeze(0)  # (samples,) -> (1, samples)
+            else:
+                waveform = torch.from_numpy(audio_data.T)  # (samples, channels) -> (channels, samples)
 
             # Convert stereo to mono by averaging channels
             if waveform.shape[0] > 1:
