@@ -25,7 +25,6 @@ dependencies = [
     "basedpyright>=1.31.7",
     "matplotlib>=3.7.0",
     "numpy>=2.3.0",
-    "pyright>=1.1.403",
     "pytest>=8.4.1",
     "pyyaml>=6.0",
     "ruff",
@@ -51,7 +50,6 @@ line-length = 100
 
 [tool.basedpyright]
 typeCheckingMode = "standard"
-exclude = ["webui"]
 
 [tool.ruff.lint]
 # extend-select = ["I", "B", "SIM", "RET"]
