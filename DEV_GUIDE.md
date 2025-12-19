@@ -69,6 +69,7 @@ AudioLoop uses a pluggable strategy pattern for candidate selection:
 - **`merge_labels.py`**: Combines human labels with training sets
 - **`create_specs.py`**: Preprocesses audio into spectrograms (optional with lazy generation)
 - **`create_subset.py`**: CLI tool for creating training-ready dataset subsets with binary classification labels
+- **`prepare_subset_specs.py`**: Creates subset-specific spectrogram directories for efficient remote deployment (hard links or copies)
 - **`track_metrics.py`**: Comprehensive metrics tracking and visualization (accuracy, F1, precision, recall, confidence, entropy) across active learning cycles
 - **`config.py`**: Unified configuration system coordinating paths, datasets, and experiments
 - **`utils/create_bootstrap_set.py`**: Bootstrap training set creation from ground truth (evaluation mode only)
@@ -599,6 +600,49 @@ subset_path = dataset_config.create_subset(
 - `original_class`: Original class name from dataset
 - `split`: Dataset split (preserves split info for reproducibility)
 - `audio_path`: Full path to audio file (enables lazy spec generation)
+
+### Remote Deployment with Subset Specs
+
+For remote training (cloud pods, HPC clusters), transferring the entire `all_specs` directory is inefficient. AudioLoop provides a tool to create subset-specific spectrogram directories:
+
+**Purpose**: Enable efficient remote deployment by creating self-contained spec directories containing only the files needed for a specific subset.
+
+**Key Features**:
+- **Hard Links (Zero Storage)**: Uses hard links by default for local zero-cost duplication
+- **Copy Fallback**: Automatically falls back to copying if hard links fail (different filesystems)
+- **Self-Contained**: Each subset directory contains exactly the specs needed
+- **Simple Syncing**: Standard rsync works without complex --files-from patterns
+
+**Workflow**:
+```bash
+# 1. Create subset CSV
+python -m audioloop.create_subset --dataset audioset --class-name "Dog" --max-samples 100000
+
+# 2. Prepare subset-specific specs directory (hard links, zero storage overhead)
+python -m audioloop.prepare_subset_specs subsets/audioset_dog_100000.csv
+
+# 3. Sync to remote (--no-o --no-g avoids permission errors on pods)
+rsync -avz --no-o --no-g data/subset_specs/audioset_dog_100000/ user@pod:/workspace/data/specs/
+
+# 4. Train on remote
+ssh user@pod "cd /workspace && python -m audioloop.train subset.csv --specs-dir data/specs"
+```
+
+**CLI Options**:
+```bash
+# Custom output directory
+python -m audioloop.prepare_subset_specs subsets/audioset_dog_100k.csv \
+    --output-dir data/subset_specs/custom_name
+
+# Use copying instead of hard links (different filesystems)
+python -m audioloop.prepare_subset_specs subsets/audioset_dog_100k.csv --use-copy
+
+# Custom source specs directory
+python -m audioloop.prepare_subset_specs subsets/audioset_dog_100k.csv \
+    --specs-dir /path/to/custom_all_specs
+```
+
+**Storage Efficiency**: Hard links use zero additional storage locally since they're just directory entries pointing to the same inode. You can delete the subset directory after syncing without affecting `all_specs`.
 
 ### Lazy Spectrogram Generation
 AudioLoop supports on-demand spectrogram generation during training:
