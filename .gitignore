@@ -8,6 +8,7 @@ wheels/
 .vscode/
 
 data
+data_local
 outputs
 subsets
 training_sets
