@@ -1,3 +1,4 @@
+import gc
 import logging
 import random
 import time
@@ -441,9 +442,11 @@ def run_training(
         model_path=model_path,
     )
 
-    # Clean up and return the best accuracy if available, otherwise final accuracy
+    # Clean up DataLoader workers explicitly to prevent file descriptor leaks
+    # This is critical for batch runs where multiple training sessions run sequentially
     del train_loader
     del model
+    gc.collect()  # Force immediate garbage collection to cleanup workers
     torch.cuda.empty_cache() if torch.cuda.is_available() else None
 
     # Return the accuracy and epoch count of the best saved model, not the final epoch

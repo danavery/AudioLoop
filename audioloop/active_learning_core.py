@@ -1,4 +1,5 @@
 import csv
+import gc
 import logging
 import os
 import tempfile
@@ -304,6 +305,13 @@ def run_binary_inference(
                 writer.writerow(formatted_result)
 
         logger.info(f"Predictions saved to: {predictions_csv}")
+
+        # Clean up DataLoader workers explicitly to prevent file descriptor leaks
+        del data_loader
+        del model
+        gc.collect()  # Force immediate garbage collection to cleanup workers
+        torch.cuda.empty_cache() if torch.cuda.is_available() else None
+
         return results
 
     finally:
