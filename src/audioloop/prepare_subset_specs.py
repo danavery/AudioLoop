@@ -230,19 +230,19 @@ Note: --no-o --no-g prevents chown permission errors on remote systems
         print(f"  Errors: {stats['errors']}")
         print()
 
-        successful = stats['linked'] + stats['copied'] + stats['skipped_existing']
+        successful = stats["linked"] + stats["copied"] + stats["skipped_existing"]
         print(f"  ✓ Successfully prepared: {successful}/{stats['total']} files")
 
-        if stats['missing'] > 0:
+        if stats["missing"] > 0:
             print(f"  ⚠ Warning: {stats['missing']} files missing in source directory")
-        if stats['errors'] > 0:
+        if stats["errors"] > 0:
             print(f"  ✗ Errors: {stats['errors']} files failed to process")
 
         print()
         print(f"Output directory: {output_dir.absolute()}")
 
         # Storage efficiency note
-        if stats['linked'] > 0:
+        if stats["linked"] > 0:
             print()
             print("Note: Hard links use zero additional storage (same inode as source).")
             print("      Deleting this directory won't affect the source specs.")

@@ -74,9 +74,9 @@ class MixedEntropyStrategy(CandidateSelectionStrategy):
         top_20_idx = int(n * 0.20)
         top_60_idx = int(n * 0.60)
 
-        high_entropy_pool = sorted_preds[0:top_20_idx]          # Top 20%
+        high_entropy_pool = sorted_preds[0:top_20_idx]  # Top 20%
         medium_entropy_pool = sorted_preds[top_20_idx:top_60_idx]  # Next 40%
-        low_entropy_pool = sorted_preds[top_60_idx:]            # Bottom 40%
+        low_entropy_pool = sorted_preds[top_60_idx:]  # Bottom 40%
 
         # Calculate target samples for each bucket (70/20/10 distribution)
         high_target = int(num_candidates * 0.70)
@@ -110,10 +110,7 @@ class MixedEntropyStrategy(CandidateSelectionStrategy):
 
             # Sample from remaining candidates
             if remaining_pools:
-                additional = random.sample(
-                    remaining_pools,
-                    min(shortfall, len(remaining_pools))
-                )
+                additional = random.sample(remaining_pools, min(shortfall, len(remaining_pools)))
                 all_candidates.extend(additional)
 
         # Shuffle to mix entropy levels

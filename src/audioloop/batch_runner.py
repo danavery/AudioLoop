@@ -31,7 +31,9 @@ from audioloop.automated_workflow import load_workflow_params, run_automated_wor
 from audioloop.config import AudioLoopConfig
 
 
-def run_single_config(config_path: Path, batch_id: str, initial_training_set: Path | None = None) -> dict:
+def run_single_config(
+    config_path: Path, batch_id: str, initial_training_set: Path | None = None
+) -> dict:
     """
     Run a single config file within a batch.
 
@@ -66,7 +68,9 @@ def run_single_config(config_path: Path, batch_id: str, initial_training_set: Pa
             training_set_v1.parent.mkdir(parents=True, exist_ok=True)
 
             if not training_set_v1.exists():
-                print(f"   Copying initial training set: {initial_training_set} -> {training_set_v1}")
+                print(
+                    f"   Copying initial training set: {initial_training_set} -> {training_set_v1}"
+                )
                 shutil.copy2(initial_training_set, training_set_v1)
             else:
                 print(f"   Using existing training set: {training_set_v1}")
@@ -79,7 +83,9 @@ def run_single_config(config_path: Path, batch_id: str, initial_training_set: Pa
             "config_file": str(config_path.absolute()),
             "original_experiment_name": original_experiment_name,
             "batched_experiment_name": batched_experiment_name,
-            "initial_training_set": str(initial_training_set.absolute()) if initial_training_set else None,
+            "initial_training_set": str(initial_training_set.absolute())
+            if initial_training_set
+            else None,
             "workflow_params": workflow_params,
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
@@ -107,11 +113,11 @@ def run_single_config(config_path: Path, batch_id: str, initial_training_set: Pa
         audio_dir = workflow_params.get("audio_dir")
 
         # Run workflow
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print(f"Running: {config_path}")
         print(f"Experiment: {original_experiment_name} (in batch {batch_id})")
         print(f"Class: {class_name}, Cycles: {num_cycles}")
-        print(f"{'='*80}\n")
+        print(f"{'=' * 80}\n")
 
         run_automated_workflow(
             config=config,
@@ -222,10 +228,10 @@ Outputs are organized into timestamped batch directories:
     batch_id = f"batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
     # Run batch
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print(f"BATCH RUNNER - {len(args.configs)} configurations")
     print(f"Batch ID: {batch_id}")
-    print(f"{'='*80}")
+    print(f"{'=' * 80}")
 
     batch_start = time.time()
     results = []
@@ -239,9 +245,9 @@ Outputs are organized into timestamped batch directories:
     batch_runtime = time.time() - batch_start
 
     # Print summary
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print("BATCH SUMMARY")
-    print(f"{'='*80}")
+    print(f"{'=' * 80}")
 
     successful = [r for r in results if r["success"]]
     failed = [r for r in results if not r["success"]]
@@ -265,7 +271,7 @@ Outputs are organized into timestamped batch directories:
             print(f"   {Path(r['config_file']).name}")
             print(f"      Error: {r['error']}")
 
-    print(f"\n{'='*80}\n")
+    print(f"\n{'=' * 80}\n")
 
     # Exit with error code if any failed
     return 1 if failed else 0

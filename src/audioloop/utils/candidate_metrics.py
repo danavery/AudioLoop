@@ -41,9 +41,7 @@ def save_candidate_metrics(output_dir: Path, cycle: int, metrics: dict[str, floa
     temp_file = history_file.with_suffix(".json.tmp")
     try:
         with temp_file.open("w", encoding="utf-8") as f:
-            json.dump(
-                {str(k): v for k, v in history.items()}, f, indent=2, sort_keys=True
-            )
+            json.dump({str(k): v for k, v in history.items()}, f, indent=2, sort_keys=True)
         # Atomic rename (POSIX guarantees atomicity)
         temp_file.replace(history_file)
     except OSError as e:
@@ -102,8 +100,7 @@ def calculate_and_save_candidate_metrics(
 
     if not metrics:
         logger.warning(
-            f"No candidate metrics calculated for cycle {cycle} "
-            f"(file: {candidates_file.name})"
+            f"No candidate metrics calculated for cycle {cycle} (file: {candidates_file.name})"
         )
         return {}
 
@@ -111,8 +108,7 @@ def calculate_and_save_candidate_metrics(
     save_candidate_metrics(output_dir, cycle, metrics)
 
     logger.info(
-        f"Saved candidate metrics for cycle {cycle}: "
-        f"{metrics['num_candidates']} candidates"
+        f"Saved candidate metrics for cycle {cycle}: {metrics['num_candidates']} candidates"
     )
 
     return metrics

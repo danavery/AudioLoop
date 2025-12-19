@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import numpy as np
 import soundfile as sf
 import torch
 import torchaudio
@@ -382,13 +381,15 @@ class AudiosetConfig(DatasetConfig):
                 return False, None
 
             # Load audio using soundfile (torchaudio's sox backend segfaults on some AudioSet FLAC files)
-            audio_data, sample_rate = sf.read(str(audio_path), dtype='float32')
+            audio_data, sample_rate = sf.read(str(audio_path), dtype="float32")
             # soundfile returns (samples, channels) or (samples,) for mono
             # Convert to torch tensor with shape (channels, samples)
             if audio_data.ndim == 1:
                 waveform = torch.from_numpy(audio_data).unsqueeze(0)  # (samples,) -> (1, samples)
             else:
-                waveform = torch.from_numpy(audio_data.T)  # (samples, channels) -> (channels, samples)
+                waveform = torch.from_numpy(
+                    audio_data.T
+                )  # (samples, channels) -> (channels, samples)
 
             # Convert stereo to mono by averaging channels
             if waveform.shape[0] > 1:

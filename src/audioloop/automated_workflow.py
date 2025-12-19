@@ -234,7 +234,6 @@ def run_automated_workflow(
         # Step 1: Train model
         print("├─ Training model...")
         try:
-
             final_accuracy, num_epochs = run_training(
                 config=config,
                 labels_file=current_training_set,
@@ -252,7 +251,6 @@ def run_automated_workflow(
         # Step 2: Run active learning
         print("├─ Selecting candidates...")
         try:
-
             predictions_file, candidates_file = run_active_learning_for_class(
                 positive_class_name=class_name,
                 model_path=current_model,
@@ -500,7 +498,9 @@ def load_workflow_params(yaml_path: str | Path) -> dict:
 
     # Validate yaml_data is a dict
     if not isinstance(yaml_data, dict):
-        raise ValueError(f"YAML file {yaml_path} must contain a dictionary, got {type(yaml_data).__name__}")
+        raise ValueError(
+            f"YAML file {yaml_path} must contain a dictionary, got {type(yaml_data).__name__}"
+        )
 
     # Extract 'workflow' section if present
     if "workflow" in yaml_data:
@@ -769,9 +769,7 @@ Prerequisites:
         args.cycles if args.cycles is not None else yaml_workflow_params.get("num_cycles", 3)
     )
     start_cycle = (
-        args.start_cycle
-        if args.start_cycle != 1
-        else yaml_workflow_params.get("start_cycle", 1)
+        args.start_cycle if args.start_cycle != 1 else yaml_workflow_params.get("start_cycle", 1)
     )
     auto_label = args.auto_label or yaml_workflow_params.get("auto_label", False)
     evaluation_mode = args.evaluation_mode or yaml_workflow_params.get("evaluation_mode", False)
