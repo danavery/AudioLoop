@@ -273,7 +273,7 @@ class DatasetConfig(ABC):
             split: Dataset split to sample from (unified split/fold parameter):
                    - FSD50K: "dev" or "eval"
                    - UrbanSound8K: "all", "fold1", ..., "fold10"
-                   - AudioSet: "balanced_train", "unbalanced_train", "eval"
+                   - AudioSet: "bal_train", "unbal_train", "eval"
                    If None, uses get_default_split()
             seed: Random seed for reproducibility (default 42)
 

@@ -433,7 +433,7 @@ class AudiosetConfig(DatasetConfig):
             class_name: Class name to use as positive class
             max_samples: Maximum total samples (positive + negative)
             positive_ratio: Target ratio of positive samples (0.0-1.0)
-            split: Dataset split to sample from (default: unbalanced_train)
+            split: Dataset split to sample from (default: unbal_train)
             seed: Random seed for reproducibility
 
         Returns:
@@ -443,7 +443,7 @@ class AudiosetConfig(DatasetConfig):
         import random
 
         random.seed(seed)
-        split = split or "unbalanced_train"
+        split = split or "unbal_train"
 
         # Validate class exists
         if class_name not in self.name_to_id:
