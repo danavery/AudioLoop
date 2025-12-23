@@ -180,7 +180,7 @@ class UrbanSound8KConfig(DatasetConfig):
             "class_name": class_name,
             "labels": [class_name],  # Convert single label to array for consistency
             "fold": int(row["fold"]),
-            "audio_path": self.get_audio_path(row["slice_file_name"], int(row["fold"])),
+            "audio_path": self.get_audio_path(row["slice_file_name"], fold=int(row["fold"])),
         }
 
     def get_audio_path(
