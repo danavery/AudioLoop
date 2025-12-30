@@ -175,21 +175,21 @@ class AudiosetConfig(DatasetConfig):
             raise FileNotFoundError(f"Metadata CSV not found: {csv_path}")
 
         audio_files = []
+        import csv as csv_module
         with csv_path.open("r") as f:
-            # Skip header comments (lines starting with #)
-            for line in f:
-                if not line.startswith("#"):
-                    # Parse CSV line manually since it uses custom format
-                    parts = [p.strip() for p in line.strip().split(",")]
-                    if len(parts) >= 4:
+            reader = csv_module.reader(f, skipinitialspace=True)
+            for row in reader:
+                # Skip header comments (lines starting with #)
+                if row and not row[0].startswith("#"):
+                    if len(row) >= 4:
                         parsed = self.parse_metadata_row(
                             {
-                                "YTID": parts[0],
-                                "start_seconds": parts[1],
-                                "end_seconds": parts[2],
-                                "positive_labels": parts[3],
+                                "YTID": row[0],
+                                "start_seconds": row[1],
+                                "end_seconds": row[2],
+                                "positive_labels": row[3],
                             },
-                            split=dir_split,  # Pass filesystem directory to parser
+                            split=dir_split,
                         )
                         audio_files.append(parsed)
 
