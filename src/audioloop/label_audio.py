@@ -110,44 +110,39 @@ class SimpleAudioLabeler:
                     break
 
     def _get_audio_path(self, candidate):
-        """Get the full path to the audio file from the filepath column."""
-        # Get filepath from predictions CSV (required)
-        filepath = candidate.get("filepath", "")
-        if not filepath:
+        """Get the full path to the audio file using dataset config."""
+        # Get filename directly from candidate
+        filename = candidate.get("filename", "")
+        if not filename:
             print(
-                "ERROR: No 'filepath' column found in candidate. This tool requires candidates from active learning workflow."
+                "ERROR: No 'filename' column found in candidate. This tool requires candidates from active learning workflow."
             )
             print(f"Candidate columns: {list(candidate.keys())}")
             return None
 
-        # The filepath is to a spectrogram (.pt), convert to audio (.wav)
-        audio_filepath = filepath.replace(".pt", ".wav")
-        filename = os.path.basename(audio_filepath)
+        # Convert spectrogram filename (.pt) to audio filename
+        if filename.endswith(".pt"):
+            filename = filename.replace(".pt", self.dataset_config.audio_extension)
 
-        if self.dataset_name == "urbansound8k":
-            # For UrbanSound8K: search through all fold directories
-            if "-" in filename and filename.endswith(".wav"):
-                for fold_num in range(1, 11):  # fold1 through fold10
-                    fold_path = os.path.join(self.audio_dir, f"fold{fold_num}", filename)
-                    if os.path.exists(fold_path):
-                        return fold_path
+        # Extract metadata for dataset-specific path resolution
+        fold = candidate.get("fold")  # For UrbanSound8K
+        split = candidate.get("split")  # For FSD50K/AudioSet
 
-            print(f"ERROR: Audio file not found: {filename}")
-            print(f"Searched in: {self.audio_dir}/fold1/ through {self.audio_dir}/fold10/")
+        # Use dataset config to get audio path
+        try:
+            audio_path = self.dataset_config.get_audio_path(
+                filename=filename, split=split, fold=int(fold) if fold else None
+            )
+
+            if audio_path.exists():
+                return str(audio_path)
+
+            print(f"ERROR: Audio file not found: {audio_path}")
             return None
 
-        if self.dataset_name == "fsd50k":
-            # For FSD50K: files are directly in the audio directory
-            audio_path = os.path.join(self.audio_dir, filename)
-            if os.path.exists(audio_path):
-                return audio_path
-
-            print(f"ERROR: Audio file not found: {filename}")
-            print(f"Searched in: {self.audio_dir}")
+        except Exception as e:
+            print(f"ERROR: Failed to get audio path for {filename}: {e}")
             return None
-
-        print(f"ERROR: Unsupported dataset: {self.dataset_name}")
-        return None
 
     def _play_audio(self, audio_path):
         """Play an audio file using system command (non-blocking)."""
