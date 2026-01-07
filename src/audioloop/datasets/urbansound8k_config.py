@@ -138,6 +138,11 @@ class UrbanSound8KConfig(DatasetConfig):
         """Get class name to ID mapping."""
         return {name: class_id for class_id, name in self.vocabulary.items()}
 
+    @property
+    def audio_extension(self) -> str:
+        """Audio file extension for UrbanSound8K (.wav)."""
+        return ".wav"
+
     def list_classes(self) -> None:
         """Print all available UrbanSound8K classes."""
         print("UrbanSound8K Classes:")

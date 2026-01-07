@@ -52,6 +52,12 @@ class DatasetConfig(ABC):
 
     @property
     @abstractmethod
+    def audio_extension(self) -> str:
+        """Audio file extension for this dataset (e.g., '.wav', '.flac')."""
+        pass
+
+    @property
+    @abstractmethod
     def name_to_id(self) -> dict[str, int]:
         """Mapping from class names to class IDs."""
         pass

@@ -177,6 +177,11 @@ class FSD50KConfig(DatasetConfig):
         return self._audio_root
 
     @property
+    def audio_extension(self) -> str:
+        """Audio file extension for FSD50K (.wav)."""
+        return ".wav"
+
+    @property
     def dataset_csv(self) -> Path:
         """Path to the main dataset CSV file."""
         return self._dataset_csv

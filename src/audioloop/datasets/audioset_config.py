@@ -91,6 +91,11 @@ class AudiosetConfig(DatasetConfig):
         return self._audio_root
 
     @property
+    def audio_extension(self) -> str:
+        """Audio file extension for AudioSet (.flac)."""
+        return ".flac"
+
+    @property
     def dataset_csv(self) -> Path:
         """Path to the main dataset CSV file."""
         return self._dataset_csv
