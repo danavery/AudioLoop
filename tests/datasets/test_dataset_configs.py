@@ -45,6 +45,10 @@ class TestDatasetConfigInterface:
                 return Path("test_audio")
 
             @property
+            def audio_extension(self) -> str:
+                return ".wav"
+
+            @property
             def name_to_id(self) -> dict[str, int]:
                 return {"test": 0}
 
@@ -564,6 +568,10 @@ class TestCreateSubsetInterface:
             @property
             def audio_root(self) -> Path:
                 return Path("test_audio")
+
+            @property
+            def audio_extension(self) -> str:
+                return ".wav"
 
             @property
             def name_to_id(self) -> dict[str, int]:
