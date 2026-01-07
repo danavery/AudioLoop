@@ -10,6 +10,7 @@ class AudioLabelingInterface {
         this.initializeElements();
         this.attachEventListeners();
         this.setupKeyboardShortcuts();
+        this.loadDatasets();  // Populate dataset dropdown from API
     }
     
     initializeElements() {
@@ -133,6 +134,29 @@ class AudioLabelingInterface {
                     break;
             }
         });
+    }
+    
+    async loadDatasets() {
+        try {
+            const response = await fetch('/api/datasets');
+            const result = await response.json();
+            
+            if (result.datasets && result.datasets.length > 0) {
+                // Clear existing options
+                this.elements.dataset.innerHTML = '';
+                
+                // Populate with datasets from API
+                result.datasets.forEach(dataset => {
+                    const option = document.createElement('option');
+                    option.value = dataset;
+                    option.textContent = dataset.toUpperCase();
+                    this.elements.dataset.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Failed to load datasets:', error);
+            // Keep the hardcoded defaults if API fails
+        }
     }
     
     async loadCandidates() {

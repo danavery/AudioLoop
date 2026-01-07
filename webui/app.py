@@ -15,6 +15,11 @@ from flask import Flask, jsonify, render_template, request, send_file
 # Add the parent directory to Python path so we can import audioloop
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+# Set default output root to project root (webui runs from subdirectory)
+# Users can override by setting AUDIOLOOP_OUTPUT_ROOT env var before running
+if "AUDIOLOOP_OUTPUT_ROOT" not in os.environ:
+    os.environ["AUDIOLOOP_OUTPUT_ROOT"] = str(Path(__file__).parent.parent)
+
 from audioloop.label_audio import SimpleAudioLabeler
 
 app = Flask(__name__)
@@ -29,6 +34,15 @@ def index():
     return render_template("labeling.html")
 
 
+@app.route("/api/datasets")
+def get_datasets():
+    """Get list of available datasets from the registry."""
+    from audioloop.datasets.dataset_registry import list_available_datasets
+
+    datasets = list_available_datasets()
+    return jsonify({"datasets": datasets})
+
+
 @app.route("/api/load", methods=["POST"])
 def load_candidates():
     """Load a candidates CSV file."""
@@ -41,11 +55,27 @@ def load_candidates():
     dataset = data.get("dataset", "fsd50k")  # Default to fsd50k
     audio_dir = data.get("audio_dir")
 
-    # Convert relative paths to absolute paths
+    # Resolve candidates CSV relative to base outputs directory
+    # This allows users to type just "labeling_candidates_v1.csv" or "myexp/labeling_candidates_v1.csv"
+    from audioloop.utils.paths import get_output_dir
+
     if candidates_csv:
-        candidates_csv = os.path.abspath(candidates_csv)
+        csv_path = Path(candidates_csv)
+        if not csv_path.is_absolute():
+            # Resolve relative to base outputs directory (not experiment-specific)
+            base_outputs_dir = get_output_dir()  # Returns outputs/ without experiment suffix
+            candidates_csv = str(base_outputs_dir / csv_path)
+        else:
+            candidates_csv = str(csv_path)
+
+    # Resolve audio_dir relative to project root if needed
     if audio_dir:
-        audio_dir = os.path.abspath(audio_dir)
+        audio_path = Path(audio_dir)
+        if not audio_path.is_absolute():
+            project_root = Path(__file__).parent.parent
+            audio_dir = str(project_root / audio_path)
+        else:
+            audio_dir = str(audio_path)
 
     if not candidates_csv or not os.path.exists(candidates_csv):
         return jsonify({"error": "Candidates CSV file not found"}), 400
