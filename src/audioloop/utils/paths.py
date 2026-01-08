@@ -3,21 +3,72 @@ Path utilities for AudioLoop.
 
 Simple utility functions to eliminate hardcoded path duplication
 and make directory locations configurable via environment variables.
+
+Project root detection looks for audioloop.yaml in the current working
+directory. This file is created by `python -m audioloop.init_project`.
 """
 
 import os
 import re
 from pathlib import Path
 
+# Module-level cache to avoid repeated filesystem checks
+_project_root_cache: Path | None = None
+
+
+def clear_project_root_cache() -> None:
+    """Clear the cached project root. Useful for testing."""
+    global _project_root_cache
+    _project_root_cache = None
+
+
+def get_project_root() -> Path:
+    """Get the AudioLoop project root directory.
+
+    Looks for audioloop.yaml in the current working directory.
+
+    Returns:
+        Absolute path to the project root directory.
+
+    Raises:
+        RuntimeError: If no audioloop.yaml found and no env var set.
+    """
+    global _project_root_cache
+
+    if _project_root_cache is not None:
+        return _project_root_cache
+
+    # Check environment variable override first
+    if env_root := os.getenv("AUDIOLOOP_PROJECT_ROOT"):
+        _project_root_cache = Path(env_root).resolve()
+        return _project_root_cache
+
+    # Check current directory for audioloop.yaml
+    cwd = Path.cwd()
+    if (cwd / "audioloop.yaml").exists():
+        _project_root_cache = cwd.resolve()
+        return _project_root_cache
+
+    # No project found
+    raise RuntimeError(
+        "No AudioLoop project found in current directory.\n"
+        "Run 'python -m audioloop.init_project' to create one,\n"
+        "or set AUDIOLOOP_PROJECT_ROOT environment variable."
+    )
+
 
 def get_data_root() -> Path:
     """Get the data root directory."""
-    return Path(os.getenv("AUDIOLOOP_DATA_ROOT", "data"))
+    if env := os.getenv("AUDIOLOOP_DATA_ROOT"):
+        return Path(env)
+    return get_project_root() / "data"
 
 
 def get_output_root() -> Path:
     """Get the output root directory."""
-    return Path(os.getenv("AUDIOLOOP_OUTPUT_ROOT", "."))
+    if env := os.getenv("AUDIOLOOP_OUTPUT_ROOT"):
+        return Path(env)
+    return get_project_root()
 
 
 def get_specs_dir() -> Path:

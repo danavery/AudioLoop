@@ -4,7 +4,6 @@ Tests for AudioLoop path utilities.
 Focused on environment variable handling and key path generation behavior.
 """
 
-import os
 import tempfile
 from pathlib import Path
 from unittest.mock import patch
@@ -12,58 +11,93 @@ from unittest.mock import patch
 import pytest
 
 from audioloop.utils.paths import (
+    clear_project_root_cache,
     create_output_directories,
     get_data_root,
     get_output_dir,
     get_output_root,
+    get_project_root,
     get_specs_dir,
     get_training_sets_dir,
 )
 
 
+class TestProjectRoot:
+    """Test project root detection."""
+
+    def test_project_root_from_env_var(self, tmp_path, monkeypatch):
+        """Test that AUDIOLOOP_PROJECT_ROOT env var is used."""
+        clear_project_root_cache()
+        monkeypatch.setenv("AUDIOLOOP_PROJECT_ROOT", str(tmp_path))
+        assert get_project_root() == tmp_path
+
+    def test_project_root_from_yaml(self, tmp_path, monkeypatch):
+        """Test that audioloop.yaml is detected."""
+        clear_project_root_cache()
+        monkeypatch.delenv("AUDIOLOOP_PROJECT_ROOT", raising=False)
+        monkeypatch.chdir(tmp_path)
+        (tmp_path / "audioloop.yaml").write_text("dataset: fsd50k\n")
+        assert get_project_root() == tmp_path
+
+    def test_project_root_missing_raises_error(self, tmp_path, monkeypatch):
+        """Test that missing project raises RuntimeError."""
+        clear_project_root_cache()
+        monkeypatch.delenv("AUDIOLOOP_PROJECT_ROOT", raising=False)
+        monkeypatch.chdir(tmp_path)
+        with pytest.raises(RuntimeError, match="No AudioLoop project found"):
+            get_project_root()
+
+
 class TestEnvironmentVariables:
     """Test environment variable handling for paths."""
 
-    @pytest.fixture(autouse=True)
-    def clean_env(self):
-        """Clear environment for consistent tests."""
-        with patch.dict(os.environ, {}, clear=True):
-            yield
+    def test_data_root_env_override(self, monkeypatch):
+        """Test that AUDIOLOOP_DATA_ROOT overrides project-based default."""
+        monkeypatch.setenv("AUDIOLOOP_DATA_ROOT", "/custom/data")
+        assert get_data_root() == Path("/custom/data")
 
-    @pytest.mark.parametrize(
-        "env_var,func,default",
-        [
-            ("AUDIOLOOP_DATA_ROOT", get_data_root, "data"),
-            ("AUDIOLOOP_OUTPUT_ROOT", get_output_root, "."),
-        ],
-    )
-    def test_root_environment_override(self, env_var, func, default):
-        """Test that environment variables override defaults."""
-        # Test default
-        assert func() == Path(default)
+    def test_output_root_env_override(self, monkeypatch):
+        """Test that AUDIOLOOP_OUTPUT_ROOT overrides project-based default."""
+        monkeypatch.setenv("AUDIOLOOP_OUTPUT_ROOT", "/custom/output")
+        assert get_output_root() == Path("/custom/output")
 
-        # Test override
-        with patch.dict(os.environ, {env_var: "/custom/path"}):
-            assert func() == Path("/custom/path")
+    def test_data_root_uses_project_root(self, tmp_path, monkeypatch):
+        """Test that data root uses project root when no env var set."""
+        clear_project_root_cache()
+        monkeypatch.delenv("AUDIOLOOP_DATA_ROOT", raising=False)
+        monkeypatch.setenv("AUDIOLOOP_PROJECT_ROOT", str(tmp_path))
+        assert get_data_root() == tmp_path / "data"
 
-    def test_specs_dir_environment_combinations(self):
+    def test_output_root_uses_project_root(self, tmp_path, monkeypatch):
+        """Test that output root uses project root when no env var set."""
+        clear_project_root_cache()
+        monkeypatch.delenv("AUDIOLOOP_OUTPUT_ROOT", raising=False)
+        monkeypatch.setenv("AUDIOLOOP_PROJECT_ROOT", str(tmp_path))
+        assert get_output_root() == tmp_path
+
+    def test_specs_dir_environment_combinations(self, tmp_path, monkeypatch):
         """Test specs directory with different environment combinations."""
-        # Default
-        assert get_specs_dir() == Path("data/all_specs")
+        clear_project_root_cache()
+        monkeypatch.setenv("AUDIOLOOP_PROJECT_ROOT", str(tmp_path))
+
+        # Default (project-relative)
+        monkeypatch.delenv("AUDIOLOOP_DATA_ROOT", raising=False)
+        monkeypatch.delenv("AUDIOLOOP_SPECS_DIR", raising=False)
+        assert get_specs_dir() == tmp_path / "data" / "all_specs"
 
         # Custom data root only
-        with patch.dict(os.environ, {"AUDIOLOOP_DATA_ROOT": "/custom"}):
-            assert get_specs_dir() == Path("/custom/all_specs")
+        monkeypatch.setenv("AUDIOLOOP_DATA_ROOT", "/custom")
+        assert get_specs_dir() == Path("/custom/all_specs")
 
         # Custom specs subdir only
-        with patch.dict(os.environ, {"AUDIOLOOP_SPECS_DIR": "spectrograms"}):
-            assert get_specs_dir() == Path("data/spectrograms")
+        monkeypatch.delenv("AUDIOLOOP_DATA_ROOT", raising=False)
+        monkeypatch.setenv("AUDIOLOOP_SPECS_DIR", "spectrograms")
+        assert get_specs_dir() == tmp_path / "data" / "spectrograms"
 
         # Both custom
-        with patch.dict(
-            os.environ, {"AUDIOLOOP_DATA_ROOT": "/custom", "AUDIOLOOP_SPECS_DIR": "spectrograms"}
-        ):
-            assert get_specs_dir() == Path("/custom/spectrograms")
+        monkeypatch.setenv("AUDIOLOOP_DATA_ROOT", "/custom")
+        monkeypatch.setenv("AUDIOLOOP_SPECS_DIR", "spectrograms")
+        assert get_specs_dir() == Path("/custom/spectrograms")
 
 
 class TestDirectoryGeneration:
