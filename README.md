@@ -119,10 +119,21 @@ For detailed usage instructions, see **[USAGE_GUIDE.md](USAGE_GUIDE.md)**.
 ## Getting Started
 
 1. **Installation**:
+  Audioloop is in early alpha; installation has been tested with Python 3.11 using either uv or a system Python virtual environment.
+
+   With uv (recommended):
    ```bash
-   git clone <repository>
-   cd audioloop
-   uv sync
+    uv python install 3.11 # install a compatible python (optional)
+    uv venv .venv
+    source .venv/bin/activate
+    uv pip install -e .
+   ```
+
+   Otherwise:
+   ```bash
+    python3 -m venv .venv
+    source .venv/bin/activate
+    python -m pip install -e .
    ```
 
 2. **Prepare Data**:
