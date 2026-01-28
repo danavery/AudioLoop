@@ -1,25 +1,91 @@
-# AudioLoop Configuration Files
+# AudioLoop Configuration
 
-This directory contains YAML configuration files for AudioLoop experiments. Configuration files make it easy to:
-- Version control experiment settings
-- Reuse configurations across multiple runs
-- Share experiment setups with collaborators
-- Reduce command-line complexity for complex experiments
+AudioLoop uses a layered configuration system with two types of YAML files:
 
-## Quick Start
+1. **Project defaults** (`audioloop.yaml`) - Settings that apply to all commands in your project
+2. **Experiment configs** (`configs/*.yaml`) - Settings for specific experiments passed via `--config`
+
+## Project Setup
+
+Before running AudioLoop commands, initialize a project directory:
 
 ```bash
-# Use a config file
+# Initialize in current directory
+python -m audioloop.init_project
+
+# Or initialize in a new directory
+python -m audioloop.init_project ~/projects/dog-classifier
+```
+
+This creates the standard directory structure and an `audioloop.yaml` template:
+
+```
+my-project/
+├── audioloop.yaml        # Project defaults (auto-loaded by all CLI commands)
+├── data/
+│   └── all_specs/        # Spectrograms
+├── outputs/              # Model outputs, predictions
+├── training_sets/        # Training CSVs
+├── subsets/              # Dataset subsets
+└── configs/              # Experiment-specific configs
+```
+
+### The `audioloop.yaml` File
+
+The generated `audioloop.yaml` contains commented examples of all available settings:
+
+```yaml
+# AudioLoop Project Configuration
+# Uncomment and modify any setting to change the default for this project.
+
+# Dataset Configuration
+dataset: fsd50k                  # Options: fsd50k, urbansound8k, audioset
+
+# Training Parameters
+# max_epochs: 1000
+# batch_size: 32
+# learning_rate: 0.001
+
+# Active Learning
+# selection_mode: entropy        # Options: entropy, confidence, basic_transition
+# total_candidates: 50
+```
+
+All CLI commands automatically load settings from `audioloop.yaml` when run from within the project directory. You only need to specify parameters that differ from your project defaults.
+
+### Working Outside the Project Directory
+
+If you need to run commands from a different directory, set the environment variable:
+
+```bash
+export AUDIOLOOP_PROJECT_ROOT=/path/to/my-project
+python -m audioloop.train training_set_v1.csv
+```
+
+## Experiment Configuration Files
+
+This `configs/` directory contains YAML configuration files for specific experiments. These are useful for:
+- Version controlling experiment settings
+- Reusing configurations across multiple runs
+- Sharing experiment setups with collaborators
+- Reducing command-line complexity for complex experiments
+
+### Quick Start
+
+```bash
+# Use an experiment config file (overrides project defaults)
 python -m audioloop.automated_workflow --config configs/examples/search_mode.yaml
 
 # Override specific values from CLI
 python -m audioloop.automated_workflow --config configs/examples/minimal.yaml --cycles 10 --batch-size 64
 
-# Traditional CLI-only approach (still works)
+# Use only project defaults (no --config needed)
 python -m audioloop.automated_workflow --class-name Drill --cycles 3
 ```
 
-## Configuration Structure
+## Experiment Config Structure
+
+Experiment config files (passed via `--config`) support two formats:
 
 ### Two-Section Format (Recommended)
 
@@ -56,19 +122,30 @@ max_epochs: 1000
 
 ## Configuration Precedence
 
-When using config files, values are merged with this precedence (highest to lowest):
+Values are merged with this precedence (highest to lowest):
 
 1. **CLI arguments** - Explicit command-line flags always win
-2. **YAML values** - Values specified in the config file
-3. **Environment variables** - `AUDIOLOOP_*` environment variables
-4. **Defaults** - Built-in defaults from `AudioLoopConfig` dataclass
+2. **Experiment config** - Values from `--config` file (if provided)
+3. **Project defaults** - Values from `audioloop.yaml` in project root
+4. **Environment variables** - `AUDIOLOOP_*` environment variables
+5. **Defaults** - Built-in defaults from `AudioLoopConfig` dataclass
 
 **Example:**
 ```bash
-# Config file has: learning_rate: 0.001
-# CLI overrides:    --learning-rate 0.01
-# Result:          learning_rate = 0.01 (CLI wins)
+# audioloop.yaml has:  learning_rate: 0.0005
+# --config file has:   learning_rate: 0.001
+# CLI overrides:       --learning-rate 0.01
+# Result:              learning_rate = 0.01 (CLI wins)
 ```
+
+**Typical usage patterns:**
+
+| Scenario | Configuration approach |
+|----------|----------------------|
+| Team-wide defaults | Set in `audioloop.yaml`, commit to repo |
+| Specific experiment | Create `configs/my_experiment.yaml` |
+| Quick one-off test | Use CLI flags only |
+| Override for one run | CLI flags override any YAML setting |
 
 ## Available Parameters
 
@@ -266,6 +343,14 @@ ValueError: max_epochs must be positive
 
 ## Troubleshooting
 
+### No AudioLoop project found
+```bash
+RuntimeError: No AudioLoop project found in current directory.
+Run 'python -m audioloop.init_project' to create one,
+or set AUDIOLOOP_PROJECT_ROOT environment variable.
+```
+→ Run `python -m audioloop.init_project` to create the project structure, or set `AUDIOLOOP_PROJECT_ROOT` if working from a different directory.
+
 ### Config file not found
 ```bash
 FileNotFoundError: Config file not found: configs/missing.yaml
@@ -279,7 +364,7 @@ yaml.YAMLError: mapping values are not allowed here
 → Check YAML syntax (indentation, colons, quotes)
 
 ### Parameter not being applied
-- Check precedence: Is a CLI arg overriding your YAML value?
+- Check precedence: Is a CLI arg or experiment config overriding your project default?
 - Check spelling: Invalid field names are silently ignored in flat format
 - Use two-section format for better validation
 
@@ -290,6 +375,7 @@ yaml.YAMLError: mapping values are not allowed here
 
 ## Additional Resources
 
+- **Project initialization**: `python -m audioloop.init_project --help`
 - **AudioLoopConfig documentation**: See `audioloop/config.py` docstring
 - **Example usage**: See `automated_workflow.py` epilog for CLI examples
 - **Developer guide**: See `DEV_GUIDE.md` for architecture details
@@ -300,4 +386,3 @@ Once you have config files working, you can build:
 - **Experiment runner** - Run multiple configs in sequence
 - **Parameter sweeps** - Grid/random search over parameter space
 - **Result tracking** - Integration with wandb, mlflow, etc.
-- **Config templates** - Generate configs from templates

@@ -8,6 +8,9 @@ AudioLoop is an active learning framework for binary audio classification that m
 # Install dependencies
 uv sync
 
+# Initialize project directory (creates audioloop.yaml and folders)
+python -m audioloop.init_project
+
 # Generate spectrograms (one-time setup)
 python -m audioloop.create_specs
 

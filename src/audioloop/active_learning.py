@@ -74,7 +74,7 @@ def run_active_learning_for_class(
     subset_csv = dataset_kwargs.pop("subset_csv", None)
 
     # Create unified config with all active learning parameters
-    config = AudioLoopConfig(
+    config = AudioLoopConfig.from_project(
         experiment_name=experiment_name,
         dataset=dataset_name,
         subset_csv=Path(subset_csv) if subset_csv else None,
@@ -523,7 +523,7 @@ Examples:
         if args.with_ground_truth:
             config_overrides["with_ground_truth"] = True
 
-        config = AudioLoopConfig(**config_overrides)
+        config = AudioLoopConfig.from_project(**config_overrides)
         dataset_config = config.get_dataset_config()
     except ValueError as e:
         parser.error(str(e))

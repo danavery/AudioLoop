@@ -27,7 +27,7 @@ def get_matching_samples(
         List of sample dictionaries with 'spec_filename' and 'audio_path' keys
     """
     if config is None:
-        config = AudioLoopConfig(dataset=dataset_name)
+        config = AudioLoopConfig.from_project(dataset=dataset_name)
     dataset_config = config.get_dataset_config()
 
     # Get split parameter or use dataset's default
@@ -211,7 +211,7 @@ def create_training_set(
         if config is None:
             from audioloop.config import AudioLoopConfig
 
-            config = AudioLoopConfig(experiment_name=experiment_name)
+            config = AudioLoopConfig.from_project(experiment_name=experiment_name)
         else:
             # Config was provided (e.g., with subset_csv) - update experiment if needed
             if experiment_name and config.experiment_name != experiment_name:
@@ -283,7 +283,7 @@ def list_available_classes(dataset_name: str, **kwargs) -> None:
         dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
         **kwargs: Additional dataset-specific parameters
     """
-    config = AudioLoopConfig(dataset=dataset_name)
+    config = AudioLoopConfig.from_project(dataset=dataset_name)
     dataset_config = config.get_dataset_config()
 
     # All datasets support list_classes()
@@ -308,7 +308,7 @@ def list_available_splits(dataset_name: str, **kwargs) -> None:
         dataset_name: Name of the dataset ('urbansound8k' or 'fsd50k')
         **kwargs: Additional dataset-specific parameters
     """
-    config = AudioLoopConfig(dataset=dataset_name)
+    config = AudioLoopConfig.from_project(dataset=dataset_name)
     dataset_config = config.get_dataset_config()
 
     splits = dataset_config.get_available_splits()
@@ -415,7 +415,7 @@ Examples:
         from pathlib import Path
 
         subset_csv = Path(args.subset_csv) if args.subset_csv else None
-        config = AudioLoopConfig(dataset=args.dataset, subset_csv=subset_csv)
+        config = AudioLoopConfig.from_project(dataset=args.dataset, subset_csv=subset_csv)
         dataset_name = config.dataset
     except ValueError as e:
         print(f"Error: {e}")

@@ -220,7 +220,7 @@ def main():
     args = parser.parse_args()
 
     # Create config to ensure consistent path handling
-    config = AudioLoopConfig(experiment_name=args.experiment)
+    config = AudioLoopConfig.from_project(experiment_name=args.experiment)
     merge_training_sets(args.original_csv, args.candidates_csv, args.output, config=config)
 
 

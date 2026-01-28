@@ -75,7 +75,7 @@ class SimpleAudioLabeler:
         if audio_dir:
             dataset_kwargs["audio_root"] = audio_dir
 
-        config = AudioLoopConfig(dataset=self.dataset_name)
+        config = AudioLoopConfig.from_project(dataset=self.dataset_name)
         self.dataset_config = config.get_dataset_config()
 
         # Set default audio directory if not provided
@@ -554,7 +554,7 @@ Dataset to use ('fsd50k' or 'urbansound8k'). Can also be set via AUDIOLOOP_DATAS
     args = parser.parse_args()
 
     # Handle dataset resolution
-    config = AudioLoopConfig(dataset=args.dataset)
+    config = AudioLoopConfig.from_project(dataset=args.dataset)
     dataset_name = config.dataset
 
     # Handle test mode

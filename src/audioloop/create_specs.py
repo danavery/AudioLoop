@@ -302,7 +302,7 @@ Examples:
     args = parser.parse_args()
 
     # Get unified config
-    config = AudioLoopConfig(dataset=args.dataset)
+    config = AudioLoopConfig.from_project(dataset=args.dataset)
     dataset_name = config.dataset
 
     # Get dataset config using registry approach

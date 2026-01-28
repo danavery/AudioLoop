@@ -320,6 +320,50 @@ class AudioLoopConfig:
         # Create config (will use env vars for any fields not in merged_params)
         return cls(**merged_params)
 
+    @classmethod
+    def from_project(cls, **overrides) -> "AudioLoopConfig":
+        """
+        Load AudioLoopConfig with project defaults from audioloop.yaml.
+
+        Finds the project root (directory containing audioloop.yaml) and loads
+        any settings from that file as defaults. Explicit overrides take precedence.
+
+        Args:
+            **overrides: Parameter overrides (highest precedence)
+
+        Returns:
+            AudioLoopConfig instance with merged configuration
+
+        Raises:
+            RuntimeError: If no project found (no audioloop.yaml in cwd and
+                         AUDIOLOOP_PROJECT_ROOT not set)
+
+        Precedence (highest to lowest):
+            1. overrides (explicit kwargs)
+            2. audioloop.yaml values (project defaults)
+            3. Environment variables (via default_factory)
+            4. Dataclass defaults
+
+        Example:
+            >>> # Load with project defaults
+            >>> config = AudioLoopConfig.from_project()
+
+            >>> # Load with project defaults, but override batch_size
+            >>> config = AudioLoopConfig.from_project(batch_size=64)
+        """
+        from .utils.paths import get_project_root
+
+        project_root = get_project_root()
+        project_yaml = project_root / "audioloop.yaml"
+
+        if project_yaml.exists():
+            return cls.from_yaml(project_yaml, **overrides)
+
+        # Project root exists (via env var) but no yaml file
+        # Just use overrides + defaults
+        filtered_overrides = {k: v for k, v in overrides.items() if v is not None}
+        return cls(**filtered_overrides)
+
     @property
     def output_dir(self) -> Path:
         """Get the outputs directory for this configuration."""

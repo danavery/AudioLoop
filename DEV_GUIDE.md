@@ -155,7 +155,10 @@ AudioLoop uses a centralized configuration system that coordinates all settings:
 ```python
 from audioloop.config import AudioLoopConfig
 
-# Create configuration
+# Create configuration with project defaults (recommended for CLI commands)
+config = AudioLoopConfig.from_project(experiment_name="my_exp")
+
+# Or create directly (for tests or when project context not needed)
 config = AudioLoopConfig(experiment_name="my_exp", dataset="urbansound8k")
 
 # Access all path locations
@@ -170,18 +173,24 @@ config.get_training_set_path(1) # training_sets/my_exp/training_set_v1.csv
 ```
 
 ### Configuration Precedence
-AudioLoop follows standard configuration patterns with proper precedence:
+AudioLoop follows a layered configuration system with proper precedence:
 1. **Explicit constructor parameters** (highest priority)
-2. **Environment variables** (fallback when no explicit value)
-3. **Default values** (lowest priority)
+2. **Experiment config file** (`--config` flag, uses `from_yaml()`)
+3. **Project defaults** (`audioloop.yaml` in project root, uses `from_project()`)
+4. **Environment variables** (`AUDIOLOOP_*` variables)
+5. **Default values** (lowest priority)
+
+**Factory Methods:**
+- `AudioLoopConfig.from_project(**overrides)` - Loads project defaults from `audioloop.yaml`, applies overrides. **Used by all CLI commands.**
+- `AudioLoopConfig.from_yaml(path, **overrides)` - Loads from specific YAML file, applies overrides
+- `AudioLoopConfig(**kwargs)` - Direct construction without project/file defaults
 
 ```python
-# Environment variable as fallback
-os.environ['AUDIOLOOP_DATASET'] = 'urbansound8k'
-config = AudioLoopConfig()  # Uses urbansound8k
+# CLI commands use from_project() to pick up audioloop.yaml defaults
+config = AudioLoopConfig.from_project(experiment_name="my_exp")
 
-# Explicit parameter overrides environment
-config = AudioLoopConfig(dataset='fsd50k')  # Uses fsd50k (ignores env var)
+# Direct construction for tests or explicit configuration
+config = AudioLoopConfig(dataset='fsd50k')  # Ignores audioloop.yaml
 ```
 
 ### Versioned Workflow System
@@ -275,8 +284,11 @@ filename,prediction,predicted_class,confidence,needs_human_label,entropy,prob_ne
 ### Unified Configuration Pattern
 All modules use the unified configuration system instead of scattered parameters:
 ```python
-# Modern approach - unified configuration
+# CLI commands: use from_project() to inherit audioloop.yaml defaults
 from audioloop.config import AudioLoopConfig
+config = AudioLoopConfig.from_project(experiment_name="test")
+
+# Tests or explicit config: use direct construction
 config = AudioLoopConfig(experiment_name="test", dataset="urbansound8k")
 
 # Pass config object to functions

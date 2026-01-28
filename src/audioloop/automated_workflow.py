@@ -845,11 +845,11 @@ Prerequisites:
                     f"--class-weighting must be 'adaptive' or a float between 0.0 and 1.0, got: {args.class_weighting}"
                 )
 
-    # Create AudioLoopConfig: from YAML with CLI overrides, or pure CLI
+    # Create AudioLoopConfig: from YAML with CLI overrides, or from project defaults
     if args.config:
         config = AudioLoopConfig.from_yaml(args.config, **cli_overrides)
     else:
-        config = AudioLoopConfig(**cli_overrides)
+        config = AudioLoopConfig.from_project(**cli_overrides)
 
     # Create output directory if it doesn't exist
     os.makedirs(config.output_dir, exist_ok=True)

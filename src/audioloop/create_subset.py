@@ -84,7 +84,7 @@ Examples:
     from audioloop.config import AudioLoopConfig
 
     # Get dataset config
-    config = AudioLoopConfig(dataset=args.dataset)
+    config = AudioLoopConfig.from_project(dataset=args.dataset)
     dataset_config = config.get_dataset_config()
 
     # Handle --list-classes

@@ -463,7 +463,7 @@ Notes:
     args = parser.parse_args()
 
     # Use config to determine output directory
-    config = AudioLoopConfig(experiment_name=args.experiment)
+    config = AudioLoopConfig.from_project(experiment_name=args.experiment)
     output_dir = str(config.output_dir)
 
     try:

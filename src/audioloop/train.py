@@ -146,7 +146,7 @@ def main():
                     f"--class-weighting must be 'adaptive' or a float between 0.0 and 1.0, got: {args.class_weighting}"
                 )
 
-    config = AudioLoopConfig(**config_overrides)
+    config = AudioLoopConfig.from_project(**config_overrides)
 
     # Set log level based on quiet flag
     log_level = logging.WARNING if args.quiet else logging.INFO
