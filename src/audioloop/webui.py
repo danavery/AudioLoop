@@ -35,20 +35,24 @@ def detect_project_root() -> Path | None:
 
 def main():
     """Launch the web UI with project context."""
-    project_root = detect_project_root()
-
-    if project_root is None:
-        print("Warning: Current directory doesn't look like an AudioLoop project.")
-        print("  (No audioloop.yaml or outputs/ found)")
-        print("  The web UI will still run, but candidate auto-detection won't work.")
-        print()
-        project_root = Path.cwd()
+    # Check if already set (e.g., Flask reloader restart)
+    if "AUDIOLOOP_PROJECT_ROOT" in os.environ:
+        project_root = Path(os.environ["AUDIOLOOP_PROJECT_ROOT"])
     else:
-        print(f"Detected project: {project_root}")
+        project_root = detect_project_root()
 
-    # Set environment so app.py knows the project root
-    os.environ["AUDIOLOOP_PROJECT_ROOT"] = str(project_root)
-    os.environ.setdefault("AUDIOLOOP_OUTPUT_ROOT", str(project_root))
+        if project_root is None:
+            print("Warning: Current directory doesn't look like an AudioLoop project.")
+            print("  (No audioloop.yaml or outputs/ found)")
+            print("  The web UI will still run, but candidate auto-detection won't work.")
+            print()
+            project_root = Path.cwd()
+        else:
+            print(f"Detected project: {project_root}")
+
+        # Set environment so app.py knows the project root
+        os.environ["AUDIOLOOP_PROJECT_ROOT"] = str(project_root)
+        os.environ.setdefault("AUDIOLOOP_OUTPUT_ROOT", str(project_root))
 
     # Import and run the Flask app
     # We need to add the webui directory to find the app module
