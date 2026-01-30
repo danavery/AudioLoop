@@ -45,6 +45,7 @@ import torchaudio
 
 from audioloop.datasets.dataset_config import DatasetConfig
 from audioloop.utils.log_normalize import LogNormalize
+from audioloop.utils.paths import get_project_root
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +105,10 @@ class TemplateAudioConfig(DatasetConfig):
     @property
     def audio_root(self) -> Path:
         """Root directory containing audio files."""
-        return self._audio_root_path
+        if self._audio_root_path.is_absolute():
+            return self._audio_root_path
+        # Resolve relative paths against project root
+        return get_project_root() / self._audio_root_path
 
     @property
     def name_to_id(self) -> dict[str, int]:

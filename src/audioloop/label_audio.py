@@ -111,7 +111,21 @@ class SimpleAudioLabeler:
 
     def _get_audio_path(self, candidate):
         """Get the full path to the audio file using dataset config."""
-        # Get filename directly from candidate
+        # First, check if audio_path is directly available (preferred)
+        audio_path = candidate.get("audio_path")
+        if audio_path and audio_path != "None":
+            from pathlib import Path
+
+            path = Path(audio_path)
+            if path.exists():
+                return str(path)
+            # Try relative to audio_dir
+            if self.audio_dir:
+                alt_path = Path(self.audio_dir) / path.name
+                if alt_path.exists():
+                    return str(alt_path)
+
+        # Fall back to reconstructing path from filename + fold/split
         filename = candidate.get("filename", "")
         if not filename:
             print(
@@ -131,14 +145,9 @@ class SimpleAudioLabeler:
         # Use dataset config to get audio path
         try:
             audio_path = self.dataset_config.get_audio_path(
-                filename=filename, split=split, fold=int(fold) if fold else None
+                filename=filename, split=split, fold=int(fold) if fold and fold != "-1" else None
             )
-
-            if audio_path.exists():
-                return str(audio_path)
-
-            print(f"ERROR: Audio file not found: {audio_path}")
-            return None
+            return str(audio_path)
 
         except Exception as e:
             print(f"ERROR: Failed to get audio path for {filename}: {e}")

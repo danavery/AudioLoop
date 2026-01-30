@@ -260,7 +260,7 @@ def run_binary_inference(
                         "prob_negative": prob_negative,
                         "prob_positive": prob_positive,
                         "original_class": original_class if original_class is not None else -1,
-                        "fold": -1,  # Fold information not available in inference mode
+                        "audio_path": batch["audio_path"][i],
                         "filepath": batch["filepath"][i],
                     }
 
@@ -284,7 +284,7 @@ def run_binary_inference(
             "prob_negative",
             "prob_positive",
             "original_class",
-            "fold",
+            "audio_path",
             "filepath",
         ]
 

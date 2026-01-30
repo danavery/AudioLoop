@@ -198,6 +198,7 @@ class SpectrogramDataset(torch.utils.data.Dataset):
                 "label": sample["label"],
                 "filename": sample["filename"],
                 "filepath": spec_filepath,
+                "audio_path": sample.get("audio_path"),
             }
 
             # Only include original_class if it exists

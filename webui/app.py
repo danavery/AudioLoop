@@ -65,20 +65,24 @@ def list_candidates():
         for csv_file in outputs_dir.rglob("labeling_candidates*.csv"):
             # Get path relative to outputs/
             rel_path = csv_file.relative_to(outputs_dir)
-            candidates.append({
-                "path": str(rel_path),
-                "full_path": str(csv_file),
-                "name": csv_file.name,
-                "modified": csv_file.stat().st_mtime,
-            })
+            candidates.append(
+                {
+                    "path": str(rel_path),
+                    "full_path": str(csv_file),
+                    "name": csv_file.name,
+                    "modified": csv_file.stat().st_mtime,
+                }
+            )
 
     # Sort by modification time, most recent first
     candidates.sort(key=lambda x: x["modified"], reverse=True)
 
-    return jsonify({
-        "candidates": candidates,
-        "project_root": str(PROJECT_ROOT),
-    })
+    return jsonify(
+        {
+            "candidates": candidates,
+            "project_root": str(PROJECT_ROOT),
+        }
+    )
 
 
 @app.route("/api/project_info")
@@ -203,8 +207,13 @@ def serve_audio(index):
 
     candidate = current_labeler.candidates[index]
     audio_path = current_labeler._get_audio_path(candidate)
+    print(f"audio_path: {audio_path}")
+    if audio_path is None:
+        return jsonify({"error": "Audio file not found"}), 404
 
-    if not audio_path or not os.path.exists(audio_path):
+    audio_path = str(PROJECT_ROOT / audio_path)
+    print(f"final path: {audio_path}")
+    if not os.path.exists(audio_path):
         return jsonify({"error": "Audio file not found"}), 404
 
     return send_file(audio_path, mimetype="audio/wav")

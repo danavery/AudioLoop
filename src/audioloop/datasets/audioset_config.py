@@ -9,6 +9,7 @@ import torchaudio
 from torch import nn
 
 from audioloop.utils.log_normalize import LogNormalize
+from audioloop.utils.paths import get_project_root
 
 from .dataset_config import DatasetConfig
 
@@ -87,7 +88,10 @@ class AudiosetConfig(DatasetConfig):
     @property
     def audio_root(self) -> Path:
         """Root directory containing audio files."""
-        return self._audio_root
+        if self._audio_root.is_absolute():
+            return self._audio_root
+        # Resolve relative paths against project root
+        return get_project_root() / self._audio_root
 
     @property
     def audio_extension(self) -> str:
