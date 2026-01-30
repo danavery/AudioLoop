@@ -4,14 +4,20 @@ Launch the AudioLoop web UI from a project directory.
 Usage:
     cd ~/projects/my-classifier
     python -m audioloop.webui
+    python -m audioloop.webui --host 0.0.0.0  # Allow external connections
+    python -m audioloop.webui --port 8080     # Custom port
 
 The web UI will detect the project from the current working directory
 and auto-populate available candidate files for labeling.
 """
 
+import argparse
 import os
 import sys
 from pathlib import Path
+
+DEFAULT_HOST = "127.0.0.1"
+DEFAULT_PORT = 5000
 
 
 def detect_project_root() -> Path | None:
@@ -35,10 +41,34 @@ def detect_project_root() -> Path | None:
 
 def main():
     """Launch the web UI with project context."""
-    # Check if already set (e.g., Flask reloader restart)
-    if "AUDIOLOOP_PROJECT_ROOT" in os.environ:
+    # Check if this is a Flask reloader restart (env vars already set)
+    is_reloader_restart = "AUDIOLOOP_PROJECT_ROOT" in os.environ
+
+    if is_reloader_restart:
         project_root = Path(os.environ["AUDIOLOOP_PROJECT_ROOT"])
+        host = os.environ.get("AUDIOLOOP_WEBUI_HOST", DEFAULT_HOST)
+        port = int(os.environ.get("AUDIOLOOP_WEBUI_PORT", DEFAULT_PORT))
     else:
+        # Parse command-line arguments
+        parser = argparse.ArgumentParser(
+            description="Launch the AudioLoop web labeling interface"
+        )
+        parser.add_argument(
+            "--host",
+            default=DEFAULT_HOST,
+            help=f"Host address (default: {DEFAULT_HOST}, use 0.0.0.0 for external access)",
+        )
+        parser.add_argument(
+            "--port",
+            type=int,
+            default=DEFAULT_PORT,
+            help=f"Port number (default: {DEFAULT_PORT})",
+        )
+        args = parser.parse_args()
+        host = args.host
+        port = args.port
+
+        # Detect project
         project_root = detect_project_root()
 
         if project_root is None:
@@ -50,12 +80,13 @@ def main():
         else:
             print(f"Detected project: {project_root}")
 
-        # Set environment so app.py knows the project root
+        # Set environment so app.py knows the project root (and for reloader)
         os.environ["AUDIOLOOP_PROJECT_ROOT"] = str(project_root)
+        os.environ["AUDIOLOOP_WEBUI_HOST"] = host
+        os.environ["AUDIOLOOP_WEBUI_PORT"] = str(port)
         os.environ.setdefault("AUDIOLOOP_OUTPUT_ROOT", str(project_root))
 
     # Import and run the Flask app
-    # We need to add the webui directory to find the app module
     webui_dir = Path(__file__).parent.parent.parent / "webui"
 
     if not webui_dir.exists():
@@ -63,7 +94,6 @@ def main():
         sys.exit(1)
 
     # Change to webui dir so Flask can find templates/static
-    # (We'll fix this properly in app.py, but this ensures it works)
     original_cwd = os.getcwd()
     os.chdir(webui_dir)
 
@@ -71,10 +101,13 @@ def main():
 
     try:
         from app import app  # type: ignore[import-not-found]
-        print("Starting web UI at http://127.0.0.1:5000")
-        print(f"Project root: {project_root}")
-        print()
-        app.run(debug=True, host="127.0.0.1", port=5000)
+
+        if not is_reloader_restart:
+            print(f"Starting web UI at http://{host}:{port}")
+            print(f"Project root: {project_root}")
+            print()
+
+        app.run(debug=True, host=host, port=port)
     finally:
         os.chdir(original_cwd)
 
