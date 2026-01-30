@@ -44,7 +44,7 @@ DEFAULT_CONFIG = """\
 # ------------------------------------------------------------------------------
 # Dataset Configuration
 # ------------------------------------------------------------------------------
-# dataset: fsd50k                  # Options: fsd50k, urbansound8k, audioset
+# dataset: fsd50k                  # Options: fsd50k, urbansound8k, audioset, or your custom dataset
 # subset_csv:                      # Restrict to subset CSV (created by create_subset)
 
 # ------------------------------------------------------------------------------
