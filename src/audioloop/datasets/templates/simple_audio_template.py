@@ -265,12 +265,12 @@ class TemplateAudioConfig(DatasetConfig):
                 hop_length=self._hop_length,
                 n_mels=self._n_mels,
             ),
-            LogNormalize(top_db=self.top_db),
+            LogNormalize(top_db=self._top_db),
         )
 
     def get_output_shape(self) -> tuple[int, ...]:
         """Get the shape of tensors produced by this dataset."""
-        return (self.n_mels, -1)  # -1 indicates variable time dimension
+        return (self._n_mels, -1)  # -1 indicates variable time dimension
 
     def parse_metadata_row(self, row: dict[str, str], split: str | None = None) -> dict[str, Any]:
         """Parse a single CSV row into standardized metadata format."""
@@ -301,7 +301,7 @@ class TemplateAudioConfig(DatasetConfig):
     def fix_spectrogram_length(self, spec: torch.Tensor) -> torch.Tensor:
         """Fix spectrogram length by cropping outliers but preserving natural variation."""
         current_length = spec.shape[-1]  # Time dimension is last
-        max_length = self.fixed_length  # Use as maximum, not target
+        max_length = self._fixed_length  # Use as maximum, not target
 
         # Only crop if it exceeds reasonable maximum (handles outliers)
         if current_length > max_length:
@@ -323,18 +323,8 @@ class TemplateAudioConfig(DatasetConfig):
                 logger.warning(f"Audio file not found: {audio_path}")
                 return False, None
 
-            # Load audio
-            waveform, file_sample_rate = torchaudio.load(str(audio_path))
-
-            # Resample if needed
-            if file_sample_rate != self.sample_rate:
-                waveform = torchaudio.functional.resample(
-                    waveform, file_sample_rate, self.sample_rate
-                )
-
-            # Convert stereo to mono by averaging channels
-            if waveform.shape[0] > 1:
-                waveform = waveform.mean(dim=0, keepdim=True)
+            # Load audio (resamples and converts to mono)
+            waveform = self.load_audio(audio_path)
 
             # Create spectrogram
             spec_transform = self.create_spectrogram_transform()

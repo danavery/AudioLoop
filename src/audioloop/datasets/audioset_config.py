@@ -383,18 +383,8 @@ class AudiosetConfig(DatasetConfig):
             if min_size is not None and audio_path.stat().st_size < min_size:
                 return False, None
 
-            # Load audio with torchaudio (uses ffmpeg backend)
-            waveform, file_sample_rate = torchaudio.load(audio_path)
-
-            # Resample if needed
-            if file_sample_rate != self.sample_rate:
-                waveform = torchaudio.functional.resample(
-                    waveform, file_sample_rate, self.sample_rate
-                )
-
-            # Convert stereo to mono by averaging channels
-            if waveform.shape[0] > 1:
-                waveform = waveform.mean(dim=0, keepdim=True)
+            # Load audio (resamples and converts to mono)
+            waveform = self.load_audio(audio_path)
 
             # Create spectrogram
             spec_transform = self.create_spectrogram_transform()

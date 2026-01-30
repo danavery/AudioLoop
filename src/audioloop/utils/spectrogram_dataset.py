@@ -6,7 +6,6 @@ import sys
 from pathlib import Path
 
 import torch
-import torchaudio
 
 logger = logging.getLogger(__name__)
 
@@ -137,22 +136,12 @@ class SpectrogramDataset(torch.utils.data.Dataset):
                     f"Likely corrupt (e.g., FLAC header with no data)."
                 )
 
-        # Load audio (may fail on corrupt files)
+        # Load audio (resamples and converts to mono)
         try:
-            waveform, file_sample_rate = torchaudio.load(str(audio_path))
+            waveform = self.dataset_config.load_audio(audio_path)
         except Exception as e:
             # Corrupt or unsupported audio file
             raise RuntimeError(f"Failed to load audio file {audio_path}: {e}") from e
-
-        # Resample if needed
-        if file_sample_rate != self.dataset_config.sample_rate:
-            waveform = torchaudio.functional.resample(
-                waveform, file_sample_rate, self.dataset_config.sample_rate
-            )
-
-        # Convert stereo to mono by averaging channels
-        if waveform.shape[0] > 1:
-            waveform = waveform.mean(dim=0, keepdim=True)
 
         # Generate spectrogram using dataset config
         spec_transform = self.dataset_config.create_spectrogram_transform()

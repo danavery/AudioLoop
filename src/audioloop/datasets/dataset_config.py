@@ -11,6 +11,7 @@ from typing import Any
 
 import torch
 import torch.nn as nn
+import torchaudio
 
 
 class DatasetConfig(ABC):
@@ -181,6 +182,35 @@ class DatasetConfig(ABC):
             Dict with keys: sample_rate, n_fft, hop_length, n_mels, top_db, fixed_length
         """
         pass
+
+    def load_audio(self, audio_path: Path) -> torch.Tensor:
+        """Load audio file, resample if needed, and convert to mono.
+
+        This is the standard audio loading method that handles:
+        - Loading audio with torchaudio
+        - Resampling to the dataset's configured sample_rate
+        - Converting stereo to mono by averaging channels
+
+        Args:
+            audio_path: Path to audio file
+
+        Returns:
+            Mono waveform tensor at the dataset's sample_rate
+        """
+        waveform, file_sample_rate = torchaudio.load(str(audio_path))
+
+        # Resample if file sample rate doesn't match config
+        target_sample_rate = self.get_audio_processing_params()["sample_rate"]
+        if file_sample_rate != target_sample_rate:
+            waveform = torchaudio.functional.resample(
+                waveform, file_sample_rate, target_sample_rate
+            )
+
+        # Convert stereo to mono by averaging channels
+        if waveform.shape[0] > 1:
+            waveform = waveform.mean(dim=0, keepdim=True)
+
+        return waveform
 
     @abstractmethod
     def create_spectrogram_transform(self) -> nn.Sequential:
