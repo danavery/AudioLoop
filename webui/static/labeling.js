@@ -10,7 +10,8 @@ class AudioLabelingInterface {
         this.initializeElements();
         this.attachEventListeners();
         this.setupKeyboardShortcuts();
-        this.loadDatasets();  // Populate dataset dropdown from API
+        this.loadAvailableCandidates();  // Populate candidates dropdown
+        this.loadProjectInfo();  // Get project config for dataset
     }
     
     initializeElements() {
@@ -20,7 +21,7 @@ class AudioLabelingInterface {
             loadForm: document.getElementById('loadForm'),
             candidatesFile: document.getElementById('candidatesFile'),
             dataset: document.getElementById('dataset'),
-            audioDir: document.getElementById('audioDir'),
+            datasetInfo: document.getElementById('datasetInfo'),
             
             // Main sections
             loadingSection: document.getElementById('loadingSection'),
@@ -136,39 +137,66 @@ class AudioLabelingInterface {
         });
     }
     
-    async loadDatasets() {
+    async loadAvailableCandidates() {
         try {
-            const response = await fetch('/api/datasets');
+            const response = await fetch('/api/candidates');
             const result = await response.json();
-            
-            if (result.datasets && result.datasets.length > 0) {
-                // Clear existing options
-                this.elements.dataset.innerHTML = '';
-                
-                // Populate with datasets from API
-                result.datasets.forEach(dataset => {
+
+            // Clear existing options
+            this.elements.candidatesFile.innerHTML = '';
+
+            if (result.candidates && result.candidates.length > 0) {
+                // Add candidates as options
+                result.candidates.forEach((candidate, index) => {
                     const option = document.createElement('option');
-                    option.value = dataset;
-                    option.textContent = dataset.toUpperCase();
-                    this.elements.dataset.appendChild(option);
+                    option.value = candidate.path;
+                    option.textContent = candidate.path;
+                    // Select first (most recent) by default
+                    if (index === 0) {
+                        option.selected = true;
+                    }
+                    this.elements.candidatesFile.appendChild(option);
                 });
+            } else {
+                // No candidates found
+                const option = document.createElement('option');
+                option.value = '';
+                option.textContent = 'No candidate files found in outputs/';
+                this.elements.candidatesFile.appendChild(option);
             }
         } catch (error) {
-            console.error('Failed to load datasets:', error);
-            // Keep the hardcoded defaults if API fails
+            console.error('Failed to load candidates:', error);
+            // Show error in dropdown
+            this.elements.candidatesFile.innerHTML = '<option value="">Error loading candidates</option>';
         }
     }
-    
+
+    async loadProjectInfo() {
+        try {
+            const response = await fetch('/api/project_info');
+            const result = await response.json();
+
+            // Set dataset from project config
+            const dataset = result.dataset || 'fsd50k';  // Default to fsd50k
+            this.elements.dataset.value = dataset;
+            this.elements.datasetInfo.innerHTML = `<strong>${dataset.toUpperCase()}</strong>`;
+        } catch (error) {
+            console.error('Failed to load project info:', error);
+            // Fall back to default
+            this.elements.dataset.value = 'fsd50k';
+            this.elements.datasetInfo.innerHTML = '<strong>FSD50K</strong> <span class="text-muted">(default)</span>';
+        }
+    }
+
     async loadCandidates() {
         const candidatesFile = this.elements.candidatesFile.value.trim();
         const dataset = this.elements.dataset.value;
-        const audioDir = this.elements.audioDir.value.trim() || null;
-        
+
         if (!candidatesFile) {
-            this.showError('Please provide a candidates CSV file path');
+            this.showError('Please select a candidates CSV file');
             return;
         }
-        
+
         try {
             const response = await fetch('/api/load', {
                 method: 'POST',
@@ -177,8 +205,7 @@ class AudioLabelingInterface {
                 },
                 body: JSON.stringify({
                     candidates_csv: candidatesFile,
-                    dataset: dataset,
-                    audio_dir: audioDir
+                    dataset: dataset
                 })
             });
             

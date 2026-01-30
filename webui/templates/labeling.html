@@ -151,25 +151,20 @@
                     <div class="card-body">
                         <form id="loadForm">
                             <div class="mb-3">
-                                <label for="candidatesFile" class="form-label">Candidates CSV File Path</label>
-                                <input type="text" class="form-control" id="candidatesFile"
-                                       placeholder="labeling_candidates_v1.csv or experiment_name/labeling_candidates_v1.csv" required>
-                                <div class="form-text">Path to the candidates CSV file from active learning</div>
-                            </div>
-
-                            <div class="mb-3">
-                                <label for="dataset" class="form-label">Dataset</label>
-                                <select class="form-select" id="dataset">
-                                    <option value="fsd50k">FSD50K</option>
-                                    <option value="urbansound8k">UrbanSound8K</option>
+                                <label for="candidatesFile" class="form-label">Candidates CSV File</label>
+                                <select class="form-select" id="candidatesFile" required>
+                                    <option value="">Loading available candidates...</option>
                                 </select>
+                                <div class="form-text">Select a candidates CSV file from active learning</div>
                             </div>
 
                             <div class="mb-3">
-                                <label for="audioDir" class="form-label">Audio Directory (optional)</label>
-                                <input type="text" class="form-control" id="audioDir"
-                                       placeholder="Leave empty to use dataset default">
-                                <div class="form-text">Custom path to audio files if not using default</div>
+                                <label class="form-label">Dataset</label>
+                                <div id="datasetInfo" class="form-control-plaintext">
+                                    <span class="text-muted">Detecting...</span>
+                                </div>
+                                <input type="hidden" id="dataset" value="">
+                                <div class="form-text">Detected from audioloop.yaml</div>
                             </div>
 
                             <button type="submit" class="btn btn-primary">Load Candidates</button>

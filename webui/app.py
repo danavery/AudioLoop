@@ -13,16 +13,27 @@ from pathlib import Path
 from flask import Flask, jsonify, render_template, request, send_file
 
 # Add the parent directory to Python path so we can import audioloop
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-# Set default output root to project root (webui runs from subdirectory)
-# Users can override by setting AUDIOLOOP_OUTPUT_ROOT env var before running
+# Determine project root:
+# 1. From AUDIOLOOP_PROJECT_ROOT (set by python -m audioloop.webui)
+# 2. Fall back to webui's parent (legacy: running directly from webui/)
+PROJECT_ROOT = Path(os.environ.get("AUDIOLOOP_PROJECT_ROOT", Path(__file__).parent.parent))
+
+# Set default output root to project root
 if "AUDIOLOOP_OUTPUT_ROOT" not in os.environ:
-    os.environ["AUDIOLOOP_OUTPUT_ROOT"] = str(Path(__file__).parent.parent)
+    os.environ["AUDIOLOOP_OUTPUT_ROOT"] = str(PROJECT_ROOT)
 
 from audioloop.label_audio import SimpleAudioLabeler
 
-app = Flask(__name__)
+# Use explicit paths for templates/static so Flask works from any directory
+WEBUI_DIR = Path(__file__).parent
+app = Flask(
+    __name__,
+    template_folder=str(WEBUI_DIR / "templates"),
+    static_folder=str(WEBUI_DIR / "static"),
+)
 
 # Global labeler instance (simple approach for now)
 current_labeler = None
@@ -41,6 +52,56 @@ def get_datasets():
 
     datasets = list_available_datasets()
     return jsonify({"datasets": datasets})
+
+
+@app.route("/api/candidates")
+def list_candidates():
+    """List available candidate files in project's outputs/ directory."""
+    outputs_dir = PROJECT_ROOT / "outputs"
+    candidates = []
+
+    if outputs_dir.exists():
+        # Find all labeling_candidates*.csv files
+        for csv_file in outputs_dir.rglob("labeling_candidates*.csv"):
+            # Get path relative to outputs/
+            rel_path = csv_file.relative_to(outputs_dir)
+            candidates.append({
+                "path": str(rel_path),
+                "full_path": str(csv_file),
+                "name": csv_file.name,
+                "modified": csv_file.stat().st_mtime,
+            })
+
+    # Sort by modification time, most recent first
+    candidates.sort(key=lambda x: x["modified"], reverse=True)
+
+    return jsonify({
+        "candidates": candidates,
+        "project_root": str(PROJECT_ROOT),
+    })
+
+
+@app.route("/api/project_info")
+def get_project_info():
+    """Return project configuration if available."""
+    import yaml
+
+    config_file = PROJECT_ROOT / "audioloop.yaml"
+    info = {
+        "project_root": str(PROJECT_ROOT),
+        "has_config": config_file.exists(),
+        "dataset": None,
+    }
+
+    if config_file.exists():
+        try:
+            with open(config_file) as f:
+                config = yaml.safe_load(f) or {}
+            info["dataset"] = config.get("dataset")
+        except Exception:
+            pass  # Ignore config parse errors
+
+    return jsonify(info)
 
 
 @app.route("/api/load", methods=["POST"])
@@ -72,8 +133,7 @@ def load_candidates():
     if audio_dir:
         audio_path = Path(audio_dir)
         if not audio_path.is_absolute():
-            project_root = Path(__file__).parent.parent
-            audio_dir = str(project_root / audio_path)
+            audio_dir = str(PROJECT_ROOT / audio_path)
         else:
             audio_dir = str(audio_path)
 
