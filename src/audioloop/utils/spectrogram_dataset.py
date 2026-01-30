@@ -139,10 +139,17 @@ class SpectrogramDataset(torch.utils.data.Dataset):
 
         # Load audio (may fail on corrupt files)
         try:
-            waveform, sample_rate = torchaudio.load(str(audio_path))
+            waveform, file_sample_rate = torchaudio.load(str(audio_path))
         except Exception as e:
             # Corrupt or unsupported audio file
             raise RuntimeError(f"Failed to load audio file {audio_path}: {e}") from e
+
+        # Resample if needed
+        if file_sample_rate != self.dataset_config.sample_rate:
+            waveform = torchaudio.functional.resample(
+                waveform, file_sample_rate, self.dataset_config.sample_rate
+            )
+
         # Convert stereo to mono by averaging channels
         if waveform.shape[0] > 1:
             waveform = waveform.mean(dim=0, keepdim=True)

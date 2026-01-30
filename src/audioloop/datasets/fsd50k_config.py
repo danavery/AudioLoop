@@ -335,7 +335,13 @@ class FSD50KConfig(DatasetConfig):
                 return False, None
 
             # Load audio
-            waveform, sample_rate = torchaudio.load(str(audio_path))
+            waveform, file_sample_rate = torchaudio.load(str(audio_path))
+
+            # Resample if needed
+            if file_sample_rate != self.sample_rate:
+                waveform = torchaudio.functional.resample(
+                    waveform, file_sample_rate, self.sample_rate
+                )
 
             # Convert stereo to mono by averaging channels
             if waveform.shape[0] > 1:

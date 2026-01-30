@@ -129,6 +129,7 @@ class TestLazySpectrogramGeneration:
 
         # Mock dataset config
         mock_config = Mock()
+        mock_config.sample_rate = 44100
         mock_config.min_audio_file_size = None
         mock_config.create_spectrogram_transform.return_value = Mock()
         mock_config.fix_spectrogram_length.return_value = torch.randn(1, 128, 100)
@@ -172,6 +173,7 @@ class TestLazySpectrogramGeneration:
 
         # Mock dataset config
         mock_config = Mock()
+        mock_config.sample_rate = 44100
         spec_data = torch.randn(1, 128, 100)
         mock_config.min_audio_file_size = None
         mock_config.create_spectrogram_transform.return_value = Mock()
@@ -238,6 +240,7 @@ class TestLazySpectrogramGeneration:
 
         # Mock dataset config
         mock_config = Mock()
+        mock_config.sample_rate = 44100
         mock_config.min_audio_file_size = None
         mock_config.create_spectrogram_transform.return_value = Mock()
         mock_config.fix_spectrogram_length.return_value = torch.randn(1, 128, 100)
@@ -443,6 +446,7 @@ class TestDatasetConfigIntegration:
 
         # Mock dataset config
         mock_config = Mock()
+        mock_config.sample_rate = 44100
         spec_data = torch.randn(1, 128, 100)
         mock_config.min_audio_file_size = None
         mock_config.create_spectrogram_transform.return_value = Mock()

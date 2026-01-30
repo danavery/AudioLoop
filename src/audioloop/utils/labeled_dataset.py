@@ -68,7 +68,7 @@ class LabeledDataset(torch.utils.data.Dataset):
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"Audio file not found: {filepath}")
 
-        waveform, sample_rate = torchaudio.load(filepath)
+        waveform, _sample_rate = torchaudio.load(filepath)
         data = waveform
         filename = os.path.basename(filepath)
 

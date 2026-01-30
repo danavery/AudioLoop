@@ -265,7 +265,7 @@ class TemplateAudioConfig(DatasetConfig):
                 hop_length=self._hop_length,
                 n_mels=self._n_mels,
             ),
-            LogNormalize(top_db=self._top_db),
+            LogNormalize(top_db=self.top_db),
         )
 
     def get_output_shape(self) -> tuple[int, ...]:
@@ -324,7 +324,13 @@ class TemplateAudioConfig(DatasetConfig):
                 return False, None
 
             # Load audio
-            waveform, sample_rate = torchaudio.load(str(audio_path))
+            waveform, file_sample_rate = torchaudio.load(str(audio_path))
+
+            # Resample if needed
+            if file_sample_rate != self.sample_rate:
+                waveform = torchaudio.functional.resample(
+                    waveform, file_sample_rate, self.sample_rate
+                )
 
             # Convert stereo to mono by averaging channels
             if waveform.shape[0] > 1:
