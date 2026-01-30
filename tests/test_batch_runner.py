@@ -205,10 +205,7 @@ config:
         Skipped by default as it requires full dataset setup.
         Run manually with: pytest -v tests/test_batch_runner.py::TestBatchRunnerIntegration::test_full_batch_run -s
         """
-        import os
-        from unittest.mock import patch
 
-        env = setup_environment
 
         # This would require actual dataset files, so we skip by default
         # To run this test manually, you'd need proper setup

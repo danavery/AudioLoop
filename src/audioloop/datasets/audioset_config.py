@@ -184,18 +184,17 @@ class AudiosetConfig(DatasetConfig):
             reader = csv_module.reader(f, skipinitialspace=True)
             for row in reader:
                 # Skip header comments (lines starting with #)
-                if row and not row[0].startswith("#"):
-                    if len(row) >= 4:
-                        parsed = self.parse_metadata_row(
-                            {
-                                "YTID": row[0],
-                                "start_seconds": row[1],
-                                "end_seconds": row[2],
-                                "positive_labels": row[3],
-                            },
-                            split=dir_split,
-                        )
-                        audio_files.append(parsed)
+                if row and not row[0].startswith("#") and len(row) >= 4:
+                    parsed = self.parse_metadata_row(
+                        {
+                            "YTID": row[0],
+                            "start_seconds": row[1],
+                            "end_seconds": row[2],
+                            "positive_labels": row[3],
+                        },
+                        split=dir_split,
+                    )
+                    audio_files.append(parsed)
 
         return audio_files
 
@@ -385,7 +384,13 @@ class AudiosetConfig(DatasetConfig):
                 return False, None
 
             # Load audio with torchaudio (uses ffmpeg backend)
-            waveform, _ = torchaudio.load(audio_path)
+            waveform, file_sample_rate = torchaudio.load(audio_path)
+
+            # Resample if needed
+            if file_sample_rate != self.sample_rate:
+                waveform = torchaudio.functional.resample(
+                    waveform, file_sample_rate, self.sample_rate
+                )
 
             # Convert stereo to mono by averaging channels
             if waveform.shape[0] > 1:

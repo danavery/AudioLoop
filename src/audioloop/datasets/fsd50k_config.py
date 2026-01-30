@@ -28,7 +28,7 @@ def load_fsd50k_vocabulary(vocab_path: Path) -> dict[int, str]:
     with vocab_path.open("r") as f:
         reader = csv.reader(f)
         for row in reader:
-            class_id, class_name, mid = row
+            class_id, class_name, _mid = row
             vocabulary[int(class_id)] = class_name
     return vocabulary
 

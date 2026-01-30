@@ -67,7 +67,7 @@ def main():
 
     try:
         from app import app  # type: ignore[import-not-found]
-        print(f"Starting web UI at http://127.0.0.1:5000")
+        print("Starting web UI at http://127.0.0.1:5000")
         print(f"Project root: {project_root}")
         print()
         app.run(debug=True, host="127.0.0.1", port=5000)

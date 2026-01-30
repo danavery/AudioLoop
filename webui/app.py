@@ -25,7 +25,7 @@ PROJECT_ROOT = Path(os.environ.get("AUDIOLOOP_PROJECT_ROOT", Path(__file__).pare
 if "AUDIOLOOP_OUTPUT_ROOT" not in os.environ:
     os.environ["AUDIOLOOP_OUTPUT_ROOT"] = str(PROJECT_ROOT)
 
-from audioloop.label_audio import SimpleAudioLabeler
+from audioloop.label_audio import SimpleAudioLabeler  # noqa: E402
 
 # Use explicit paths for templates/static so Flask works from any directory
 WEBUI_DIR = Path(__file__).parent

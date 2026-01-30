@@ -270,7 +270,7 @@ class TemplateAudioConfig(DatasetConfig):
 
     def get_output_shape(self) -> tuple[int, ...]:
         """Get the shape of tensors produced by this dataset."""
-        return (self._n_mels, -1)  # -1 indicates variable time dimension
+        return (self.n_mels, -1)  # -1 indicates variable time dimension
 
     def parse_metadata_row(self, row: dict[str, str], split: str | None = None) -> dict[str, Any]:
         """Parse a single CSV row into standardized metadata format."""
@@ -301,7 +301,7 @@ class TemplateAudioConfig(DatasetConfig):
     def fix_spectrogram_length(self, spec: torch.Tensor) -> torch.Tensor:
         """Fix spectrogram length by cropping outliers but preserving natural variation."""
         current_length = spec.shape[-1]  # Time dimension is last
-        max_length = self._fixed_length  # Use as maximum, not target
+        max_length = self.fixed_length  # Use as maximum, not target
 
         # Only crop if it exceeds reasonable maximum (handles outliers)
         if current_length > max_length:

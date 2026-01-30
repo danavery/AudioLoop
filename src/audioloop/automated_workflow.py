@@ -251,7 +251,7 @@ def run_automated_workflow(
         # Step 2: Run active learning
         print("├─ Selecting candidates...")
         try:
-            predictions_file, candidates_file = run_active_learning_for_class(
+            _predictions_file, candidates_file = run_active_learning_for_class(
                 positive_class_name=class_name,
                 model_path=current_model,
                 dataset_name=config.dataset,

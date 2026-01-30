@@ -328,27 +328,27 @@ class TestActiveLearningParameters:
         """Test validation of range-bound active learning parameters."""
         # positive_percentage validation
         with pytest.raises(
-            ValueError, match="positive_percentage must be None or between 0.0 and 1.0"
+            ValueError, match=r"positive_percentage must be None or between 0\.0 and 1\.0"
         ):
             AudioLoopConfig(positive_percentage=-0.1)
 
         with pytest.raises(
-            ValueError, match="positive_percentage must be None or between 0.0 and 1.0"
+            ValueError, match=r"positive_percentage must be None or between 0\.0 and 1\.0"
         ):
             AudioLoopConfig(positive_percentage=1.1)
 
         # min_confidence validation
-        with pytest.raises(ValueError, match="min_confidence must be between 0.0 and 1.0"):
+        with pytest.raises(ValueError, match=r"min_confidence must be between 0\.0 and 1\.0"):
             AudioLoopConfig(min_confidence=-0.1)
 
-        with pytest.raises(ValueError, match="min_confidence must be between 0.0 and 1.0"):
+        with pytest.raises(ValueError, match=r"min_confidence must be between 0\.0 and 1\.0"):
             AudioLoopConfig(min_confidence=1.1)
 
         # estimated_positive_pct validation
-        with pytest.raises(ValueError, match="estimated_positive_pct must be between 0.0 and 1.0"):
+        with pytest.raises(ValueError, match=r"estimated_positive_pct must be between 0\.0 and 1\.0"):
             AudioLoopConfig(estimated_positive_pct=-0.1)
 
-        with pytest.raises(ValueError, match="estimated_positive_pct must be between 0.0 and 1.0"):
+        with pytest.raises(ValueError, match=r"estimated_positive_pct must be between 0\.0 and 1\.0"):
             AudioLoopConfig(estimated_positive_pct=1.1)
 
     def test_selection_mode_validation(self):
@@ -370,34 +370,34 @@ class TestActiveLearningParameters:
         """Test validation of basic transition parameters."""
         # f1_threshold validation
         with pytest.raises(
-            ValueError, match="basic_transition_f1_threshold must be between 0.0 and 1.0"
+            ValueError, match=r"basic_transition_f1_threshold must be between 0\.0 and 1\.0"
         ):
             AudioLoopConfig(basic_transition_f1_threshold=-0.1)
 
         with pytest.raises(
-            ValueError, match="basic_transition_f1_threshold must be between 0.0 and 1.0"
+            ValueError, match=r"basic_transition_f1_threshold must be between 0\.0 and 1\.0"
         ):
             AudioLoopConfig(basic_transition_f1_threshold=1.1)
 
         # confidence_threshold validation
         with pytest.raises(
-            ValueError, match="basic_transition_confidence_threshold must be between 0.0 and 1.0"
+            ValueError, match=r"basic_transition_confidence_threshold must be between 0\.0 and 1\.0"
         ):
             AudioLoopConfig(basic_transition_confidence_threshold=-0.1)
 
         with pytest.raises(
-            ValueError, match="basic_transition_confidence_threshold must be between 0.0 and 1.0"
+            ValueError, match=r"basic_transition_confidence_threshold must be between 0\.0 and 1\.0"
         ):
             AudioLoopConfig(basic_transition_confidence_threshold=1.1)
 
         # variance_threshold validation
         with pytest.raises(
-            ValueError, match="basic_transition_variance_threshold must be between 0.0 and 1.0"
+            ValueError, match=r"basic_transition_variance_threshold must be between 0\.0 and 1\.0"
         ):
             AudioLoopConfig(basic_transition_variance_threshold=-0.1)
 
         with pytest.raises(
-            ValueError, match="basic_transition_variance_threshold must be between 0.0 and 1.0"
+            ValueError, match=r"basic_transition_variance_threshold must be between 0\.0 and 1\.0"
         ):
             AudioLoopConfig(basic_transition_variance_threshold=1.1)
 
@@ -437,10 +437,10 @@ class TestActiveLearningParameters:
             AudioLoopConfig(precision_floor="invalid")
 
         # Invalid: float out of range
-        with pytest.raises(ValueError, match="precision_floor must be between 0.0 and 1.0"):
+        with pytest.raises(ValueError, match=r"precision_floor must be between 0\.0 and 1\.0"):
             AudioLoopConfig(precision_floor=-0.1)
 
-        with pytest.raises(ValueError, match="precision_floor must be between 0.0 and 1.0"):
+        with pytest.raises(ValueError, match=r"precision_floor must be between 0\.0 and 1\.0"):
             AudioLoopConfig(precision_floor=1.5)
 
         # Invalid: wrong type

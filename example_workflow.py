@@ -111,7 +111,7 @@ def run_complete_workflow(
         # Step 1: Run active learning cycle
         print("Step 1: Running active learning cycle...")
         try:
-            predictions_file, candidates_file = run_active_learning_for_class(
+            _predictions_file, candidates_file = run_active_learning_for_class(
                 positive_class_name=class_name,
                 model_path=current_model,
                 run_number=cycle,
