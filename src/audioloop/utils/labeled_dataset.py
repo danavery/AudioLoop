@@ -86,11 +86,6 @@ class LabeledDataset(torch.utils.data.Dataset):
 
 
 if __name__ == "__main__":
-    # Check available backends
-    print("Available torchaudio backends:")
-    print(f"  Current backend: {torchaudio.get_audio_backend()}")
-    print(f"  Available backends: {torchaudio.list_audio_backends()}")
-
     # Test with labels.csv
     dataset = LabeledDataset(labels_file="../../labels.csv")
     print(f"Dataset length: {len(dataset)}")
@@ -104,6 +99,3 @@ if __name__ == "__main__":
             print(f"Filename: {sample['filename']}")
         except Exception as e:
             print(f"Error loading audio: {e}")
-            print("Try setting a different backend:")
-            print("  torchaudio.set_audio_backend('sox_io')")
-            print("  or install soundfile: pip install soundfile")

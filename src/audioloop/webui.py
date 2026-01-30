@@ -66,7 +66,7 @@ def main():
     sys.path.insert(0, str(webui_dir))
 
     try:
-        from app import app
+        from app import app  # type: ignore[import-not-found]
         print(f"Starting web UI at http://127.0.0.1:5000")
         print(f"Project root: {project_root}")
         print()
