@@ -28,14 +28,14 @@ Basic Usage:
     config.get_predictions_path(1)  # outputs/test/predictions_v1.csv
 
 Class Weighting Modes:
-    # No weighting (default) - treats all classes equally
+    # Fixed weighting (default) - prevents model collapse with imbalanced training data
+    config = AudioLoopConfig(class_weighting=0.70)  # Target 70% positive weight
+
+    # No weighting - treats all classes equally (can collapse to all-positive)
     config = AudioLoopConfig(class_weighting=None)
 
     # Adaptive weighting - calculates inverse frequency from training set each cycle
     config = AudioLoopConfig(class_weighting="adaptive")
-
-    # Fixed weighting - maintains consistent target positive ratio across cycles
-    config = AudioLoopConfig(class_weighting=0.25)  # Target 25% positive samples
 
 Configuration Precedence:
     1. Explicit constructor parameters (highest priority)
@@ -93,7 +93,7 @@ class AudioLoopConfig:
     model_type: str = "cnn5layer"
     model_kwargs: dict[str, Any] = field(default_factory=dict)
     class_weighting: str | float | None = (
-        None  # "adaptive", float (target positive ratio 0.0-1.0), or None
+        0.70  # "adaptive", float (target positive ratio 0.0-1.0), or None
     )
 
     # Stopping criteria configuration (within-epoch)

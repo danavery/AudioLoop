@@ -59,7 +59,7 @@ DEFAULT_CONFIG = """\
 
 # Model
 # model_type: cnn5layer            # Available: cnn5layer, simple_cnn
-# class_weighting:                 # null, "adaptive", or float (0.0-1.0)
+# class_weighting: 0.70            # Options: null (none), "adaptive", or float (0.0-1.0)
 
 # ------------------------------------------------------------------------------
 # Learning Rate Scheduler

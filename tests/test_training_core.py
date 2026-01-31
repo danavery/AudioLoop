@@ -12,10 +12,10 @@ from audioloop.config import AudioLoopConfig
 class TestClassWeightingConfig:
     """Test class weighting configuration."""
 
-    def test_class_weighting_disabled_by_default(self):
-        """Test that class weighting is disabled by default."""
+    def test_class_weighting_default(self):
+        """Test that class weighting defaults to 0.70."""
         config = AudioLoopConfig()
-        assert config.class_weighting is None
+        assert config.class_weighting == 0.70
 
     def test_class_weighting_adaptive_mode(self):
         """Test that adaptive class weighting can be enabled."""
