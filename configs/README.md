@@ -179,7 +179,7 @@ These parameters configure the AudioLoop experiment (all `AudioLoopConfig` datac
 - `weight_decay`: L2 regularization (default: 1e-5)
 - `seed`: Random seed for reproducibility (default: 42)
 - `model_type`: Model architecture (default: `cnn5layer`)
-- `class_weighting`: Class weighting mode (`null`, `"adaptive"`, or float 0.0-1.0)
+- `class_weighting`: Class weighting mode (default: 0.70; options: `null`, `"adaptive"`, or float 0.0-1.0)
 
 #### Learning Rate Scheduler
 - `use_lr_scheduler`: Enable ReduceLROnPlateau (default: true)

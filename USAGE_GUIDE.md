@@ -4,16 +4,37 @@ Complete command reference for AudioLoop's CLI tools and practical usage pattern
 
 ## Installation and Setup
 
+AudioLoop is installed once in a fixed location, then used from separate project directories.
+
+### Install AudioLoop (One-Time)
+
 ```bash
-# Install AudioLoop
-git clone <repository>
-cd audioloop
+# Clone to a permanent location
+git clone <repository> ~/tools/audioloop
+cd ~/tools/audioloop
 uv sync
 
-# Install with web UI support
-uv sync --extra webui
+# Recommended: Add activation alias to ~/.bashrc or ~/.zshrc
+echo 'alias al="source ~/tools/audioloop/.venv/bin/activate"' >> ~/.bashrc
+```
 
-# Environment setup (optional)
+### Create a Project Directory (Per Classification Task)
+
+```bash
+# Activate audioloop
+source ~/tools/audioloop/.venv/bin/activate  # Or: al
+
+# Create and initialize project
+mkdir ~/projects/my-classifier
+cd ~/projects/my-classifier
+python -m audioloop.init_project
+```
+
+### Environment Variables (Optional)
+
+Set defaults in your shell or project's `audioloop.yaml`:
+
+```bash
 export AUDIOLOOP_DATASET=urbansound8k      # Default dataset
 export AUDIOLOOP_DATA_ROOT=/custom/data    # Custom data directory
 export AUDIOLOOP_OUTPUT_ROOT=/custom/out   # Custom output directory
@@ -274,11 +295,10 @@ python -m audioloop.train --list-models
 ```
 
 **Class Weighting Modes:**
-- **No weighting** (default): Omit the flag - treats all classes equally
+- **Fixed 0.70** (default): Prevents model collapse with imbalanced training data
 - **Adaptive** (`--class-weighting adaptive`): Calculates inverse frequency from current training set ratio each cycle
-- **Fixed** (`--class-weighting 0.25`): Maintains consistent target positive ratio (0.0-1.0) across all cycles
-  - Use when F1 scores oscillate wildly between cycles
-  - Set to your estimated positive class percentage (e.g., 0.05 for 5% positive, 0.25 for 25% positive)
+- **No weighting** (`--class-weighting null`): Treats all classes equally (can collapse to all-positive predictions)
+- **Custom fixed** (`--class-weighting 0.25`): Set a specific target positive ratio (0.0-1.0)
 
 ## Active Learning
 
@@ -373,14 +393,12 @@ python -m audioloop.active_learning --class-name dog_bark --run-number 1 \
 
 ### Web UI (Recommended)
 ```bash
-# Install web UI dependencies
-uv sync --extra webui
-
-# Start web labeling interface
-cd webui && python app.py
+# From your project directory, start the web labeling interface
+cd ~/projects/my-classifier
+python -m audioloop.webui
 
 # Open browser to http://127.0.0.1:5000
-# Load: outputs/labeling_candidates_v1.csv
+# Select candidate file from dropdown (auto-populated from outputs/)
 # Features: Visual interface, audio player, keyboard shortcuts, progress tracking
 ```
 
@@ -538,7 +556,7 @@ python -m audioloop.automated_workflow --class-name Siren --cycles 20 --cycle-st
 --positive-pct FLOAT          # Stratify candidates by prediction (0.0-1.0, default: None, incompatible with mixed_entropy)
 --selection-mode {confidence,entropy,mixed_entropy,basic_transition}  # Selection strategy (default: entropy)
 --cycle-stopping-strategy {none,label,search}  # Cycle stopping strategy (default: none)
---class-weighting {adaptive,0.0-1.0}  # Class weighting mode (default: none)
+--class-weighting {adaptive,null,0.0-1.0}  # Class weighting mode (default: 0.70)
 --experiment EXPERIMENT       # Experiment name for organization
 --seed SEED                   # Random seed for reproducibility
 ```

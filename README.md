@@ -4,20 +4,39 @@ AudioLoop is an active learning framework for binary audio classification that m
 
 ## Quick Start
 
+AudioLoop is installed once and used from separate project directories for each classification task.
+
+### 1. Install AudioLoop (One-Time)
+
 ```bash
-# Install dependencies
+# Clone to a permanent location
+git clone <repository> ~/tools/audioloop
+cd ~/tools/audioloop
+
+# Install with uv (recommended)
 uv sync
 
-# Initialize project directory (creates audioloop.yaml and folders)
+# Optional: Add alias to ~/.bashrc or ~/.zshrc for easy activation
+echo 'alias al="source ~/tools/audioloop/.venv/bin/activate"' >> ~/.bashrc
+```
+
+### 2. Create a Project (Per Classification Task)
+
+```bash
+# Activate audioloop (or use your alias: al)
+source ~/tools/audioloop/.venv/bin/activate
+
+# Create and initialize a new project directory
+mkdir ~/projects/my-audio-classifier
+cd ~/projects/my-audio-classifier
 python -m audioloop.init_project
 
-# Generate spectrograms (one-time setup)
+# Download dataset (FSD50K or UrbanSound8K) into data/
+# Then generate spectrograms
 python -m audioloop.create_specs
 
-# Create initial training set
+# Create initial training set and run
 python -m audioloop.utils.create_bootstrap_set --class-name Drill --n 50
-
-# Run automated workflow
 python -m audioloop.automated_workflow --class-name Drill --cycles 3 --evaluation-mode --auto-label
 ```
 
@@ -121,34 +140,68 @@ For detailed usage instructions, see **[USAGE_GUIDE.md](USAGE_GUIDE.md)**.
 
 ## Getting Started
 
-1. **Installation**:
-  Audioloop is in early alpha; installation has been tested with Python 3.11 using either uv or a system Python virtual environment.
+AudioLoop requires Python 3.11+ and is installed once, then used from separate project directories.
 
-   With uv (recommended):
-   ```bash
-    uv python install 3.11 # install a compatible python (optional)
-    uv venv .venv
-    source .venv/bin/activate
-    uv pip install -e .
-   ```
+### Step 1: Install AudioLoop (One-Time)
 
-   Otherwise:
-   ```bash
-    python3 -m venv .venv
-    source .venv/bin/activate
-    python -m pip install -e .
-   ```
+Choose a permanent location for the audioloop installation:
 
-2. **Prepare Data**:
-   - Download UrbanSound8K or FSD50K dataset
-   - Generate spectrograms: `python -m audioloop.create_specs`
+**With uv (recommended):**
+```bash
+git clone <repository> ~/tools/audioloop
+cd ~/tools/audioloop
+uv python install 3.11  # Optional: install Python 3.11 if needed
+uv sync
+```
 
-3. **Run Example**:
-   ```bash
-   python -m audioloop.automated_workflow --class-name siren --cycles 2 --evaluation-mode --auto-label
-   ```
+**With pip:**
+```bash
+git clone <repository> ~/tools/audioloop
+cd ~/tools/audioloop
+python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -e .
+```
 
-4. **Explore**: See detailed guides below for specific workflows
+**Recommended:** Add a shell alias for easy activation:
+```bash
+# Add to ~/.bashrc or ~/.zshrc
+alias al='source ~/tools/audioloop/.venv/bin/activate'
+```
+
+### Step 2: Create a Project Directory
+
+Each classification task gets its own directory. Activate audioloop first, then initialize:
+
+```bash
+source ~/tools/audioloop/.venv/bin/activate  # Or just: al
+
+mkdir ~/projects/siren-detector
+cd ~/projects/siren-detector
+python -m audioloop.init_project
+```
+
+This creates the project structure (`data/`, `outputs/`, `training_sets/`, `audioloop.yaml`).
+
+### Step 3: Prepare Data
+
+Download your dataset and place audio files in the project's `data/` directory, then generate spectrograms:
+
+```bash
+# With audioloop activated, from your project directory:
+python -m audioloop.create_specs --dataset urbansound8k
+```
+
+### Step 4: Run Your First Workflow
+
+```bash
+python -m audioloop.utils.create_bootstrap_set --class-name siren --n 50
+python -m audioloop.automated_workflow --class-name siren --cycles 2 --evaluation-mode --auto-label
+```
+
+### Step 5: Explore
+
+See the detailed guides below for specific workflows and advanced usage.
 
 ## Documentation
 
@@ -178,9 +231,8 @@ For detailed usage instructions, see **[USAGE_GUIDE.md](USAGE_GUIDE.md)**.
 ## Dependencies
 
 - **PyTorch**: Neural network training and inference
-- **TorchAudio**: Audio processing and spectrogram generation  
+- **TorchAudio + TorchCodec**: Audio processing and spectrogram generation
 - **NumPy**: Numerical operations
-- **SoundFile**: Audio file I/O
 - **TQDM**: Progress tracking
 - **Ruff**: Code formatting and linting
 

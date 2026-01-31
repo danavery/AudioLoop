@@ -275,7 +275,6 @@ filename,prediction,predicted_class,confidence,needs_human_label,entropy,prob_ne
 - **PyTorch**: Neural network training and inference
 - **TorchAudio**: Audio processing and spectrogram generation
 - **NumPy**: Numerical operations
-- **SoundFile**: Audio file I/O
 - **TQDM**: Progress bars
 - **Ruff**: Code formatting and linting
 
@@ -343,25 +342,25 @@ AudioLoop supports three class weighting modes for handling imbalanced datasets:
 ```python
 from audioloop.config import AudioLoopConfig
 
-# No weighting (default) - treats all classes equally
+# Fixed weighting (default) - prevents model collapse with imbalanced training data
+config = AudioLoopConfig(class_weighting=0.70)  # Target 70% positive weight
+
+# No weighting - treats all classes equally (can collapse to all-positive predictions)
 config = AudioLoopConfig(class_weighting=None)
 
 # Adaptive weighting - calculates inverse frequency from training set each cycle
 config = AudioLoopConfig(class_weighting="adaptive")
-
-# Fixed weighting - maintains consistent target positive ratio across cycles
-config = AudioLoopConfig(class_weighting=0.25)  # Target 25% positive
 ```
 
 **Implementation**: The `class_weighting` parameter is a unified setting that replaced the previous boolean `use_class_weighting` flag, enabling experimentation with fixed target ratios:
-- `None`: Standard CrossEntropyLoss without weights
+- `float` (0.0-1.0): Fixed weights as `weight_positive = (1.0 - target) / target` (default: 0.70)
 - `"adaptive"`: Weights calculated as `total_samples / (num_classes * class_counts)` each cycle
-- `float` (0.0-1.0): Fixed weights as `weight_positive = (1.0 - target) / target`
+- `None`: Standard CrossEntropyLoss without weights
 
 **When to Use**:
-- **No weighting**: Balanced datasets or as baseline for comparison
-- **Adaptive**: Naturally imbalanced data where training set ratio should match
-- **Fixed**: When F1 scores oscillate between cycles due to ratio drift (experimental)
+- **Fixed 0.70 (default)**: Recommended for most active learning scenarios; prevents model collapse when training set is imbalanced
+- **Adaptive**: When training set composition closely matches real-world distribution
+- **No weighting**: Only for naturally balanced datasets or baseline comparisons
 
 ### Dataset Extensibility
 AudioLoop supports adding custom datasets through a simple file-based convention with automatic discovery:
