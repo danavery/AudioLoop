@@ -322,29 +322,71 @@ class AudioLabelingInterface {
                     label: label
                 })
             });
-            
+
             const result = await response.json();
-            
+
             if (result.error) {
                 this.showError(result.error);
                 return;
             }
-            
+
             // Success - update display and auto-advance
             const labelText = label === '1' ? 'Positive' : 'Negative';
             this.showSuccess(`Labeled as ${labelText}`);
-            
+
+            // Check if all samples are now labeled
+            if (result.labeled_count === result.total) {
+                this.showCompletionState();
+                return;
+            }
+
             // Auto-advance to next sample
             if (this.currentIndex < this.totalCandidates - 1) {
                 await this.navigateTo(this.currentIndex + 1);
             } else {
-                // Refresh current to show updated label
-                await this.loadCurrentCandidate();
+                // At end - jump to first unlabeled if any
+                await this.jumpToNextUnlabeled();
             }
-            
+
         } catch (error) {
             this.showError('Failed to save label: ' + error.message);
         }
+    }
+
+    showCompletionState() {
+        // Stop any playing audio
+        this.stopAudio();
+
+        // Update progress to show 100%
+        this.elements.progressBar.style.width = '100%';
+        this.elements.progressBar.textContent = '100%';
+        this.elements.progressBar.classList.remove('bg-primary');
+        this.elements.progressBar.classList.add('bg-success');
+        this.elements.progressDetails.textContent = `${this.totalCandidates} / ${this.totalCandidates} labeled`;
+
+        // Show completion message in candidate info area
+        this.elements.candidateInfo.innerHTML = `
+            <div class="text-center py-4">
+                <h2 class="text-success mb-3">🎉 All Done!</h2>
+                <p class="lead">You've labeled all ${this.totalCandidates} candidates.</p>
+                <p class="text-muted">Don't forget to save your labels before closing.</p>
+                <button class="btn btn-success btn-lg mt-3" onclick="document.getElementById('saveBtn').click()">
+                    💾 Save Labels
+                </button>
+            </div>
+        `;
+
+        // Update current label display
+        this.elements.currentLabel.textContent = 'Complete!';
+        this.elements.currentLabel.className = 'badge bg-success fs-6';
+
+        // Disable labeling buttons (no more to label)
+        this.elements.positiveBtn.disabled = true;
+        this.elements.negativeBtn.disabled = true;
+        this.elements.nextUnlabeledBtn.disabled = true;
+
+        // Show persistent success message
+        this.showSuccess('All candidates labeled! Remember to save.');
     }
     
     async navigateTo(index) {

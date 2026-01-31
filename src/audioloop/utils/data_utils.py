@@ -70,6 +70,9 @@ def variable_length_collate_fn(batch):
     if any("original_class" in item for item in batch):
         result["original_class"] = [item.get("original_class") for item in batch]
 
+    if any("audio_path" in item for item in batch):
+        result["audio_path"] = [item.get("audio_path") for item in batch]
+
     return result
 
 

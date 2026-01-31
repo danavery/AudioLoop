@@ -241,7 +241,18 @@ def label_candidate():
     current_labeler.candidates[index]["needs_human_label"] = label
     current_labeler.changes_made = True
 
-    return jsonify({"success": True, "label": label})
+    # Calculate progress for completion check
+    labeled_count = sum(
+        1 for c in current_labeler.candidates if c.get("needs_human_label", "").strip() != ""
+    )
+    total = len(current_labeler.candidates)
+
+    return jsonify({
+        "success": True,
+        "label": label,
+        "labeled_count": labeled_count,
+        "total": total
+    })
 
 
 @app.route("/api/save", methods=["POST"])
