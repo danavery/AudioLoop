@@ -2,7 +2,7 @@ import csv
 import os
 
 import torch
-import torchaudio
+from torchcodec.decoders import AudioDecoder
 
 
 class LabeledDataset(torch.utils.data.Dataset):
@@ -68,8 +68,8 @@ class LabeledDataset(torch.utils.data.Dataset):
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"Audio file not found: {filepath}")
 
-        waveform, _sample_rate = torchaudio.load(filepath)
-        data = waveform
+        decoder = AudioDecoder(filepath, num_channels=1)
+        data = decoder.get_all_samples().data
         filename = os.path.basename(filepath)
 
         # Apply transform if provided

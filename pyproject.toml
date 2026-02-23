@@ -29,8 +29,8 @@ dependencies = [
     "pytest>=8.4.1",
     "pyyaml>=6.0",
     "ruff",
-    "torch>=2.7.1",
-    "torchaudio>=2.7.1",
+    "torch>=2.10.0",
+    "torchaudio>=2.10.0",
     "torchcodec>=0.10.0",
     "tqdm>=4.67.1",
 ]

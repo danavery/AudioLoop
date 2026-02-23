@@ -139,12 +139,8 @@ class TestLazySpectrogramGeneration:
         )
 
         # Mock the audio file existence and loading
-        with (
-            patch("pathlib.Path.exists", return_value=True),
-            patch("torchaudio.load") as mock_load,
-        ):
-            mock_load.return_value = (torch.randn(1, 16000), 44100)
-
+        mock_config.load_audio.return_value = torch.randn(1, 16000)
+        with patch("pathlib.Path.exists", return_value=True):
             # Mock the transform
             mock_transform = mock_config.create_spectrogram_transform.return_value
             mock_transform.return_value = torch.randn(1, 128, 100)
@@ -184,15 +180,13 @@ class TestLazySpectrogramGeneration:
         )
 
         # Mock the audio loading
+        mock_config.load_audio.return_value = torch.randn(1, 16000)
         with (
             patch("pathlib.Path.exists", return_value=True),
-            patch("torchaudio.load") as mock_load,
             patch("audioloop.utils.spectrogram_dataset.os.path.exists", return_value=False),
             patch("audioloop.utils.spectrogram_dataset.os.makedirs"),
             patch("audioloop.utils.spectrogram_dataset.torch.save") as mock_save,
         ):
-            mock_load.return_value = (torch.randn(1, 16000), 44100)
-
             # Mock the transform
             mock_transform = mock_config.create_spectrogram_transform.return_value
             mock_transform.return_value = spec_data
@@ -249,28 +243,24 @@ class TestLazySpectrogramGeneration:
             csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=mock_config
         )
 
-        # Mock stereo audio loading
+        # Mock audio loading - load_audio returns mono since torchcodec handles conversion
+        mock_config.load_audio.return_value = torch.randn(1, 16000)
         with (
             patch("pathlib.Path.exists", return_value=True),
-            patch("torchaudio.load") as mock_load,
             patch("audioloop.utils.spectrogram_dataset.os.path.exists", return_value=False),
             patch("audioloop.utils.spectrogram_dataset.torch.save"),
         ):
-            # Return stereo audio (2 channels)
-            stereo_audio = torch.randn(2, 16000)
-            mock_load.return_value = (stereo_audio, 44100)
-
             # Mock the transform to check what it receives
             mock_transform = mock_config.create_spectrogram_transform.return_value
 
             def check_mono(waveform):
-                # Should receive mono (1 channel)
+                # Should receive mono (1 channel) from load_audio
                 assert waveform.shape[0] == 1
                 return torch.randn(1, 128, 100)
 
             mock_transform.side_effect = check_mono
 
-            # Should convert stereo to mono
+            # Should receive mono audio from load_audio
             _ = dataset[0]
 
 
@@ -457,11 +447,8 @@ class TestDatasetConfigIntegration:
         )
 
         # Mock audio loading
-        with (
-            patch("pathlib.Path.exists", return_value=True),
-            patch("torchaudio.load") as mock_load,
-        ):
-            mock_load.return_value = (torch.randn(1, 16000), 44100)
+        mock_config.load_audio.return_value = torch.randn(1, 16000)
+        with patch("pathlib.Path.exists", return_value=True):
             mock_transform = mock_config.create_spectrogram_transform.return_value
             mock_transform.return_value = spec_data
 
