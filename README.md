@@ -216,7 +216,6 @@ See the detailed guides below for specific workflows and advanced usage.
 - **[docs/candidate_selection_explained.md](docs/candidate_selection_explained.md)**: Deep dive into selection strategies
 
 **Specialized Topics:**
-- **[FSD50K_INTEGRATION.md](FSD50K_INTEGRATION.md)**: FSD50K dataset integration guide
 - **[docs/stopping_criteria_guide.md](docs/stopping_criteria_guide.md)**: Training stopping criteria
 - **[docs/cycle_stopping_criteria.md](docs/cycle_stopping_criteria.md)**: Active learning cycle stopping strategies
 - **[docs/shape_compatibility_and_variable_lengths.md](docs/shape_compatibility_and_variable_lengths.md)**: Variable-length spectrogram support

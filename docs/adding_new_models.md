@@ -42,7 +42,7 @@ AudioLoop models are standard PyTorch modules with two additional methods: one f
 
 ### Step 1: Create Your Model Class
 
-Create a new file in `audioloop/audioloop/models/` (e.g., `my_model.py`):
+Create a new file in `src/audioloop/models/` (e.g., `my_model.py`):
 
 ```python
 import torch

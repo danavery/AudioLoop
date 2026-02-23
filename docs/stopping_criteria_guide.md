@@ -85,22 +85,22 @@ for epoch in range(1000):
 
 ## Integration with AudioLoop
 
-The stopping criteria integrate with AudioLoop's training system through the `train.py` module:
+The stopping criteria integrate with AudioLoop's training system through the config:
 
 ```python
-from audioloop.utils.stopping_criteria import PlateauCriterion
+from audioloop.config import AudioLoopConfig
 from audioloop.training_core import run_training
 
-# Use custom stopping criterion
-stopping_criterion = PlateauCriterion(patience=30, min_delta=0.01, accuracy_floor=0.9)
-
-# Pass to training function
-run_training(
-    dataset,
-    model,
-    stopping_criterion=stopping_criterion,
-    # ... other parameters
+# Configure stopping criterion via config
+config = AudioLoopConfig(
+    stopping_criterion_type="plateau",
+    patience=30,
+    min_delta=0.01,
+    accuracy_floor=0.9,
 )
+
+# Training creates the criterion from config automatically
+run_training(config, labels_file="training_sets/training_set_v1.csv", version=1)
 ```
 
 **CLI Usage:**
@@ -368,8 +368,8 @@ def test_custom_criterion():
 
 The AudioLoop codebase includes several examples of stopping criteria usage:
 
-1. **Default Training**: Uses `AccuracyCriterion` with 1000 max epochs
-2. **Plateau Detection**: Uses `PlateauCriterion` for longer training sessions
+1. **Default Training**: Uses `PlateauCriterion` (the default stopping criterion)
+2. **Simple Training**: Uses `AccuracyCriterion` for training to 100% accuracy
 3. **Custom Workflows**: See `automated_workflow.py` for advanced usage patterns
 
 ## API Reference

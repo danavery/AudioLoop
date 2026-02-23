@@ -245,12 +245,9 @@ When training on limited data, models often become overconfident, assigning conf
 
 The randomization ensures that when multiple samples have identical scores, they're selected randomly rather than in file order.
 
-## Alternative Strategies (Not Currently Implemented)
+## Potential Future Strategies
 
 Other active learning strategies that could be added:
-1. **Uncertainty Sampling**: Select samples with highest entropy
-2. **Margin Sampling**: Select samples closest to decision boundary
-3. **Diversity Sampling**: Ensure selected samples are different from each other
-4. **Expected Model Change**: Select samples that would most change the model
-
-The current high-confidence strategy with randomization is simple and effective for audio classification tasks where human verification of confident predictions helps build reliable models.
+1. **Margin Sampling**: Select samples closest to decision boundary
+2. **Diversity Sampling**: Ensure selected samples are different from each other
+3. **Expected Model Change**: Select samples that would most change the model

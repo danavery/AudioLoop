@@ -304,16 +304,14 @@ The automated workflow displays detailed metrics each cycle. Watch for:
 ### 6. Ensemble Training (Future)
 When ensemble training is implemented, candidate metrics should become more stable. Consider revisiting automated stopping at that point.
 
-## Experimental: Mixed Sampling
+## Mixed Sampling
 
-**Status:** Not yet implemented, under consideration
-
-Current pure high-entropy sampling focuses only on boundary cases. Mixed sampling would include:
-- 60-70% high-entropy (boundary cases for learning)
-- 20-30% medium-entropy (challenging but not boundary)
+Mixed-entropy sampling is now available as the `mixed_entropy` selection strategy. It samples across multiple entropy levels:
+- 70% high-entropy (boundary cases for learning)
+- 20% medium-entropy (challenging but not boundary)
 - 10% low-entropy (confident predictions as sanity check)
 
-This could improve metric stability and correlation with corpus performance.
+See [candidate_selection_explained.md](candidate_selection_explained.md) for full details on the mixed-entropy strategy.
 
 ## Troubleshooting
 
@@ -393,7 +391,7 @@ if criterion and criterion.should_stop(current_cycle):
 4. Should we use different metrics (accuracy instead of F1) for stopping decisions?
 
 ### Planned Improvements
-- [ ] Implement mixed-entropy sampling option
+- [x] Implement mixed-entropy sampling option
 - [ ] Add ensemble training support
 - [ ] Track additional signals (entropy distribution, prediction changes)
 - [ ] Conduct systematic experiments on metric correlation

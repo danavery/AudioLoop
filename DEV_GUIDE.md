@@ -703,8 +703,8 @@ Audio is converted to variable-length mel-spectrograms with log normalization, s
 ### Pluggable Training Stopping Criteria
 AudioLoop uses a Strategy pattern for training stopping decisions:
 - **Architecture**: Abstract base class `TrainingStoppingCriterion` with pluggable implementations
-- **Default Behavior**: `HybridStoppingCriterion` adaptively switches between accuracy and plateau modes based on training behavior
-- **Strategy Classes**: `AccuracyCriterion`, `PlateauCriterion`, `HybridStoppingCriterion`
+- **Default Behavior**: `PlateauCriterion` stops when training loss plateaus, with optional accuracy floor
+- **Strategy Classes**: `AccuracyCriterion`, `PlateauCriterion`
 - **Extensibility**: Easy to add early stopping, plateau detection, or custom criteria
 - **Interface**: `should_stop(epoch, train_accuracy, train_loss, val_accuracy, val_loss) -> bool`
 - **State Management**: `reset()` method for stateful criteria like early stopping
@@ -741,33 +741,32 @@ The `set_seed()` function controls:
 - PyTorch CUDA RNG (GPU operations)
 - CUDNN deterministic mode (consistent GPU behavior)
 
-### Adaptive Hybrid Stopping Strategy (Default)
-The `HybridStoppingCriterion` addresses the challenge where training can get stuck at high accuracy (95-99%) without reaching perfect accuracy:
-- **Starts with accuracy-based stopping**: Waits for 100% accuracy to handle erratic early training
-- **Monitors high accuracy plateau**: If accuracy ≥ 95% for multiple epochs without reaching 100%
-- **Switches to plateau-based stopping**: Efficiently stops when stuck at high accuracy
-- **Behavior-driven switching**: Based on actual training dynamics, not arbitrary thresholds
+### Plateau Stopping with Accuracy Floor (Default)
+The `PlateauCriterion` with an optional `accuracy_floor` addresses the challenge where training can get stuck at high accuracy (95-99%) without reaching perfect accuracy:
+- **Monitors training loss**: Stops when loss stops improving for `patience` epochs
+- **Accuracy floor**: Only counts patience when accuracy is above the floor threshold
+- **Prevents premature stopping**: Ignores plateaus during early erratic training
+- **Configurable thresholds**: Tune patience, min_delta, and accuracy floor per task
 
 Example usage:
 ```python
-from audioloop.utils.stopping_criteria import HybridStoppingCriterion
+from audioloop.utils.stopping_criteria import PlateauCriterion
 
 # Default configuration (recommended for most audio tasks)
-criterion = HybridStoppingCriterion()
+criterion = PlateauCriterion()
 
-# Custom configuration for different training behaviors
-criterion = HybridStoppingCriterion(
-    high_accuracy_threshold=0.9,    # Switch threshold (90% vs 95%)
-    high_accuracy_patience=10,      # Epochs to wait at high accuracy
-    plateau_patience=30,            # Plateau detection patience
+# With accuracy floor to prevent early stopping
+criterion = PlateauCriterion(
+    accuracy_floor=0.90,    # Only count patience when accuracy >= 90%
+    patience=30,            # Epochs to wait without improvement
+    min_delta=0.01,         # Minimum improvement threshold
     max_epochs=1000
 )
 ```
 
 ### Available Stopping Criteria
-- **`HybridStoppingCriterion`** (default): Adaptive switching from accuracy to plateau mode
+- **`PlateauCriterion`** (default): Stops when loss plateaus, with optional accuracy floor
 - **`AccuracyCriterion`**: Stops at 100% accuracy or max epochs
-- **`PlateauCriterion`**: Stops when loss plateaus (early stopping)
 
 ## Related Documentation
 
@@ -776,6 +775,5 @@ For specific guides, see:
 - **[docs/candidate_selection_explained.md](docs/candidate_selection_explained.md)**: Deep dive into selection strategies
 - **[docs/stopping_criteria_guide.md](docs/stopping_criteria_guide.md)**: Training stopping criteria
 - **[docs/shape_compatibility_and_variable_lengths.md](docs/shape_compatibility_and_variable_lengths.md)**: Variable-length spectrogram support
-- **[FSD50K_INTEGRATION.md](FSD50K_INTEGRATION.md)**: FSD50K dataset integration
 - **[LABELING_GUIDE.md](LABELING_GUIDE.md)**: Audio labeling best practices
 - **[webui/README.md](webui/README.md)**: Web-based labeling interface

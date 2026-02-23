@@ -227,7 +227,7 @@ python -m audioloop.utils.create_bootstrap_set --class-name siren --n 40 --exper
 
 **Bootstrap Set Parameters:**
 ```bash
---dataset {urbansound8k,fsd50k} # Dataset to use (overrides AUDIOLOOP_DATASET)
+--dataset {urbansound8k,fsd50k,audioset} # Dataset to use (overrides AUDIOLOOP_DATASET)
 --class-name CLASS_NAME         # Class name for positive samples
 --n N                          # Total number of samples (default: 40)
 --positive-pct POSITIVE_PCT    # Percentage positive (default: 0.75)
@@ -261,13 +261,12 @@ python -m audioloop.train training_sets/training_set_v1.csv --experiment myexp
 python -m audioloop.train training_sets/training_set_v1.csv --seed 123
 
 # Train with specific stopping criterion
-python -m audioloop.train training_sets/training_set_v1.csv --stopping-criterion hybrid
-python -m audioloop.train training_sets/training_set_v1.csv --stopping-criterion accuracy
 python -m audioloop.train training_sets/training_set_v1.csv --stopping-criterion plateau --patience 30
+python -m audioloop.train training_sets/training_set_v1.csv --stopping-criterion accuracy
 
-# Custom hybrid stopping parameters
-python -m audioloop.train training_sets/training_set_v1.csv --stopping-criterion hybrid \
-  --high-accuracy-threshold 0.9 --high-accuracy-patience 15 --patience 25
+# Plateau with accuracy floor (only count patience when accuracy >= threshold)
+python -m audioloop.train training_sets/training_set_v1.csv --stopping-criterion plateau \
+  --accuracy-floor 0.90 --patience 25
 
 # Train with custom model
 python -m audioloop.train training_sets/training_set_v1.csv --model-type simple_cnn
@@ -286,9 +285,9 @@ python -m audioloop.train --list-models
 --batch-size 32               # Training batch size
 --learning-rate 0.001         # Learning rate
 --seed 42                     # Random seed for reproducibility
---stopping-criterion {accuracy,plateau,hybrid}  # Stopping strategy
---patience N                  # Epochs to wait for improvement (plateau/hybrid)
---high-accuracy-threshold 0.95  # Threshold for hybrid criterion
+--stopping-criterion {accuracy,plateau}  # Stopping strategy (default: plateau)
+--patience N                  # Epochs to wait for improvement (plateau)
+--accuracy-floor 0.95         # Only count patience when accuracy >= threshold (plateau)
 --model-type MODEL_TYPE       # Model architecture to use
 --class-weighting {adaptive,0.0-1.0}  # Class weighting mode (see below)
 --experiment EXPERIMENT       # Experiment name for organization
@@ -482,21 +481,6 @@ python -m audioloop.track_metrics --experiment myexp --plot
 # Mixed mode: Handles files with and without ground truth gracefully
 ```
 
-### Output Management
-```bash
-# Analyze what files can be cleaned (dry run)
-python -m audioloop.clean_outputs
-
-# Clean safe files (removes example/demo files, keeps workflow files)
-python -m audioloop.clean_outputs --clean
-
-# Clean without confirmation
-python -m audioloop.clean_outputs --clean --force
-
-# Move misplaced training files to training_sets/
-python -m audioloop.clean_outputs --move-training
-```
-
 ## Automated Workflows
 
 ### Automated Workflow (Recommended)
@@ -550,7 +534,7 @@ python -m audioloop.automated_workflow --class-name Siren --cycles 20 --cycle-st
 --cycles N                    # Number of active learning cycles (default: 3)
 --evaluation-mode             # Enable evaluation mode with ground truth access
 --auto-label                  # Use ground truth for automatic labeling (requires --evaluation-mode)
---dataset {urbansound8k,fsd50k}  # Dataset choice
+--dataset {urbansound8k,fsd50k,audioset}  # Dataset choice
 --epochs N                    # Max training epochs per cycle (default: 1000)
 --candidates N                # Number of candidates per cycle (default: 50)
 --positive-pct FLOAT          # Stratify candidates by prediction (0.0-1.0, default: None, incompatible with mixed_entropy)
@@ -638,8 +622,8 @@ filename,prediction,predicted_class,confidence,needs_human_label,entropy,prob_ne
 
 ```bash
 # Format and lint code
-ruff check audioloop/
-ruff format audioloop/
+ruff check src/audioloop/
+ruff format src/audioloop/
 
 # List available models
 python -m audioloop.train --list-models

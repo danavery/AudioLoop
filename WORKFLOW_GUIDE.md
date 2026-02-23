@@ -323,7 +323,7 @@ training_sets/
 - Alternative: Use adaptive weighting for balanced classes or no weighting as baseline
   ```bash
   --class-weighting adaptive  # Adapts to current training set ratio
-  # (omit flag for no weighting)
+  --class-weighting null      # No weighting (default is 0.70 fixed)
   ```
 
 ### Debugging Strategies
