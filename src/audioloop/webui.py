@@ -50,9 +50,7 @@ def main():
         port = int(os.environ.get("AUDIOLOOP_WEBUI_PORT", DEFAULT_PORT))
     else:
         # Parse command-line arguments
-        parser = argparse.ArgumentParser(
-            description="Launch the AudioLoop web labeling interface"
-        )
+        parser = argparse.ArgumentParser(description="Launch the AudioLoop web labeling interface")
         parser.add_argument(
             "--host",
             default=DEFAULT_HOST,

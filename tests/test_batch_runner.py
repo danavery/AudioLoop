@@ -206,7 +206,6 @@ config:
         Run manually with: pytest -v tests/test_batch_runner.py::TestBatchRunnerIntegration::test_full_batch_run -s
         """
 
-
         # This would require actual dataset files, so we skip by default
         # To run this test manually, you'd need proper setup
         pass

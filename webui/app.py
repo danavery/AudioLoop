@@ -247,12 +247,9 @@ def label_candidate():
     )
     total = len(current_labeler.candidates)
 
-    return jsonify({
-        "success": True,
-        "label": label,
-        "labeled_count": labeled_count,
-        "total": total
-    })
+    return jsonify(
+        {"success": True, "label": label, "labeled_count": labeled_count, "total": total}
+    )
 
 
 @app.route("/api/save", methods=["POST"])

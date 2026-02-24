@@ -184,6 +184,7 @@ class AudiosetConfig(DatasetConfig):
 
         audio_files = []
         import csv as csv_module
+
         with csv_path.open("r") as f:
             reader = csv_module.reader(f, skipinitialspace=True)
             for row in reader:

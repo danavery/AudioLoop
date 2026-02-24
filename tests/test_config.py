@@ -345,10 +345,14 @@ class TestActiveLearningParameters:
             AudioLoopConfig(min_confidence=1.1)
 
         # estimated_positive_pct validation
-        with pytest.raises(ValueError, match=r"estimated_positive_pct must be between 0\.0 and 1\.0"):
+        with pytest.raises(
+            ValueError, match=r"estimated_positive_pct must be between 0\.0 and 1\.0"
+        ):
             AudioLoopConfig(estimated_positive_pct=-0.1)
 
-        with pytest.raises(ValueError, match=r"estimated_positive_pct must be between 0\.0 and 1\.0"):
+        with pytest.raises(
+            ValueError, match=r"estimated_positive_pct must be between 0\.0 and 1\.0"
+        ):
             AudioLoopConfig(estimated_positive_pct=1.1)
 
     def test_selection_mode_validation(self):

@@ -198,9 +198,7 @@ class DatasetConfig(ABC):
             Mono waveform tensor at the dataset's sample_rate
         """
         target_sample_rate = self.get_audio_processing_params()["sample_rate"]
-        decoder = AudioDecoder(
-            str(audio_path), sample_rate=target_sample_rate, num_channels=1
-        )
+        decoder = AudioDecoder(str(audio_path), sample_rate=target_sample_rate, num_channels=1)
         waveform = decoder.get_all_samples().data
 
         return waveform
