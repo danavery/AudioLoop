@@ -1,6 +1,6 @@
 # AudioLoop Developer Guide
 
-Developer reference for AudioLoop architecture, patterns, and extensibility. For usage instructions, see [USAGE_GUIDE.md](USAGE_GUIDE.md). For workflow patterns, see [WORKFLOW_GUIDE.md](WORKFLOW_GUIDE.md).
+Developer reference for AudioLoop architecture, patterns, and extensibility. For CLI command reference, see [CLI_REFERENCE.md](CLI_REFERENCE.md). For workflow patterns, see [WORKFLOW_GUIDE.md](WORKFLOW_GUIDE.md).
 
 ## Project Architecture
 

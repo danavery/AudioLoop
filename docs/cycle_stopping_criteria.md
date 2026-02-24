@@ -259,6 +259,35 @@ If using `positive_percentage` (stratified sampling), candidates are forced to h
 ### 4. No Ground Truth Access
 Stopping decisions must be made without access to corpus-level ground truth (since production datasets won't have labels). This limits what signals we can use.
 
+## Design Rationale: Why Patience-Based Stopping
+
+AudioLoop uses patience-based stopping (stop when improvement plateaus) rather than threshold-based stopping (stop when metric exceeds a fixed value). Here's why:
+
+### Threshold Approach (Rejected)
+```python
+# Stop when F1 > 0.65 and stable
+if rolling_avg(f1) > 0.65 and rolling_std(f1) < 0.08:
+    stop()
+```
+
+**Problems:**
+- What if the dataset is hard? May never reach 0.65
+- What if the dataset is easy? Wastes cycles after reaching 0.65
+- User needs domain expertise to pick a "good" threshold
+
+### Patience Approach (Implemented)
+```python
+# Stop when F1 stops improving and stable
+if no_improvement_for(5) and stable():
+    stop()
+```
+
+**Benefits:**
+- **Dataset agnostic**: No need to know if 0.6 or 0.8 is "good" for your problem
+- **Handles oscillations**: Rolling averages smooth cycle-to-cycle variance; stability checks prevent stopping during unstable periods
+- **Avoids early plateaus**: `min_cycles` prevents stopping too early; `min_delta` tolerates small fluctuations
+- **Intuitive**: "Stop when it stops getting better" requires no domain expertise
+
 ## Best Practices
 
 ### 1. Start with Fixed Cycles

@@ -1,6 +1,6 @@
-# AudioLoop Usage Guide
+# AudioLoop CLI Reference
 
-Complete command reference for AudioLoop's CLI tools and practical usage patterns. This guide covers all commands, parameters, and examples in one place.
+Complete command reference for AudioLoop's CLI tools. Every command, parameter, and file format in one place. For workflow patterns and best practices, see [WORKFLOW_GUIDE.md](WORKFLOW_GUIDE.md).
 
 ## Installation and Setup
 
@@ -30,37 +30,27 @@ cd ~/projects/my-classifier
 python -m audioloop.init_project
 ```
 
-### Environment Variables (Optional)
+### Configuration
 
-Set defaults in your shell or project's `audioloop.yaml`:
+Project settings live in `audioloop.yaml` (created by `init_project`).
 
+**Configuration precedence** (highest to lowest):
+1. **CLI flags** — always win
+2. **`audioloop.yaml`** — project-level defaults
+3. **Environment variables** — fallback when no CLI flag or yaml value
+4. **Built-in defaults**
+
+**Environment variables** (optional):
 ```bash
-export AUDIOLOOP_DATASET=urbansound8k      # Default dataset
-export AUDIOLOOP_DATA_ROOT=/custom/data    # Custom data directory
-export AUDIOLOOP_OUTPUT_ROOT=/custom/out   # Custom output directory
+AUDIOLOOP_DATASET=urbansound8k       # Default dataset
+AUDIOLOOP_EXPERIMENT=my_experiment   # Default experiment name
+AUDIOLOOP_PROJECT_ROOT=/path/to/project  # Override project root detection
+AUDIOLOOP_DATA_ROOT=/custom/data     # Override data directory (default: data/)
+AUDIOLOOP_OUTPUT_ROOT=/custom/out    # Override output root directory
+AUDIOLOOP_SPECS_DIR=all_specs        # Override spectrogram subdirectory name (default: all_specs)
 ```
 
-## Configuration System
-
-AudioLoop uses a unified configuration system with proper precedence:
-
-**Configuration Precedence:**
-1. **Explicit CLI parameters** (highest priority)
-2. **Environment variables** (fallback when no explicit value)
-3. **Default values** (lowest priority)
-
-**Environment Variables:**
-```bash
-export AUDIOLOOP_DATASET=urbansound8k      # Default dataset
-export AUDIOLOOP_DATA_ROOT=/custom/data    # Custom data directory  
-export AUDIOLOOP_OUTPUT_ROOT=/custom/out   # Custom output directory
-export AUDIOLOOP_SPECS_DIR=all_specs       # Spectrograms subdirectory
-```
-
-**Experiment Organization:**
-AudioLoop automatically organizes files by experiment:
-- **Default**: `outputs/`, `training_sets/`
-- **With experiment**: `outputs/{experiment}/`, `training_sets/{experiment}/`
+Note: The path variables (`PROJECT_ROOT`, `DATA_ROOT`, `OUTPUT_ROOT`, `SPECS_DIR`) are checked directly and not configurable via yaml.
 
 ## Data Preparation
 
@@ -150,10 +140,6 @@ python -m audioloop.create_subset --dataset audioset --class-name "Dog" --max-sa
 # Train directly - specs generated as needed
 python -m audioloop.train subsets/audioset_dog_1000.csv
 ```
-
-**When to Use Each Approach:**
-- **Pre-generation**: Large datasets used repeatedly, saves time across multiple experiments
-- **Lazy generation**: Small subsets, quick experiments, changing spectrogram parameters
 
 ### Creating Initial Training Sets
 
@@ -682,92 +668,6 @@ new_training_set = merge_training_sets(
 print(f"Created: {new_training_set}")
 ```
 
-## Best Practices and Tips
-
-### Labeling Quality
-1. **Listen completely** - Let audio play fully before deciding
-2. **Be consistent** - Apply same criteria throughout session
-3. **Skip if unclear** - Better to skip than guess incorrectly
-4. **Take breaks** - Avoid ear fatigue every 50-100 samples
-5. **Focus on quality** - Confident labels are more valuable than quantity
-
-### Training Set Creation
-1. **Start balanced** - Use 70-80% positive samples for initial training
-2. **Sufficient samples** - Aim for 40-60 samples total to start
-3. **Verify classes** - Use `--list-classes` to see available options
-4. **Use seeds** - Add `--seed 42` for reproducible training sets
-5. **Check output** - Verify CSV format matches expected structure
-
-### Model Training
-1. **Start small** - Begin with 20-50 samples per class
-2. **Monitor accuracy** - Should reach 95%+ on training set
-3. **Check convergence** - Training should complete in <500 epochs
-4. **Use experiments** - Organize with `--experiment` for clean separation
-
-### Active Learning Strategy
-1. **Start with confidence** - Use confidence-based selection initially
-2. **Switch to entropy** - When model becomes overconfident
-3. **Use basic transition** - Let system automatically switch strategies
-4. **Balance classes** - Maintain ~75% positive, 25% negative
-5. **Iterate quickly** - Short cycles (20-50 samples) work better than long ones
-
-## Troubleshooting
-
-### Common Issues and Solutions
-
-**Spectrograms not found:**
-```bash
-python -m audioloop.create_specs  # Regenerate spectrograms
-```
-
-**No training set exists:**
-```bash
-python -m audioloop.utils.create_bootstrap_set --class-name siren --n 40  # Create initial set
-```
-
-**Invalid class name:**
-```bash
-python -m audioloop.utils.create_bootstrap_set --list-classes  # See available classes
-```
-
-**Not enough samples for class:**
-```bash
-python -m audioloop.utils.create_bootstrap_set --class-name rare_class --n 10  # Reduce sample count
-```
-
-**Model not found:**
-```bash
-python -m audioloop.train training_sets/training_set_v1.csv  # Train first
-```
-
-**Audio won't play:**
-```bash
-python -m audioloop.label_audio file.csv --audio-dir /full/path/to/audio
-```
-
-**Version mismatch:**
-```bash
-python -m audioloop.active_learning --run-number 2 --model outputs/model_v2.pt
-```
-
-**Environment variable issues:**
-```bash
-export AUDIOLOOP_DATASET=fsd50k        # Set valid dataset
-unset AUDIOLOOP_DATASET                # Remove invalid setting
-echo $AUDIOLOOP_DATASET                # Check current setting
-```
-
-### Performance Issues
-- **Slow training**: Reduce batch size or use smaller model
-- **Out of memory**: Lower batch size (`--batch-size 16`) or use CPU
-- **Slow audio loading**: Ensure audio files are local, not networked
-- **Training not converging**: Check training set balance and size
-
-### Dataset Issues
-- **Wrong dataset format**: Use correct `--dataset` parameter
-- **Missing audio files**: Check audio directory paths
-- **Inconsistent file paths**: Use absolute paths or correct relative paths
-
 ## Quick Reference
 
 ### Essential Commands
@@ -789,5 +689,6 @@ python -m audioloop.automated_workflow --class-name siren --cycles 3 --evaluatio
 python -m audioloop.track_metrics --plot
 ```
 
-### Next Steps
-See [WORKFLOW_GUIDE.md](WORKFLOW_GUIDE.md) for complete workflow patterns and [DEV_GUIDE.md](DEV_GUIDE.md) for development information.
+### See Also
+- [WORKFLOW_GUIDE.md](WORKFLOW_GUIDE.md) — Workflow patterns, best practices, and troubleshooting
+- [DEV_GUIDE.md](DEV_GUIDE.md) — Development and architecture information

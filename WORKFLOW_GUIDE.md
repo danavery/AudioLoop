@@ -1,6 +1,6 @@
 # AudioLoop Workflow Guide
 
-Complete guide to AudioLoop's active learning workflow patterns, best practices, and end-to-end processes. For specific command syntax, see [USAGE_GUIDE.md](USAGE_GUIDE.md).
+Complete guide to AudioLoop's active learning workflow patterns, best practices, and end-to-end processes. For specific command syntax, see [CLI_REFERENCE.md](CLI_REFERENCE.md).
 
 ## Overview
 
@@ -385,7 +385,7 @@ done
 
 ### Setup Phase
 1. **Plan experiment organization**: Use descriptive experiment names
-2. **Prepare data properly**: Generate spectrograms, verify dataset structure
+2. **Prepare data properly**: Pre-generate spectrograms for large datasets used repeatedly; use lazy generation (automatic when CSVs include `audio_path`) for small subsets and quick experiments
 3. **Start small**: Begin with 40-60 samples in initial training set
 4. **Document criteria**: Clear labeling guidelines for consistency
 
@@ -401,5 +401,5 @@ done
 3. **Document findings**: Record what works for future reference
 4. **Plan next steps**: Based on results and remaining challenges
 
-For detailed command syntax and parameters, see [USAGE_GUIDE.md](USAGE_GUIDE.md).
+For detailed command syntax and parameters, see [CLI_REFERENCE.md](CLI_REFERENCE.md).
 For development and architecture information, see [DEV_GUIDE.md](DEV_GUIDE.md).
