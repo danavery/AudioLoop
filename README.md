@@ -2,6 +2,8 @@
 
 AudioLoop is an active learning framework for binary audio classification that minimizes human labeling effort through strategic sample selection.
 
+Label smarter, not harder!
+
 ## Quick Start/Demo
 
 AudioLoop is installed once and used from separate project directories for each classification task.
@@ -100,7 +102,9 @@ python -m audioloop.webui [--host 0.0.0.0 if not localhost]
 # Remember to save your labels before exiting the web UI!
 ```
 
-For detailed command reference, see **[docs/cli_reference.md](docs/cli_reference.md)**.
+For a more detailed guide on how to use AudioLoop, see **[docs/workflow_guide.md](docs/workflow_guide.md)**.
+
+A reference to all available actions can be found at **[docs/cli_reference.md](docs/cli_reference.md)**.
 
 
 ## Core Concepts
@@ -113,7 +117,7 @@ It supports two types of use cases:
 
 ### Active learning loop
 
-Audioloop's core idea is that we can save human labeling time by starting with a small known set of labels and iteratively creating models that get better and better at currently identifying positive and negative examples. Audio clips that would be especially helpful to add to the training set get selected for explicit human classification. This way the human labelers can focus on the useful cases and not on random sets of examples.
+Audioloop's core idea is that we can save human labeling time by starting with a small known set of labels and iteratively creating models that get better and better at correctly identifying positive and negative examples. Audio clips that would be especially helpful to add to the training set get selected for explicit human classification. This way human labelers can focus on the useful cases and not on random sets of examples.
 
 1) A user manually creates an initial small positive/negative training set CSV of discrete audio clips for classification
 2) A model is trained on that training set

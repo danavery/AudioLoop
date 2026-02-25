@@ -378,11 +378,20 @@ yaml.YAMLError: mapping values are not allowed here
 - **Project initialization**: `python -m audioloop.init_project --help`
 - **AudioLoopConfig documentation**: See `audioloop/config.py` docstring
 - **Example usage**: See `automated_workflow.py` epilog for CLI examples
-- **Developer guide**: See `DEV_GUIDE.md` for architecture details
+- **Developer guide**: See [`DEV_GUIDE.md`](../DEV_GUIDE.md) for architecture details
 
-## Future Enhancements
+## Batch Runner
 
-Once you have config files working, you can build:
-- **Experiment runner** - Run multiple configs in sequence
-- **Parameter sweeps** - Grid/random search over parameter space
-- **Result tracking** - Integration with wandb, mlflow, etc.
+AudioLoop includes a batch runner for running multiple configs sequentially:
+
+```bash
+# Run all configs in a directory
+python -m audioloop.batch_runner configs/my_experiment/*.yaml
+
+# With a shared initial training set
+python -m audioloop.batch_runner --initial-training-set training_sets/bootstrap.csv configs/*.yaml
+```
+
+Outputs are organized under a timestamped batch directory: `outputs/batch_YYYYMMDD_HHMMSS/{experiment_name}/`
+
+See `python -m audioloop.batch_runner --help` for full options.

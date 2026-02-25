@@ -52,6 +52,8 @@ AUDIOLOOP_SPECS_DIR=all_specs        # Override spectrogram subdirectory name (d
 
 Note: The path variables (`PROJECT_ROOT`, `DATA_ROOT`, `OUTPUT_ROOT`, `SPECS_DIR`) are checked directly and not configurable via yaml.
 
+For complete YAML configuration file documentation, including all parameters and experiment config format, see [configs/README.md](../configs/README.md).
+
 ## Data Preparation
 
 ### Create Dataset Subsets (For Large Datasets)
