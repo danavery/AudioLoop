@@ -1,6 +1,6 @@
 # AudioLoop CLI Reference
 
-Complete command reference for AudioLoop's CLI tools. Every command, parameter, and file format in one place. For workflow patterns and best practices, see [WORKFLOW_GUIDE.md](WORKFLOW_GUIDE.md).
+Complete command reference for AudioLoop's CLI tools. Every command, parameter, and file format in one place. For workflow patterns and best practices, see [workflow_guide.md](workflow_guide.md).
 
 ## Installation and Setup
 
@@ -690,5 +690,5 @@ python -m audioloop.track_metrics --plot
 ```
 
 ### See Also
-- [WORKFLOW_GUIDE.md](WORKFLOW_GUIDE.md) — Workflow patterns, best practices, and troubleshooting
-- [DEV_GUIDE.md](DEV_GUIDE.md) — Development and architecture information
+- [workflow_guide.md](workflow_guide.md) — Workflow patterns, best practices, and troubleshooting
+- [DEV_GUIDE.md](../DEV_GUIDE.md) — Development and architecture information

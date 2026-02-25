@@ -1,6 +1,6 @@
 # Audio Labeling Guide
 
-> **Note:** AudioLoop now includes a web-based labeling interface (see [webui/README.md](webui/README.md)) which is the recommended labeling workflow. This guide covers the CLI labeling tool, which remains available as an alternative.
+> **Note:** AudioLoop now includes a web-based labeling interface (see [webui/README.md](../webui/README.md)) which is the recommended labeling workflow. This guide covers the CLI labeling tool, which remains available as an alternative.
 
 This guide covers practical usage of the CLI audio labeling tool for AudioLoop's active learning workflow.
 

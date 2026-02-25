@@ -1,6 +1,6 @@
 # AudioLoop Workflow Guide
 
-Complete guide to AudioLoop's active learning workflow patterns, best practices, and end-to-end processes. For specific command syntax, see [CLI_REFERENCE.md](CLI_REFERENCE.md).
+Complete guide to AudioLoop's active learning workflow patterns, best practices, and end-to-end processes. For specific command syntax, see [cli_reference.md](cli_reference.md).
 
 ## Overview
 
@@ -401,5 +401,5 @@ done
 3. **Document findings**: Record what works for future reference
 4. **Plan next steps**: Based on results and remaining challenges
 
-For detailed command syntax and parameters, see [CLI_REFERENCE.md](CLI_REFERENCE.md).
-For development and architecture information, see [DEV_GUIDE.md](DEV_GUIDE.md).
+For detailed command syntax and parameters, see [cli_reference.md](cli_reference.md).
+For development and architecture information, see [DEV_GUIDE.md](../DEV_GUIDE.md).

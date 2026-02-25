@@ -100,7 +100,7 @@ python -m audioloop.webui [--host 0.0.0.0 if not localhost]
 # Remember to save your labels before exiting the web UI!
 ```
 
-For detailed command reference, see **[CLI_REFERENCE.md](CLI_REFERENCE.md)**.
+For detailed command reference, see **[docs/cli_reference.md](docs/cli_reference.md)**.
 
 
 ## Core Concepts

@@ -1,4 +1,0 @@
-if [ -d .venv ]; then
-  export VIRTUAL_ENV="$PWD/.venv"
-  PATH_add "$VIRTUAL_ENV/bin"
-fi

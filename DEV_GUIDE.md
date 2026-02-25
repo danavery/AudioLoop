@@ -1,6 +1,6 @@
 # AudioLoop Developer Guide
 
-Developer reference for AudioLoop architecture, patterns, and extensibility. For CLI command reference, see [CLI_REFERENCE.md](CLI_REFERENCE.md). For workflow patterns, see [WORKFLOW_GUIDE.md](WORKFLOW_GUIDE.md).
+Developer reference for AudioLoop architecture, patterns, and extensibility. For CLI command reference, see [docs/cli_reference.md](docs/cli_reference.md). For workflow patterns, see [docs/workflow_guide.md](docs/workflow_guide.md).
 
 ## Project Architecture
 
@@ -363,168 +363,14 @@ config = AudioLoopConfig(class_weighting="adaptive")
 - **No weighting**: Only for naturally balanced datasets or baseline comparisons
 
 ### Dataset Extensibility
-AudioLoop supports adding custom datasets through a simple file-based convention with automatic discovery:
+AudioLoop supports adding custom datasets through file-based auto-discovery. Create a `DatasetConfig` subclass in `src/audioloop/datasets/` and it's available in all CLI commands immediately.
 
-#### Quick Start
-1. **Create config file**: `audioloop/datasets/my_dataset_config.py`
-2. **Define config class**: `class MyDatasetConfig(DatasetConfig)`
-3. **Implement required methods**: Inherit from `DatasetConfig` and implement abstract methods
-4. **Use immediately**: `--dataset my_dataset` in all CLI commands
-
-#### Example - Using the Template
-```bash
-# 1. Copy the template to create your dataset config
-cp audioloop/datasets/templates/simple_audio_template.py audioloop/datasets/my_dataset_config.py
-
-# 2. Edit the copied file:
-#    - Rename class from TemplateAudioConfig to MyDatasetConfig
-#    - Update paths: data/YOUR_DATASET_NAME/ → data/my_dataset/
-#    - Customize class vocabulary for your classes
-
-# 3. Use immediately
-python -m audioloop.utils.create_bootstrap_set --dataset my_dataset --list-classes
-python -m audioloop.utils.create_bootstrap_set --dataset my_dataset --list-splits
-```
-
-Your CSV format:
-```csv
-filename,label
-audio1.wav,speech
-audio2.wav,music
-audio3.wav,noise
-```
-
-#### Naming Convention
-- **File naming**: `{dataset_name}_config.py` → dataset name `"{dataset_name}"`
-- **Class naming**: `{DatasetName}Config` (e.g., `MyAudioConfig`, `CommonVoiceConfig`)
-- **Auto-discovery**: No registration needed - just create the file
-
-#### Available Datasets
-List currently available datasets:
-```bash
-# Method 1: Check help message (shows available datasets)
-python -m audioloop.utils.create_bootstrap_set --help
-
-# Method 2: Check via Python
-python -c "from audioloop.datasets.registry import list_available_datasets; print(list_available_datasets())"
-```
+See **[docs/custom_datasets.md](docs/custom_datasets.md)** for the full walkthrough.
 
 ### Model Extensibility
-AudioLoop supports adding custom models through a simple file-based convention with automatic discovery:
+AudioLoop supports adding custom models through the same auto-discovery pattern. Create an `AudioLoopModel` subclass in `src/audioloop/models/` and use `--model-type my_model`.
 
-#### Quick Start
-1. **Create model file**: `audioloop/models/my_model.py`
-2. **Define model class**: Standard PyTorch `nn.Module` that inherits from `AudioLoopModel`
-3. **Implement minimal interface**: Just one method - `get_model_info()`
-4. **Use immediately**: `--model-type my_model` in training commands
-
-#### Requirements
-All custom models must:
-- **Inherit from `AudioLoopModel`**: Minimal abstract base class (just metadata)
-- **Accept standard parameters**: `num_classes` and `**kwargs` in constructor
-- **Use standard PyTorch interface**: Standard `forward(x: torch.Tensor)` method
-- **Return logits**: Standard classification output format
-
-#### Example Implementation
-```python
-# audioloop/models/resnet.py
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from .audio_loop_model import AudioLoopModel
-
-class ResNet(AudioLoopModel):
-    def __init__(self, num_classes=2, **kwargs):
-        super().__init__()
-        self.num_classes = num_classes
-        self.depth = kwargs.get('depth', 18)
-        self.dropout_rate = kwargs.get('dropout_rate', 0.1)
-
-        # Build ResNet architecture based on depth
-        # ... implement ResNet layers ...
-        self.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3)
-        # ... more layers ...
-        self.fc = nn.Linear(512, num_classes)
-        self.dropout = nn.Dropout(self.dropout_rate)
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        """Standard PyTorch forward pass."""
-        # Add channel dimension if needed
-        if x.ndim == 3:
-            x = x.unsqueeze(1)
-
-        # Standard ResNet forward pass
-        x = F.relu(self.conv1(x))
-        # ... forward through ResNet blocks ...
-
-        # Global pooling and classification
-        x = F.adaptive_avg_pool2d(x, (1, 1))
-        x = x.flatten(1)
-        x = self.dropout(x)
-        x = self.fc(x)
-        return x
-
-    def get_model_info(self) -> dict:
-        """Get model metadata - constructor parameters are auto-saved."""
-        return {
-            "model_type": "resnet",  # Should match filename
-            "num_classes": self.num_classes,
-            "depth": self.depth,
-            "dropout_rate": self.dropout_rate,
-            "num_parameters": sum(p.numel() for p in self.parameters()),
-        }
-```
-
-#### Usage
-```bash
-# List available models
-python -m audioloop.train --list-models
-
-# Train with custom model (basic usage)
-python -m audioloop.train training_set_v1.csv --model-type resnet
-
-# Models automatically appear in all CLI commands
-python -m audioloop.active_learning --class-name Drill --run-number 1  # Uses saved model
-```
-
-#### Custom Model Parameters
-Pass model-specific parameters via config:
-```python
-from audioloop.config import AudioLoopConfig
-
-# Configure custom model parameters
-config = AudioLoopConfig(
-    model_type="resnet",
-    model_kwargs={
-        "depth": 50,
-        "dropout_rate": 0.2,
-        "custom_param": "value"
-    }
-)
-
-# Use in training - parameters are automatically preserved
-from audioloop.training_core import run_training
-run_training(config, labels_file="training_set_v1.csv", version=1)
-```
-
-**Note**: AudioLoop automatically saves and restores all constructor parameters from `get_model_info()`, so models are reconstructed with exactly the same configuration.
-
-#### Key Features
-- **Standard PyTorch**: Uses normal `forward(x: torch.Tensor)` - full ecosystem compatibility
-- **Automatic Save/Load**: Constructor parameters preserved automatically
-- **File naming**: `my_model.py` → model name `"my_model"`
-- **Class naming**: Any name - system finds the AudioLoopModel subclass automatically
-- **Auto-discovery**: No registration needed - just create the file
-
-#### Available Models
-List currently available models:
-```bash
-# Method 1: Check training help
-python -m audioloop.train --list-models
-
-# Method 2: Check via Python
-python -c "from audioloop.models.model_registry import list_available_models; print(list_available_models())"
-```
+See **[docs/extending.md](docs/extending.md)** and **[docs/adding_new_models.md](docs/adding_new_models.md)** for details.
 
 ### Path Management
 **Architecture**: All path generation flows through `AudioLoopConfig`. The `utils/paths.py` module provides internal helpers used by config only.
@@ -562,218 +408,32 @@ Active learning prioritizes samples with high model confidence for human review,
 - **Training Control**: Strategy classes handle stopping decisions, training loop handles execution
 - This ensures focused, maintainable code with clear responsibilities
 
-### Dataset Subsetting
-AudioLoop provides a unified interface for creating training-ready subsets from large datasets:
+### Dataset Subsetting and Large Dataset Workflows
+AudioLoop supports creating training-ready subsets from large datasets, lazy spectrogram generation, and efficient remote deployment with subset-specific spec directories.
 
-**Purpose**: Large datasets like AudioSet (2M+ files) are impractical to work with in their entirety. The subsetting system creates manageable, labeled subsets for binary classification tasks.
-
-**Key Features**:
-- **Unified Interface**: `DatasetConfig.create_subset()` method provides consistent API across datasets
-- **Training-Ready Output**: Generates CSV with format: `filename,label,original_class,split,audio_path`
-- **Missing File Handling**: Automatically filters out missing files (e.g., deleted YouTube videos)
-- **Reproducible Sampling**: Seed-based random sampling for consistent subsets
-- **Balanced vs Imbalanced**: Configurable positive ratio for dataset balance
-
-**CLI Tool**:
-```bash
-# Create subset with default 50% positive ratio
-python -m audioloop.create_subset --dataset audioset --class-name "Dog" --max-samples 1000
-
-# Create imbalanced subset (5% positive)
-python -m audioloop.create_subset --dataset audioset --class-name "Speech" \
-    --max-samples 100000 --positive-ratio 0.05
-
-# List available classes
-python -m audioloop.create_subset --dataset audioset --list-classes
-```
-
-**Programmatic Usage**:
-```python
-from audioloop.config import AudioLoopConfig
-
-config = AudioLoopConfig(dataset="audioset")
-dataset_config = config.get_dataset_config()
-
-# Create subset
-subset_path = dataset_config.create_subset(
-    output_path=Path("subsets/dog_1000.csv"),
-    class_name="Dog",
-    max_samples=1000,
-    positive_ratio=0.5,
-    split="unbalanced_train",  # Dataset-specific split
-    seed=42
-)
-```
-
-**Output Format**: The generated CSV is self-contained and training-ready:
-- `filename`: Audio filename (e.g., "abc123.flac")
-- `label`: Binary label (0 or 1)
-- `original_class`: Original class name from dataset
-- `split`: Dataset split (preserves split info for reproducibility)
-- `audio_path`: Full path to audio file (enables lazy spec generation)
-
-### Remote Deployment with Subset Specs
-
-For remote training (cloud pods, HPC clusters), transferring the entire `all_specs` directory is inefficient. AudioLoop provides a tool to create subset-specific spectrogram directories:
-
-**Purpose**: Enable efficient remote deployment by creating self-contained spec directories containing only the files needed for a specific subset.
-
-**Key Features**:
-- **Hard Links (Zero Storage)**: Uses hard links by default for local zero-cost duplication
-- **Copy Fallback**: Automatically falls back to copying if hard links fail (different filesystems)
-- **Self-Contained**: Each subset directory contains exactly the specs needed
-- **Simple Syncing**: Standard rsync works without complex --files-from patterns
-
-**Workflow**:
-```bash
-# 1. Create subset CSV
-python -m audioloop.create_subset --dataset audioset --class-name "Dog" --max-samples 100000
-
-# 2. Prepare subset-specific specs directory (hard links, zero storage overhead)
-python -m audioloop.prepare_subset_specs subsets/audioset_dog_100000.csv
-
-# 3. Sync to remote (--no-o --no-g avoids permission errors on pods)
-rsync -avz --no-o --no-g data/subset_specs/audioset_dog_100000/ user@pod:/workspace/data/specs/
-
-# 4. Train on remote
-ssh user@pod "cd /workspace && python -m audioloop.train subset.csv --specs-dir data/specs"
-```
-
-**CLI Options**:
-```bash
-# Custom output directory
-python -m audioloop.prepare_subset_specs subsets/audioset_dog_100k.csv \
-    --output-dir data/subset_specs/custom_name
-
-# Use copying instead of hard links (different filesystems)
-python -m audioloop.prepare_subset_specs subsets/audioset_dog_100k.csv --use-copy
-
-# Custom source specs directory
-python -m audioloop.prepare_subset_specs subsets/audioset_dog_100k.csv \
-    --specs-dir /path/to/custom_all_specs
-```
-
-**Storage Efficiency**: Hard links use zero additional storage locally since they're just directory entries pointing to the same inode. You can delete the subset directory after syncing without affecting `all_specs`.
-
-### Lazy Spectrogram Generation
-AudioLoop supports on-demand spectrogram generation during training:
-
-**How It Works**:
-1. **CSV with audio_path**: Training CSVs can include full path to audio files
-2. **Dataset Config Pass-Through**: `SpectrogramDataset` receives `dataset_config` parameter
-3. **On-Demand Generation**: When `.pt` file missing, generates spec from audio on-the-fly
-4. **Automatic Caching**: Generated specs saved to disk for future use
-
-**Benefits**:
-- **Simpler Workflow**: Fewer pre-processing steps
-- **Storage Efficiency**: Only generate specs for files actually used
-- **Flexibility**: Change spectrogram parameters without regenerating entire dataset
-
-**Implementation**:
-```python
-# In training_core.py
-dataset_config = config.get_dataset_config()
-
-train_dataset = SpectrogramDataset(
-    csv_file=labels_file,
-    specs_dir=str(config.specs_dir),
-    dataset_config=dataset_config,  # Enables lazy generation
-)
-```
-
-**Behavior**:
-- Spectrogram `.pt` file exists → Load from disk (fast path)
-- Spectrogram missing + `audio_path` available + `dataset_config` provided → Generate on-the-fly
-- Spectrogram missing + no lazy generation support → Raise helpful error
-
-**Example Workflows**:
-```bash
-# Approach 1: Pre-generate all specs
-python -m audioloop.create_specs --dataset audioset
-python -m audioloop.train training_set_v1.csv
-
-# Approach 2: Lazy generation
-python -m audioloop.create_subset --dataset audioset --class-name "Dog" --max-samples 1000
-python -m audioloop.train subsets/audioset_dog_1000.csv  # Specs generated as needed
-```
+See **[docs/custom_datasets.md](docs/custom_datasets.md)** for subsetting, lazy generation, and remote deployment workflows.
 
 ### Spectrogram Preprocessing
 Audio is converted to variable-length mel-spectrograms with log normalization, stored as PyTorch tensors for efficient loading. Spectrograms can be pre-generated via `create_specs.py` or generated on-demand during training via lazy generation.
 
-### Pluggable Training Stopping Criteria
-AudioLoop uses a Strategy pattern for training stopping decisions:
-- **Architecture**: Abstract base class `TrainingStoppingCriterion` with pluggable implementations
-- **Default Behavior**: `PlateauCriterion` stops when training loss plateaus, with optional accuracy floor
-- **Strategy Classes**: `AccuracyCriterion`, `PlateauCriterion`
-- **Extensibility**: Easy to add early stopping, plateau detection, or custom criteria
-- **Interface**: `should_stop(epoch, train_accuracy, train_loss, val_accuracy, val_loss) -> bool`
-- **State Management**: `reset()` method for stateful criteria like early stopping
-- **Usage**: Pass `stopping_criterion` parameter to `run_training()` or use default
+### Stopping Criteria
+AudioLoop uses pluggable Strategy patterns for both training stopping (within a cycle) and cycle stopping (across cycles):
 
-### Cycle Stopping Criteria
-AudioLoop also supports automatic stopping of active learning cycles based on candidate performance metrics:
-- **Architecture**: Base class `CycleStoppingCriterion` with mode-specific implementations
-- **Strategies**: `LabelModeStoppingCriterion` (optimizes F1), `SearchModeStoppingCriterion` (optimizes recall with precision floor)
-- **Metrics Tracking**: Candidate metrics calculated after each labeling round and persisted to JSON
-- **Rolling Statistics**: Uses rolling averages and stability measures to reduce noise from small sample sizes
-- **State Management**: Tracks patience counter and best cycle across the active learning process
-- **Interface**: `should_stop(current_cycle) -> bool` and `get_best_cycle() -> int`
-- **Integration**: `automated_workflow.py` and `merge_labels.py` handle metric calculation and stopping decisions
-- **Factory**: `create_cycle_stopping_criterion(config, metrics_history)` for instantiation
-- **Limitations**: Experimental feature - candidate metrics (on ~50 high-entropy examples) don't always correlate with corpus performance
-
-See `docs/cycle_stopping_criteria.md` for detailed documentation.
+- **Training stopping**: `PlateauCriterion` (default) stops when loss plateaus, with optional accuracy floor. `AccuracyCriterion` stops at 100% accuracy. See **[docs/stopping_criteria_guide.md](docs/stopping_criteria_guide.md)**.
+- **Cycle stopping**: `LabelModeStoppingCriterion` (optimizes F1) and `SearchModeStoppingCriterion` (optimizes recall with precision floor). See **[docs/cycle_stopping_criteria.md](docs/cycle_stopping_criteria.md)**.
+- **Custom criteria**: See **[docs/extending.md](docs/extending.md)**.
 
 ### Reproducibility and Seed Management
-AudioLoop provides seed management for reproducible experiments:
-
-- **Default Seed**: All modules use seed `42` by default for consistent behavior
-- **Training Reproducibility**: Model weights, data shuffling, and optimization are seeded
-- **Candidate Selection Reproducibility**: Random sampling in active learning is seeded
-- **Initial Dataset Creation**: Training set sampling is seeded
-- **CLI Support**: All main scripts accept `--seed` parameter for custom seeds
-- **Automated Workflows**: Seed propagates through entire multi-cycle workflows
-
-The `set_seed()` function controls:
-- Python's `random` module (sampling, shuffling)
-- NumPy RNG (numerical operations)
-- PyTorch RNG (model initialization, dropout)
-- PyTorch CUDA RNG (GPU operations)
-- CUDNN deterministic mode (consistent GPU behavior)
-
-### Plateau Stopping with Accuracy Floor (Default)
-The `PlateauCriterion` with an optional `accuracy_floor` addresses the challenge where training can get stuck at high accuracy (95-99%) without reaching perfect accuracy:
-- **Monitors training loss**: Stops when loss stops improving for `patience` epochs
-- **Accuracy floor**: Only counts patience when accuracy is above the floor threshold
-- **Prevents premature stopping**: Ignores plateaus during early erratic training
-- **Configurable thresholds**: Tune patience, min_delta, and accuracy floor per task
-
-Example usage:
-```python
-from audioloop.utils.stopping_criteria import PlateauCriterion
-
-# Default configuration (recommended for most audio tasks)
-criterion = PlateauCriterion()
-
-# With accuracy floor to prevent early stopping
-criterion = PlateauCriterion(
-    accuracy_floor=0.90,    # Only count patience when accuracy >= 90%
-    patience=30,            # Epochs to wait without improvement
-    min_delta=0.01,         # Minimum improvement threshold
-    max_epochs=1000
-)
-```
-
-### Available Stopping Criteria
-- **`PlateauCriterion`** (default): Stops when loss plateaus, with optional accuracy floor
-- **`AccuracyCriterion`**: Stops at 100% accuracy or max epochs
+All modules use seed `42` by default. The `set_seed()` function controls Python `random`, NumPy, PyTorch, CUDA, and CUDNN deterministic mode. All CLI scripts accept `--seed` and seeds propagate through automated workflows.
 
 ## Related Documentation
 
-For specific guides, see:
-- **[docs/adding_new_models.md](docs/adding_new_models.md)**: Detailed guide for integrating custom models
+- **[docs/custom_datasets.md](docs/custom_datasets.md)**: Adding your own audio data
+- **[docs/extending.md](docs/extending.md)**: Adding custom models, strategies, and stopping criteria
+- **[docs/adding_new_models.md](docs/adding_new_models.md)**: Detailed model integration guide
 - **[docs/candidate_selection_explained.md](docs/candidate_selection_explained.md)**: Deep dive into selection strategies
 - **[docs/stopping_criteria_guide.md](docs/stopping_criteria_guide.md)**: Training stopping criteria
+- **[docs/cycle_stopping_criteria.md](docs/cycle_stopping_criteria.md)**: Cross-cycle stopping criteria
 - **[docs/shape_compatibility_and_variable_lengths.md](docs/shape_compatibility_and_variable_lengths.md)**: Variable-length spectrogram support
-- **[LABELING_GUIDE.md](LABELING_GUIDE.md)**: Audio labeling best practices
+- **[docs/labeling_guide.md](docs/labeling_guide.md)**: Audio labeling best practices
 - **[webui/README.md](webui/README.md)**: Web-based labeling interface
