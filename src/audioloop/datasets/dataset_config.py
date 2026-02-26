@@ -179,7 +179,7 @@ class DatasetConfig(ABC):
         """Get audio processing parameters for spectrogram generation.
 
         Returns:
-            Dict with keys: sample_rate, n_fft, hop_length, n_mels, top_db, fixed_length
+            Dict with keys: sample_rate, n_fft, hop_length, n_mels, top_db, max_spectrogram_length
         """
         pass
 

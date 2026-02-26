@@ -236,7 +236,7 @@ class TestDatasetConfigBehavior:
         # Should include fold in path
         assert "fold3" in str(path)
 
-    def test_different_fixed_lengths(self):
+    def test_different_max_spectrogram_lengths(self):
         """Test that datasets have different fixed lengths for spectrograms."""
         fsd50k = FSD50KConfig()
         urbansound8k = UrbanSound8KConfig()
@@ -246,9 +246,9 @@ class TestDatasetConfigBehavior:
         assert urbansound8k.get_output_shape()[1] == -1
 
         # But still have different max length limits for outlier handling
-        assert fsd50k.fixed_length != urbansound8k.fixed_length
-        assert fsd50k.fixed_length == 2048
-        assert urbansound8k.fixed_length == 993
+        assert fsd50k._max_spectrogram_length != urbansound8k._max_spectrogram_length
+        assert fsd50k._max_spectrogram_length == 2048
+        assert urbansound8k._max_spectrogram_length == 993
 
     def test_consistent_audio_parameters(self):
         """Test that datasets use consistent audio processing parameters."""
@@ -256,10 +256,10 @@ class TestDatasetConfigBehavior:
         urbansound8k = UrbanSound8KConfig()
 
         # These should be the same for consistency
-        assert fsd50k.sample_rate == urbansound8k.sample_rate
-        assert fsd50k.n_fft == urbansound8k.n_fft
-        assert fsd50k.hop_length == urbansound8k.hop_length
-        assert fsd50k.n_mels == urbansound8k.n_mels
+        assert fsd50k._sample_rate == urbansound8k._sample_rate
+        assert fsd50k._n_fft == urbansound8k._n_fft
+        assert fsd50k._hop_length == urbansound8k._hop_length
+        assert fsd50k._n_mels == urbansound8k._n_mels
 
 
 class TestMetadataHandling:
@@ -314,18 +314,18 @@ class TestNewAbstractMethods:
         assert fixed_spec.shape[-1] == 100
 
         # Test with a spectrogram within reasonable limits (should be preserved)
-        medium_spec = torch.randn(1, 128, config.fixed_length // 2)
+        medium_spec = torch.randn(1, 128, config._max_spectrogram_length // 2)
         fixed_spec = config.fix_spectrogram_length(medium_spec)
 
         # Should preserve natural length
-        assert fixed_spec.shape[-1] == config.fixed_length // 2
+        assert fixed_spec.shape[-1] == config._max_spectrogram_length // 2
 
         # Test with an outlier spectrogram (should be cropped)
-        outlier_spec = torch.randn(1, 128, config.fixed_length * 2)
+        outlier_spec = torch.randn(1, 128, config._max_spectrogram_length * 2)
         fixed_spec = config.fix_spectrogram_length(outlier_spec)
 
         # Should be cropped to max allowed length
-        assert fixed_spec.shape[-1] == config.fixed_length
+        assert fixed_spec.shape[-1] == config._max_spectrogram_length
 
     @pytest.mark.parametrize("config_class", [FSD50KConfig, UrbanSound8KConfig])
     def test_process_single_file_signature(self, config_class):
@@ -351,7 +351,7 @@ class TestNewAbstractMethods:
         assert all(isinstance(dim, int) for dim in shape)
 
         # Should match expected dimensions
-        assert shape[0] == config.n_mels  # Frequency dimension
+        assert shape[0] == config._n_mels  # Frequency dimension
         assert shape[1] == -1  # Time dimension is variable (-1 sentinel)
 
 
@@ -549,7 +549,7 @@ class TestAudioSetConfig:
         shape = config.get_output_shape()
 
         # Should be (n_mels, -1) for variable time dimension
-        assert shape[0] == config.n_mels
+        assert shape[0] == config._n_mels
         assert shape[1] == -1
 
 

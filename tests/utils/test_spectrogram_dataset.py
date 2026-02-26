@@ -3,11 +3,29 @@ Tests for SpectrogramDataset with lazy generation support.
 """
 
 import csv
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 import torch
 
 from audioloop.utils.spectrogram_dataset import SpectrogramDataset
+
+
+def _make_mock_config():
+    """Create a mock dataset config with get_spectrogram_path that mimics standard behavior."""
+    mock_config = Mock()
+    mock_config.sample_rate = 44100
+    mock_config.min_audio_file_size = None
+
+    def _get_spec_path(filename, specs_dir):
+        """Replace common audio extensions with .pt"""
+        spec_name = filename
+        for ext in [".wav", ".flac", ".mp3", ".ogg"]:
+            spec_name = spec_name.replace(ext, ".pt")
+        return Path(specs_dir) / spec_name
+
+    mock_config.get_spectrogram_path = _get_spec_path
+    return mock_config
 
 
 class TestSpectrogramDatasetCSVParsing:
@@ -25,7 +43,9 @@ class TestSpectrogramDatasetCSVParsing:
             writer.writerow(["filename", "label", "original_class", "split", "audio_path"])
             writer.writerow(["test.flac", "1", "Dog", "bal_train", "/mnt/audio/test.flac"])
 
-        dataset = SpectrogramDataset(csv_file=str(csv_file), specs_dir=str(specs_dir))
+        dataset = SpectrogramDataset(
+            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=_make_mock_config()
+        )
 
         assert len(dataset.samples) == 1
         assert dataset.samples[0]["audio_path"] == "/mnt/audio/test.flac"
@@ -44,7 +64,9 @@ class TestSpectrogramDatasetCSVParsing:
             writer.writerow(["filename", "label", "original_class"])
             writer.writerow(["test.wav", "1", "Speech"])
 
-        dataset = SpectrogramDataset(csv_file=str(csv_file), specs_dir=str(specs_dir))
+        dataset = SpectrogramDataset(
+            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=_make_mock_config()
+        )
 
         assert dataset.samples[0]["original_class"] == "Speech"
 
@@ -60,17 +82,18 @@ class TestSpectrogramDatasetCSVParsing:
             writer.writerow(["filename", "label", "original_class"])
             writer.writerow(["test.wav", "1", "5"])
 
-        dataset = SpectrogramDataset(csv_file=str(csv_file), specs_dir=str(specs_dir))
+        dataset = SpectrogramDataset(
+            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=_make_mock_config()
+        )
 
         assert dataset.samples[0]["original_class"] == 5
 
-    def test_parse_csv_handles_multiple_extensions(self, tmp_path):
-        """Test that multiple audio extensions are handled for spec path."""
+    def test_spec_path_uses_dataset_config(self, tmp_path):
+        """Test that spec path is resolved via dataset_config.get_spectrogram_path."""
         csv_file = tmp_path / "test.csv"
         specs_dir = tmp_path / "specs"
         specs_dir.mkdir()
 
-        # Test with different audio extensions
         with open(csv_file, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["filename", "label"])
@@ -78,11 +101,29 @@ class TestSpectrogramDatasetCSVParsing:
             writer.writerow(["test.mp3", "0"])
             writer.writerow(["test.ogg", "1"])
 
-        dataset = SpectrogramDataset(csv_file=str(csv_file), specs_dir=str(specs_dir))
+        dataset = SpectrogramDataset(
+            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=_make_mock_config()
+        )
 
         # All should map to .pt files
         assert all(sample["spec_filepath"].endswith(".pt") for sample in dataset.samples)
         assert dataset.samples[0]["spec_filepath"].endswith("test.pt")
+
+    def test_dataset_config_required(self, tmp_path):
+        """Test that omitting dataset_config raises ValueError."""
+        csv_file = tmp_path / "test.csv"
+        specs_dir = tmp_path / "specs"
+        specs_dir.mkdir()
+
+        with open(csv_file, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["filename", "label"])
+            writer.writerow(["test.wav", "1"])
+
+        import pytest
+
+        with pytest.raises(ValueError, match="dataset_config is required"):
+            SpectrogramDataset(csv_file=str(csv_file), specs_dir=str(specs_dir))
 
 
 class TestLazySpectrogramGeneration:
@@ -105,7 +146,9 @@ class TestLazySpectrogramGeneration:
             writer.writerow(["filename", "label"])
             writer.writerow(["test.wav", "1"])
 
-        dataset = SpectrogramDataset(csv_file=str(csv_file), specs_dir=str(specs_dir))
+        dataset = SpectrogramDataset(
+            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=_make_mock_config()
+        )
 
         # Should load the existing file
         item = dataset[0]
@@ -128,9 +171,7 @@ class TestLazySpectrogramGeneration:
             writer.writerow(["test.flac", "1", str(audio_dir / "test.flac")])
 
         # Mock dataset config
-        mock_config = Mock()
-        mock_config.sample_rate = 44100
-        mock_config.min_audio_file_size = None
+        mock_config = _make_mock_config()
         mock_config.create_spectrogram_transform.return_value = Mock()
         mock_config.fix_spectrogram_length.return_value = torch.randn(1, 128, 100)
 
@@ -168,10 +209,8 @@ class TestLazySpectrogramGeneration:
             writer.writerow(["test.flac", "1", str(audio_file)])
 
         # Mock dataset config
-        mock_config = Mock()
-        mock_config.sample_rate = 44100
+        mock_config = _make_mock_config()
         spec_data = torch.randn(1, 128, 100)
-        mock_config.min_audio_file_size = None
         mock_config.create_spectrogram_transform.return_value = Mock()
         mock_config.fix_spectrogram_length.return_value = spec_data
 
@@ -199,8 +238,8 @@ class TestLazySpectrogramGeneration:
             saved_path = mock_save.call_args[0][1]
             assert saved_path.endswith("test.pt")
 
-    def test_error_when_spec_missing_and_no_lazy_generation(self, tmp_path):
-        """Test that helpful error is raised when spec missing and no lazy generation."""
+    def test_error_when_spec_missing_and_no_audio_path(self, tmp_path):
+        """Test that helpful error is raised when spec missing and no audio_path."""
         csv_file = tmp_path / "test.csv"
         specs_dir = tmp_path / "specs"
         specs_dir.mkdir()
@@ -211,7 +250,9 @@ class TestLazySpectrogramGeneration:
             writer.writerow(["filename", "label"])
             writer.writerow(["missing.wav", "1"])
 
-        dataset = SpectrogramDataset(csv_file=str(csv_file), specs_dir=str(specs_dir))
+        dataset = SpectrogramDataset(
+            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=_make_mock_config()
+        )
 
         # Should return None for missing files (graceful skip behavior)
         result = dataset[0]
@@ -233,9 +274,7 @@ class TestLazySpectrogramGeneration:
             writer.writerow(["test.flac", "1", str(audio_dir / "test.flac")])
 
         # Mock dataset config
-        mock_config = Mock()
-        mock_config.sample_rate = 44100
-        mock_config.min_audio_file_size = None
+        mock_config = _make_mock_config()
         mock_config.create_spectrogram_transform.return_value = Mock()
         mock_config.fix_spectrogram_length.return_value = torch.randn(1, 128, 100)
 
@@ -284,7 +323,9 @@ class TestSpectrogramDatasetReturnValues:
             writer.writerow(["filename", "label", "original_class"])
             writer.writerow(["test.wav", "1", "Dog"])
 
-        dataset = SpectrogramDataset(csv_file=str(csv_file), specs_dir=str(specs_dir))
+        dataset = SpectrogramDataset(
+            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=_make_mock_config()
+        )
 
         item = dataset[0]
         assert item is not None
@@ -312,7 +353,9 @@ class TestSpectrogramDatasetReturnValues:
             writer.writerow(["filename", "label"])
             writer.writerow(["test.wav", "1"])
 
-        dataset = SpectrogramDataset(csv_file=str(csv_file), specs_dir=str(specs_dir))
+        dataset = SpectrogramDataset(
+            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=_make_mock_config()
+        )
 
         item = dataset[0]
         assert item is not None
@@ -322,8 +365,8 @@ class TestSpectrogramDatasetReturnValues:
 class TestDatasetConfigIntegration:
     """Test integration with dataset configs."""
 
-    def test_dataset_config_parameter_enables_lazy_generation(self, tmp_path):
-        """Test that providing dataset_config enables lazy generation."""
+    def test_dataset_config_stored(self, tmp_path):
+        """Test that dataset_config is stored on the instance."""
         csv_file = tmp_path / "test.csv"
         specs_dir = tmp_path / "specs"
         specs_dir.mkdir()
@@ -334,16 +377,11 @@ class TestDatasetConfigIntegration:
             writer.writerow(["filename", "label", "audio_path"])
             writer.writerow(["test.flac", "1", "/fake/path.flac"])
 
-        # Without dataset_config
-        dataset_no_config = SpectrogramDataset(csv_file=str(csv_file), specs_dir=str(specs_dir))
-        assert dataset_no_config.dataset_config is None
-
-        # With dataset_config
-        mock_config = Mock()
-        dataset_with_config = SpectrogramDataset(
+        mock_config = _make_mock_config()
+        dataset = SpectrogramDataset(
             csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=mock_config
         )
-        assert dataset_with_config.dataset_config == mock_config
+        assert dataset.dataset_config == mock_config
 
     def test_error_when_audio_file_missing(self, tmp_path):
         """Test that FileNotFoundError is raised when audio file doesn't exist."""
@@ -357,8 +395,7 @@ class TestDatasetConfigIntegration:
             writer.writerow(["filename", "label", "audio_path"])
             writer.writerow(["test.flac", "1", "/nonexistent/path.flac"])
 
-        mock_config = Mock()
-        mock_config.min_audio_file_size = None
+        mock_config = _make_mock_config()
 
         dataset = SpectrogramDataset(
             csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=mock_config
@@ -386,7 +423,7 @@ class TestDatasetConfigIntegration:
             writer.writerow(["filename", "label", "audio_path"])
             writer.writerow(["test.wav", "1", str(tmp_path / "test.wav")])
 
-        mock_config = Mock()
+        mock_config = _make_mock_config()
         dataset = SpectrogramDataset(
             csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=mock_config
         )
@@ -400,8 +437,8 @@ class TestDatasetConfigIntegration:
         # Mock config methods should not have been called
         mock_config.create_spectrogram_transform.assert_not_called()
 
-    def test_lazy_generation_without_dataset_config_fails_gracefully(self, tmp_path):
-        """Test that missing spec without dataset_config gives helpful error."""
+    def test_lazy_generation_without_audio_path_fails_gracefully(self, tmp_path):
+        """Test that missing spec without audio_path gives graceful skip."""
         csv_file = tmp_path / "test.csv"
         specs_dir = tmp_path / "specs"
         specs_dir.mkdir()
@@ -412,8 +449,9 @@ class TestDatasetConfigIntegration:
             writer.writerow(["filename", "label", "audio_path"])
             writer.writerow(["missing.wav", "1", str(tmp_path / "missing.wav")])
 
-        # No dataset_config provided
-        dataset = SpectrogramDataset(csv_file=str(csv_file), specs_dir=str(specs_dir))
+        dataset = SpectrogramDataset(
+            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=_make_mock_config()
+        )
 
         # Should return None for files that can't be loaded (graceful skip behavior)
         result = dataset[0]
@@ -435,10 +473,8 @@ class TestDatasetConfigIntegration:
             writer.writerow(["test.flac", "1", str(audio_file)])
 
         # Mock dataset config
-        mock_config = Mock()
-        mock_config.sample_rate = 44100
+        mock_config = _make_mock_config()
         spec_data = torch.randn(1, 128, 100)
-        mock_config.min_audio_file_size = None
         mock_config.create_spectrogram_transform.return_value = Mock()
         mock_config.fix_spectrogram_length.return_value = spec_data
 

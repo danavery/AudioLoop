@@ -38,16 +38,16 @@ class AudiosetConfig(DatasetConfig):
     """Configuration for AudioSet dataset."""
 
     # Audio processing parameters (matching other datasets for consistency)
-    sample_rate: int = 44100
-    n_fft: int = 1024
-    hop_length: int = 256
-    n_mels: int = 128
-    top_db: int = 80
-    fixed_length: int = 2048  # AudioSet clips are ~10s, so allow longer spectrograms
+    _sample_rate: int = 44100
+    _n_fft: int = 1024
+    _hop_length: int = 256
+    _n_mels: int = 128
+    _top_db: int = 80
+    _max_spectrogram_length: int = 2048  # AudioSet clips are ~10s, so allow longer spectrograms
 
     # Default paths - adjust to your mount point
     _audio_root: Path = Path("/mnt/audioset/audioset")
-    output_dir: Path = Path("data/all_specs")
+
 
     # Specific files
     ontology_json: Path = Path("/mnt/audioset/audioset/metadata/ontology.json")
@@ -322,34 +322,34 @@ class AudiosetConfig(DatasetConfig):
     def get_audio_processing_params(self) -> dict[str, Any]:
         """Get audio processing parameters for spectrogram generation."""
         return {
-            "sample_rate": self.sample_rate,
-            "n_fft": self.n_fft,
-            "hop_length": self.hop_length,
-            "n_mels": self.n_mels,
-            "top_db": self.top_db,
-            "fixed_length": self.fixed_length,
+            "sample_rate": self._sample_rate,
+            "n_fft": self._n_fft,
+            "hop_length": self._hop_length,
+            "n_mels": self._n_mels,
+            "top_db": self._top_db,
+            "max_spectrogram_length": self._max_spectrogram_length,
         }
 
     def create_spectrogram_transform(self):
         """Create PyTorch transform pipeline for generating spectrograms."""
         return nn.Sequential(
             torchaudio.transforms.MelSpectrogram(
-                sample_rate=self.sample_rate,
-                n_fft=self.n_fft,
-                hop_length=self.hop_length,
-                n_mels=self.n_mels,
+                sample_rate=self._sample_rate,
+                n_fft=self._n_fft,
+                hop_length=self._hop_length,
+                n_mels=self._n_mels,
             ),
-            LogNormalize(top_db=self.top_db),
+            LogNormalize(top_db=self._top_db),
         )
 
     def get_output_shape(self) -> tuple[int, ...]:
         """Get the shape of tensors produced by this dataset."""
-        return (self.n_mels, -1)  # -1 indicates variable time dimension
+        return (self._n_mels, -1)  # -1 indicates variable time dimension
 
     def fix_spectrogram_length(self, spec: torch.Tensor) -> torch.Tensor:
         """Fix spectrogram length by cropping outliers but preserving natural variation."""
         current_length = spec.shape[-1]  # Time dimension is last
-        max_length = self.fixed_length  # Use as maximum, not target
+        max_length = self._max_spectrogram_length
 
         # Only crop if it exceeds reasonable maximum (handles outliers)
         if current_length > max_length:

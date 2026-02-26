@@ -28,10 +28,16 @@ class SpectrogramDataset(torch.utils.data.Dataset):
         Args:
             csv_file: Path to CSV file containing labels with headers
             specs_dir: Directory containing precomputed .pt spectrogram files
-            dataset_config: Optional DatasetConfig for lazy spectrogram generation.
-                           If provided along with audio_path in CSV, specs will be
-                           generated on-the-fly when missing.
+            dataset_config: DatasetConfig for spectrogram path resolution and lazy generation.
+                           Used to resolve spectrogram paths via get_spectrogram_path() and
+                           to generate spectrograms on-the-fly when missing (if audio_path
+                           is present in CSV).
         """
+        if dataset_config is None:
+            raise ValueError(
+                "dataset_config is required. SpectrogramDataset uses it for spectrogram "
+                "path resolution (get_spectrogram_path) and lazy generation."
+            )
         self.specs_dir = specs_dir
         self.dataset_config = dataset_config
         self.samples = []
@@ -89,11 +95,8 @@ class SpectrogramDataset(torch.utils.data.Dataset):
 
         audio_path = row.get("audio_path", None)
 
-        # Build spectrogram path - handle multiple audio extensions
-        spec_filename = filename
-        for ext in [".wav", ".flac", ".mp3", ".ogg"]:
-            spec_filename = spec_filename.replace(ext, ".pt")
-        spec_filepath = os.path.join(self.specs_dir, spec_filename)
+        # Build spectrogram path using dataset config (same method used by create_specs)
+        spec_filepath = str(self.dataset_config.get_spectrogram_path(filename, Path(self.specs_dir)))
 
         return {
             "filename": filename,
@@ -113,15 +116,8 @@ class SpectrogramDataset(torch.utils.data.Dataset):
             torch.Tensor: Generated spectrogram
 
         Raises:
-            RuntimeError: If dataset_config not provided
             FileNotFoundError: If audio file doesn't exist
         """
-
-        if not self.dataset_config:
-            raise RuntimeError(
-                "Cannot generate spectrogram: dataset_config not provided to SpectrogramDataset"
-            )
-
         audio_path = Path(audio_path)
         if not audio_path.exists():
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
@@ -171,7 +167,7 @@ class SpectrogramDataset(torch.utils.data.Dataset):
             else:
                 # Try lazy generation if audio_path available
                 audio_path = sample.get("audio_path")
-                if audio_path and self.dataset_config:
+                if audio_path:
                     # Debug mode: log audio file being loaded for lazy generation
                     if os.getenv("AUDIOLOOP_DEBUG_FILES"):
                         logger.info(
@@ -188,8 +184,8 @@ class SpectrogramDataset(torch.utils.data.Dataset):
                     # No lazy generation possible - raise error
                     raise FileNotFoundError(
                         f"Spectrogram file not found: {spec_filepath}. "
-                        f"Either pre-generate specs with create_specs.py, or provide "
-                        f"audio_path column in CSV and dataset_config parameter."
+                        f"Either pre-generate specs with create_specs, or provide "
+                        f"audio_path column in CSV for lazy generation."
                     )
 
             # Build return dictionary with all available fields

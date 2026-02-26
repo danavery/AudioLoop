@@ -66,10 +66,10 @@ class TemplateAudioConfig(DatasetConfig):
     # =============================================================================
 
     # Path to your CSV file with labels
-    _dataset_csv_path = Path("data/YOUR_DATASET_NAME/labels.csv")
+    _dataset_csv = Path("data/YOUR_DATASET_NAME/labels.csv")
 
     # Directory containing your audio files
-    _audio_root_path = Path("data/YOUR_DATASET_NAME/clips")
+    _audio_root = Path("data/YOUR_DATASET_NAME/clips")
 
     # Audio file extension (will try common extensions if file not found)
     _audio_extension = ".wav"
@@ -91,7 +91,7 @@ class TemplateAudioConfig(DatasetConfig):
     _hop_length = 512
     _n_mels = 128
     _top_db = 80
-    _fixed_length = 993  # Standard AudioLoop spectrogram length
+    _max_spectrogram_length = 993  # Spectrograms longer than this are cropped
 
     # =============================================================================
     # INTERFACE IMPLEMENTATION (usually no need to modify below this line)
@@ -100,15 +100,15 @@ class TemplateAudioConfig(DatasetConfig):
     @property
     def dataset_csv(self) -> Path:
         """Path to the main dataset CSV file."""
-        return self._dataset_csv_path
+        return self._dataset_csv
 
     @property
     def audio_root(self) -> Path:
         """Root directory containing audio files."""
-        if self._audio_root_path.is_absolute():
-            return self._audio_root_path
+        if self._audio_root.is_absolute():
+            return self._audio_root
         # Resolve relative paths against project root
-        return get_project_root() / self._audio_root_path
+        return get_project_root() / self._audio_root
 
     @property
     def name_to_id(self) -> dict[str, int]:
@@ -240,7 +240,7 @@ class TemplateAudioConfig(DatasetConfig):
             "hop_length": self._hop_length,
             "n_mels": self._n_mels,
             "top_db": self._top_db,
-            "fixed_length": self._fixed_length,
+            "max_spectrogram_length": self._max_spectrogram_length,
         }
 
     def is_positive_class(self, class_name: str, positive_class: str | int) -> bool:
@@ -305,7 +305,7 @@ class TemplateAudioConfig(DatasetConfig):
     def fix_spectrogram_length(self, spec: torch.Tensor) -> torch.Tensor:
         """Fix spectrogram length by cropping outliers but preserving natural variation."""
         current_length = spec.shape[-1]  # Time dimension is last
-        max_length = self._fixed_length  # Use as maximum, not target
+        max_length = self._max_spectrogram_length
 
         # Only crop if it exceeds reasonable maximum (handles outliers)
         if current_length > max_length:
