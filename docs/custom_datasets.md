@@ -20,24 +20,34 @@ audio3.wav,noise
 AudioLoop discovers datasets automatically by file naming convention. No registration required.
 
 ```bash
-# 1. Copy the template
-cp src/audioloop/datasets/templates/simple_audio_template.py src/audioloop/datasets/my_dataset_config.py
+# 1. Create a datasets/ directory in your project root (alongside audioloop.yaml)
+mkdir -p datasets
 
-# 2. Edit the copied file:
+# 2. Copy the template
+cp src/audioloop/datasets/templates/simple_audio_template.py datasets/my_dataset_config.py
+
+# 3. Edit the copied file:
 #    - Rename class from TemplateAudioConfig to MyDatasetConfig
 #    - Update paths: data/YOUR_DATASET_NAME/ → data/my_dataset/
 #    - Customize class vocabulary for your classes
 
-# 3. Use immediately
+# 4. Use immediately
 python -m audioloop.utils.create_bootstrap_set --dataset my_dataset --list-classes
 python -m audioloop.utils.create_bootstrap_set --dataset my_dataset --list-splits
 ```
 
 ## How Discovery Works
 
+AudioLoop scans two locations for dataset config files, in order of precedence:
+
+1. **Project-level** (recommended): `datasets/*_config.py` in your project root
+2. **Built-in**: `src/audioloop/datasets/*_config.py` in the AudioLoop package
+
+Naming conventions:
 - **File naming**: `{dataset_name}_config.py` → dataset name `{dataset_name}`
 - **Class naming**: `{DatasetName}Config` (e.g., `MyAudioConfig`, `CommonVoiceConfig`)
-- **Auto-discovery**: Place the file in `src/audioloop/datasets/` and it's available everywhere
+
+Project-level configs take precedence over built-in ones with the same name, so you can override built-in dataset behavior for your project.
 
 ## Verifying Your Dataset
 

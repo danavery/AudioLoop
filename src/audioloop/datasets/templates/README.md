@@ -1,6 +1,6 @@
 # Dataset Configuration Templates
 
-This directory contains template files for creating custom dataset configurations. **Do not modify these templates directly** - instead, copy them to the parent `datasets/` directory and customize.
+This directory contains template files for creating custom dataset configurations. **Do not modify these templates directly** - instead, copy them to the `datasets/` directory in your project root and customize.
 
 ## Available Templates
 
@@ -9,11 +9,12 @@ Template for the most common pattern: audio files in a folder + labels in a CSV 
 
 **Usage:**
 ```bash
-# 1. Copy the template
-cp audioloop/datasets/templates/simple_audio_template.py audioloop/datasets/my_dataset_config.py
+# 1. Create project datasets directory and copy the template
+mkdir -p datasets
+cp src/audioloop/datasets/templates/simple_audio_template.py datasets/my_dataset_config.py
 
 # 2. Edit the copied file:
-#    - Rename class from TemplateAudioConfig to MyDatasetConfig  
+#    - Rename class from TemplateAudioConfig to MyDatasetConfig
 #    - Update paths to point to your data
 #    - Customize class vocabulary
 
