@@ -352,11 +352,11 @@ class SimpleAudioLabeler:
     def _show_help(self):
         """Display help information."""
         print("\nCommands:")
-        print("  1 or y - Label as POSITIVE (1) - This IS the target sound")
-        print("  0 or n - Label as NEGATIVE (0) - This is NOT the target sound")
+        print("  1      - Label as POSITIVE (1) - This IS the target sound")
+        print("  0      - Label as NEGATIVE (0) - This is NOT the target sound")
+        print("  n      - Next sample (without labeling)")
         print("  p      - Play/replay audio")
         print("  x      - Stop currently playing audio")
-        print("  n      - Next sample (without labeling)")
         print("  b      - Previous sample")
         print("  j      - Jump to sample number")
         print("  u      - Jump to next unlabeled (great for resuming)")
@@ -396,10 +396,10 @@ class SimpleAudioLabeler:
                     elif command in ["h", "help", "?"]:
                         self._show_help()
 
-                    elif command in ["1", "y"]:
+                    elif command == "1":
                         self._label_and_advance("1", "Labeled as POSITIVE (1)")
 
-                    elif command in ["0", "n"]:
+                    elif command == "0":
                         self._label_and_advance("0", "Labeled as NEGATIVE (0)")
 
                     elif command == "p":
