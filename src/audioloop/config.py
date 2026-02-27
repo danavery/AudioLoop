@@ -59,6 +59,7 @@ from .datasets.dataset_config import DatasetConfig
 from .utils.paths import (
     create_output_directories,
     get_output_dir,
+    get_project_root,
     get_specs_dir,
     get_training_sets_dir,
 )
@@ -75,6 +76,7 @@ class AudioLoopConfig:
     # Dataset configuration (environment variable support)
     dataset: str = field(default_factory=lambda: os.getenv("AUDIOLOOP_DATASET", "fsd50k"))
     subset_csv: Path | None = None  # Optional subset CSV to restrict dataset files
+    specs_dir_path: str | None = None  # Spectrogram dir (relative to project root, or absolute)
 
     # Training parameters (experiment configuration)
     max_epochs: int = 1000
@@ -377,6 +379,9 @@ class AudioLoopConfig:
     @property
     def specs_dir(self) -> Path:
         """Get the spectrograms directory."""
+        if self.specs_dir_path is not None:
+            p = Path(self.specs_dir_path)
+            return p if p.is_absolute() else get_project_root() / p
         return get_specs_dir()
 
     def get_model_path(self, version: int) -> Path:

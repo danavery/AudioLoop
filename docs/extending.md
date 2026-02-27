@@ -7,10 +7,12 @@ How to add custom models, selection strategies, and stopping criteria. For addin
 AudioLoop discovers models automatically by file naming convention, the same way datasets work.
 
 ### Quick Start
-1. Create `src/audioloop/models/my_model.py`
+1. Create `models/my_model.py` in your project root (or `src/audioloop/models/my_model.py` in the package)
 2. Define a class inheriting from `AudioLoopModel`
 3. Implement `forward()`, `get_model_info()`, and `can_handle_shape()`
 4. Use immediately: `--model-type my_model`
+
+> **Project-level models**: The `models/` directory in your project root is the recommended location for custom models — it keeps your code separate from the installed package and survives reinstalls. Project-level models take precedence over built-in models with the same name. The directory is not created by `audioloop init`; create it yourself when needed.
 
 ### Requirements
 - **Inherit from `AudioLoopModel`** (extends `nn.Module` with metadata)
@@ -36,19 +38,22 @@ For a complete walkthrough with code examples and testing guidance, see [adding_
 
 ## Custom Selection Strategies
 
-Selection strategies determine which candidates are presented to the human labeler. AudioLoop uses a Strategy pattern with auto-discovery.
+Selection strategies determine which candidates are presented to the human labeler.
 
 ### Quick Start
-1. Create `src/audioloop/strategies/my_strategy.py`
-2. Define a class inheriting from `SelectionStrategy`
-3. Implement `select_candidates(predictions_df, n, **kwargs) -> DataFrame`
-4. Use immediately: `--selection-mode my_strategy`
+1. Create `src/audioloop/utils/candidate_selection/my_strategy.py`
+2. Define a class inheriting from `CandidateSelectionStrategy` (in `base.py`)
+3. Implement `select_candidates(predictions, num_candidates, **kwargs) -> list[dict]`
+4. Register in the `strategies` dict in `factory.py`
+5. Use with: `--selection-mode my_strategy`
 
 ### Built-in Strategies
 - **`entropy`** (default): Selects highest-uncertainty examples
 - **`confidence`**: Selects highest-confidence examples
 - **`mixed_entropy`**: Samples across entropy levels (70% high / 20% medium / 10% low)
 - **`basic_transition`**: Starts with confidence, switches to entropy based on performance
+- **`stratified_uncertainty`**: Samples across stratified uncertainty bins
+- **`random`**: Random selection (baseline)
 
 See [candidate_selection_explained.md](candidate_selection_explained.md) for detailed explanations of the built-in strategies.
 
@@ -73,7 +78,7 @@ See [cycle_stopping_criteria.md](cycle_stopping_criteria.md) for details.
 
 ## Architecture Notes
 
-All extensibility in AudioLoop follows the same pattern:
-- **File-based auto-discovery**: Create a file in the right directory, it's found automatically
-- **Strategy pattern**: Abstract base class with pluggable implementations
-- **Convention over configuration**: File naming determines the CLI name, no registration step
+- **Models**: File-based auto-discovery — project-level `models/` takes precedence over built-in `audioloop/models/`
+- **Selection strategies**: Factory registration — add a class and register it in `factory.py`
+- **Stopping criteria**: Instantiated directly in training/cycle configuration code
+- **Common pattern**: Abstract base class with pluggable implementations

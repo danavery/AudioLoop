@@ -1,252 +1,61 @@
-# Shape Compatibility and Variable Length Spectrograms
+# Shape Compatibility and Variable-Length Spectrograms
 
-AudioLoop supports flexible spectrogram dimensions and automatic dataset/model compatibility checking. This enables domain-specific audio processing while preventing runtime failures from incompatible combinations.
+AudioLoop validates dataset/model compatibility at startup and supports variable-length spectrograms. Datasets declare output shapes, models declare what shapes they accept, and the training pipeline checks compatibility before training begins.
 
-## Overview
+## Dataset Side: `get_output_shape()`
 
-### Shape Compatibility System
-- **Datasets declare output shapes** using `get_output_shape()`
-- **Models declare input requirements** using `can_handle_shape()`
-- **Training pipeline automatically validates** compatibility before starting
-- **Clear error messages** guide users to compatible alternatives
-
-### Variable Length Spectrograms
-- **Natural audio durations preserved** (no forced padding)
-- **Outlier handling** crops extremely long audio to reasonable limits
-- **Implicit temporal augmentation** through natural length variation
-- **Dynamic batch padding** handles different lengths within batches
-
-## Shape Compatibility Interface
-
-### Dataset Side: Declaring Output Shape
-
-Datasets implement `get_output_shape()` to declare what tensor dimensions they produce:
+Each dataset config returns its tensor shape (excluding batch dimension). The sentinel value `-1` marks a variable dimension (typically time):
 
 ```python
-class MyDatasetConfig(DatasetConfig):
-    def get_output_shape(self) -> tuple[int, ...]:
-        return (64, -1)  # 64 frequency bins, variable time dimension
+def get_output_shape(self) -> tuple[int, ...]:
+    return (self.n_mels, -1)  # e.g. (128, -1) — 128 mel bins, variable time
 ```
 
-**Sentinel Values:**
-- **`-1`** indicates a variable dimension (typically time)
-- **Positive integers** indicate fixed dimensions
+## Crop-Not-Pad Behavior: `fix_spectrogram_length()`
 
-### Model Side: Declaring Input Requirements
-
-Models implement `can_handle_shape()` to specify compatibility:
-
-```python
-class MyCNN(AudioLoopModel):
-    def can_handle_shape(self, shape: tuple[int, ...]) -> bool:
-        return len(shape) == 2  # Can handle any 2D tensor
-```
-
-**Common Patterns:**
-
-```python
-# CNN with adaptive pooling - any 2D shape
-def can_handle_shape(self, shape):
-    return len(shape) == 2
-
-# MLP requiring exact element count  
-def can_handle_shape(self, shape):
-    return math.prod(shape) == 127104  # 128 * 993
-
-# RNN requiring fixed feature dimension, variable sequence
-def can_handle_shape(self, shape):
-    return len(shape) == 2 and shape[1] == 128
-```
-
-### Training Pipeline Integration
-
-The training pipeline automatically checks compatibility:
-
-```python
-# Get dataset and model
-dataset_shape = dataset_config.get_output_shape()
-model = create_model(...)
-
-# Automatic compatibility check
-if not model.can_handle_shape(dataset_shape):
-    raise ValueError(f"Model cannot handle shape {dataset_shape}")
-```
-
-**Error Messages:**
-```
-Model 'audio_mlp' cannot handle tensors with shape (128, -1) from dataset 'whale_calls'.
-Available models: ['cnn5layer', 'simplecnn'].
-Try a different model with --model-type or use a compatible dataset.
-```
-
-## Variable Length Spectrograms
-
-### Current Behavior
-
-AudioLoop now preserves natural audio durations instead of forcing all spectrograms to the same length:
-
-#### Before (Fixed Length):
-- All audio → exactly 993 or 2048 frames
-- Short audio gets zero-padded (artificial silence)
-- Long audio gets cropped (loses information)
-
-#### After (Variable Length):
-- Short audio → preserved at natural length (e.g., 400 frames)
-- Medium audio → preserved at natural length (e.g., 1200 frames)  
-- Outlier audio → cropped to reasonable maximum (e.g., 2048 frames)
-
-### Dataset Configuration
-
-Datasets control length handling via `fix_spectrogram_length()`:
+Spectrograms shorter than the configured maximum are kept at their natural length (no zero-padding). Only outliers exceeding the max are center-cropped:
 
 ```python
 def fix_spectrogram_length(self, spec: torch.Tensor) -> torch.Tensor:
-    """Crop outliers but preserve natural variation."""
     current_length = spec.shape[-1]
-    max_length = self.fixed_length  # Use as maximum, not target
-    
-    # Only crop outliers - preserve natural lengths
+    max_length = self._max_spectrogram_length
+
     if current_length > max_length:
         start_idx = (current_length - max_length) // 2
         spec = spec[..., start_idx : start_idx + max_length]
-    
-    return spec  # No padding for short spectrograms
+
+    return spec  # Short spectrograms returned as-is
 ```
 
-### Batch Processing
+## Model Side: `can_handle_shape()`
 
-The `variable_length_collate_fn` handles different lengths within batches:
+Models declare what input shapes they support. All current CNN models use adaptive pooling, so they accept any 2D tensor:
 
 ```python
-# Input batch with different lengths
-batch = [
-    (128, 400),   # Short spectrogram
-    (128, 800),   # Medium spectrogram
-    (128, 1200),  # Long spectrogram
-]
-
-# Output: padded to max length in batch
-result = variable_length_collate_fn(batch)
-# Shape: (3, 128, 1200) - all padded to longest (1200)
+def can_handle_shape(self, shape: tuple[int, ...]) -> bool:
+    return len(shape) == 2  # Any 2D shape works via adaptive pooling
 ```
 
-**Benefits:**
-- **Within-batch consistency** for PyTorch tensor operations
-- **Between-batch variation** for temporal augmentation
-- **Minimal padding** (only to batch maximum, not global maximum)
+A model requiring a fixed input size (e.g. an MLP) would check exact dimensions and reject shapes containing `-1`.
 
-## Benefits
+## Batch Processing: `variable_length_collate_fn`
 
-### Domain-Specific Optimization
-Different audio domains can use appropriate spectrogram dimensions:
+Within each batch, spectrograms are padded to the length of the longest item in that batch. This gives within-batch tensor consistency while preserving between-batch length variation:
 
 ```python
-# Whale calls: Lower frequency range, longer time
-class WhaleCallConfig(DatasetConfig):
-    def get_output_shape(self):
-        return (64, -1)  # 64 mels, variable time up to 1500 frames
-
-# Bird songs: Higher frequency range, shorter time  
-class BirdSongConfig(DatasetConfig):
-    def get_output_shape(self):
-        return (128, -1)  # 128 mels, variable time up to 800 frames
+# Three spectrograms with different time dimensions:
+#   (128, 400), (128, 800), (128, 1200)
+# After collation → batch tensor shape: (3, 128, 1200)
 ```
 
-### Improved Model Training
-- **Natural variation** improves model generalization
-- **No artificial padding artifacts** from zero-padding short audio
-- **No information loss** from cropping medium-length audio
-- **Implicit temporal augmentation** through length diversity
+See `src/audioloop/utils/data_utils.py` for the implementation.
 
-### Automatic Validation
-- **Prevents runtime crashes** from dimension mismatches
-- **Clear error messages** with suggested fixes
-- **Early failure** before expensive training starts
-- **Future-proof** for non-CNN models (MLPs, Transformers, etc.)
+## Compatibility Error
 
-## Examples
+If a model can't handle a dataset's shape, training fails immediately with a message like:
 
-### Compatible Combinations
-
-Current models work with all current datasets:
-
-```bash
-# All these combinations work
-✅ fsd50k (128, -1) + cnn5layer
-✅ fsd50k (128, -1) + simplecnn  
-✅ urbansound8k (128, -1) + cnn5layer
-✅ urbansound8k (128, -1) + simplecnn
 ```
-
-### Incompatible Example
-
-A hypothetical MLP model requiring exact input size:
-
-```python
-class AudioMLP(AudioLoopModel):
-    def can_handle_shape(self, shape):
-        return math.prod(shape) == 127104  # Exactly 128 * 993
-        
-# This would fail:
-❌ fsd50k (128, -1) + audio_mlp
-# Error: Cannot determine exact size from variable dimension
+Model 'audio_mlp' cannot handle tensors with shape (128, -1) from dataset 'fsd50k'.
+Available models: ['cnn5layer', 'cnn7layer', 'simplecnn'].
+Try a different model with --model-type or use a compatible dataset.
 ```
-
-### Custom Dataset Example
-
-```python
-class MarineAcousticsConfig(DatasetConfig):
-    """Optimized for underwater whale call detection."""
-    
-    fixed_length = 1500  # Max length for outlier cropping
-    
-    def get_output_shape(self):
-        return (64, -1)  # Fewer mels (10-1000 Hz range), variable time
-        
-    def create_spectrogram_transform(self):
-        return nn.Sequential(
-            torchaudio.transforms.MelSpectrogram(
-                sample_rate=2000,    # Lower sample rate for underwater
-                n_mels=64,           # Focus on whale frequency range
-                f_min=10.0,          # Blue whale calls start at ~10 Hz
-                f_max=1000.0,        # Humpback upper range
-            ),
-            LogNormalize(top_db=80),
-        )
-```
-
-## Migration from Fixed Lengths
-
-### Existing Behavior Preserved
-- **Maximum length limits** still prevent outliers (FSD50K: 2048, UrbanSound8K: 993)
-- **Same model architectures** work without changes (adaptive pooling)
-- **Same CLI commands** work without modification
-
-### New Capabilities Added  
-- **Natural length variation** enables better model training
-- **Domain-specific optimization** through custom shape declarations
-- **Automatic compatibility checking** prevents configuration errors
-- **Future model support** for architectures requiring specific input dimensions
-
-### No Breaking Changes
-- **Existing datasets** return `(128, -1)` instead of `(128, 993)`
-- **Existing models** accept any 2D shape via adaptive pooling
-- **Existing workflows** continue working with improved training
-
-## Technical Details
-
-### Collate Function Selection
-AudioLoop automatically uses `variable_length_collate_fn` for all training, which works for both fixed and variable length spectrograms.
-
-### Memory Efficiency
-- **Minimal padding**: Only pad within each batch, not to global maximum
-- **Natural lengths**: No wasted memory on unnecessary padding
-- **Batch grouping**: Future optimization could group similar lengths
-
-### Model Architecture Support
-- **CNNs with adaptive pooling**: Handle any input size ✅
-- **Fully connected networks**: Require exact input size ⚠️  
-- **RNNs**: Can handle variable sequence lengths ✅
-- **Transformers**: May require sequence length limits ⚠️
-
-The shape compatibility system ensures only compatible combinations are used, preventing runtime failures while enabling domain-specific optimizations.

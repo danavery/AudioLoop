@@ -28,12 +28,14 @@ Usage:
   python -m audioloop.label_audio outputs/labeling_candidates_v1.csv --dataset fsd50k --audio-dir data/FSD50K/FSD50K.dev_audio
 
 Controls:
-- 1 or y: Label as POSITIVE (target sound detected)
-- 0 or n: Label as NEGATIVE (target sound NOT detected)
+- 1: Label as POSITIVE (target sound detected)
+- 0: Label as NEGATIVE (target sound NOT detected)
+- n: Skip to next without labeling
 - p: Play/replay audio
 - x: Stop currently playing audio
 - u: Jump to next unlabeled sample
-- q: Quit and save
+- s: Save progress
+- q: Quit (prompts to save)
 
 The tool automatically plays audio after each label for efficient workflow.
 """

@@ -1,10 +1,10 @@
 # AudioLoop Developer Guide
 
-Developer reference for AudioLoop architecture, patterns, and extensibility. For CLI command reference, see [docs/cli_reference.md](docs/cli_reference.md). For workflow patterns, see [docs/workflow_guide.md](docs/workflow_guide.md).
+Developer reference for AudioLoop architecture, patterns, and extensibility. For workflow patterns and configuration, see [docs/user_manual.md](docs/user_manual.md).
 
 ## Project Architecture
 
-AudioLoop is an active learning framework for binary audio classification supporting arbitrary audio datasets. It implements a versioned workflow for iterative model improvement through human-in-the-loop labeling. Built-in support includes FSD50K and UrbanSound8K, with easy extensibility for custom datasets.
+AudioLoop is an active learning framework for binary audio classification supporting arbitrary audio datasets. It implements a versioned workflow for iterative model improvement through human-in-the-loop labeling. Built-in support includes AudioSet, FSD50K, and UrbanSound8K, with easy extensibility for custom datasets.
 
 ### Design Goals
 
@@ -37,21 +37,21 @@ AudioLoop supports two primary workflow modes designed for different use cases:
 - Auto-labeling possible for rapid testing
 - Full evaluation metrics (F1, precision, recall, accuracy)
 
-Use the `--with-ground-truth` flag to enable evaluation mode in active learning commands.
+Use `--evaluation-mode` with `automated_workflow`, or `--with-ground-truth` with individual commands like `active_learning`.
 
 ### Selection Strategies
 
 AudioLoop uses a pluggable strategy pattern for candidate selection:
 
-**ConfidenceStrategy** (Default):
-- Selects samples with highest model confidence scores
-- Best for early training cycles when model is uncertain
-- Can lead to overconfidence in later cycles
-
-**EntropyStrategy** (Uncertainty Sampling):
+**EntropyStrategy** (Default):
 - Selects samples with highest entropy (most uncertain predictions)
-- Best for later training cycles or when model becomes overconfident
+- Best general-purpose strategy for active learning
 - Focuses on samples near decision boundaries
+
+**ConfidenceStrategy**:
+- Selects samples with highest model confidence scores
+- Useful for early training cycles to verify model is learning correctly
+- Can lead to redundant selections once the model becomes overconfident
 
 **BasicTransitionStrategy**:
 - Automatically switches from confidence to entropy based on model performance
@@ -78,7 +78,7 @@ AudioLoop uses a pluggable strategy pattern for candidate selection:
 - **`utils/candidate_selection.py`**: Pluggable candidate selection strategies using Strategy pattern
 
 ### Models
-- **`models/base.py`**: Abstract base class (`AudioLoopModel`) defining the pluggable model interface
+- **`models/audio_loop_model.py`**: Abstract base class (`AudioLoopModel`) defining the pluggable model interface
 - **`models/cnn_5layer.py`**: Primary CNN architecture with adaptive pooling
 - **`models/simple_cnn.py`**: Alternative lightweight CNN model
 
@@ -206,7 +206,7 @@ Customize paths and behavior via environment variables:
 - `AUDIOLOOP_DATASET`: Default dataset (`fsd50k` or `urbansound8k`)
 - `AUDIOLOOP_DATA_ROOT`: Root directory for data files (default: `data`)
 - `AUDIOLOOP_OUTPUT_ROOT`: Root directory for outputs (default: `.`)
-- `AUDIOLOOP_SPECS_DIR`: Spectrograms subdirectory (default: `all_specs`)
+- `AUDIOLOOP_SPECS_DIR`: Spectrograms subdirectory (default: `all_specs`). Env var fallback; prefer `specs_dir_path` in yaml.
 
 ### Sound Classification
 - **`datasets/fsd50k.py`**: FSD50K class mappings (200 classes with semantic groupings)
@@ -248,26 +248,32 @@ Customize paths and behavior via environment variables:
 ## File Formats
 
 ### Training Set CSV
+Bootstrap (from `create_bootstrap_set`):
 ```csv
-filepath,label,run
-data/all_specs/100032-3-0-0.pt,1,1
-data/all_specs/100263-2-0-117.pt,0,1
+filename,label,audio_path
+clip_001.pt,1,/path/to/audio/clip_001.wav
+```
+
+Merged (from `merge_labels`):
+```csv
+filename,label
+data/all_specs/100032-3-0-0.pt,1
 ```
 
 ### Predictions CSV (Generated)
-Default format (production mode):
+Production mode:
 ```csv
-filename,prediction,predicted_class,confidence,entropy,prob_negative,prob_positive,original_class,fold,filepath
+filename,prediction,predicted_class,target_class,confidence,entropy,prob_negative,prob_positive,original_class,audio_path,filepath
 ```
 
-With ground truth evaluation (--with-ground-truth flag):
+Evaluation mode (--with-ground-truth flag):
 ```csv
-filename,ground_truth,prediction,predicted_class,confidence,entropy,prob_negative,prob_positive,correct,original_class,fold,filepath
+filename,ground_truth,prediction,predicted_class,target_class,confidence,entropy,prob_negative,prob_positive,original_class,correct,audio_path,filepath
 ```
 
 ### Candidates CSV (For Human Labeling)
 ```csv
-filename,prediction,predicted_class,confidence,needs_human_label,entropy,prob_negative,prob_positive,original_class,fold,filepath
+filename,prediction,predicted_class,target_class,confidence,entropy,prob_negative,prob_positive,original_class,audio_path,filepath,needs_human_label,human_confidence
 ```
 
 ## Key Dependencies
@@ -435,5 +441,4 @@ All modules use seed `42` by default. The `set_seed()` function controls Python 
 - **[docs/stopping_criteria_guide.md](docs/stopping_criteria_guide.md)**: Training stopping criteria
 - **[docs/cycle_stopping_criteria.md](docs/cycle_stopping_criteria.md)**: Cross-cycle stopping criteria
 - **[docs/shape_compatibility_and_variable_lengths.md](docs/shape_compatibility_and_variable_lengths.md)**: Variable-length spectrogram support
-- **[docs/labeling_guide.md](docs/labeling_guide.md)**: Audio labeling best practices
 - **[webui/README.md](webui/README.md)**: Web-based labeling interface

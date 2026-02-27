@@ -1,7 +1,7 @@
 # Handling Corrupt Audio Files
 
 ## Problem
-Some audio files in datasets are corrupt and cause `torchaudio.load()` to segfault when attempting lazy spectrogram generation. These crashes cannot be caught with try/except.
+Occasional audio files in some datasets are corrupt and cause `torchaudio.load()` to segfault when attempting lazy spectrogram generation. These crashes cannot be caught with try/except.
 
 ## Solution
 We maintain a list of known bad files in each dataset config and filter them out during processing.

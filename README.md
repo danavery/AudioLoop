@@ -102,9 +102,28 @@ python -m audioloop.webui [--host 0.0.0.0 if not localhost]
 # Remember to save your labels before exiting the web UI!
 ```
 
-For a more detailed guide on how to use AudioLoop, see **[docs/workflow_guide.md](docs/workflow_guide.md)**.
+For a more detailed guide on how to use AudioLoop, see **[docs/user_manual.md](docs/user_manual.md)**.
 
-A reference to all available actions can be found at **[docs/cli_reference.md](docs/cli_reference.md)**.
+### Available Actions
+
+All actions are run as `python -m audioloop.<action>`. Use `--help` on any action for full details.
+
+| Action | Description |
+|--------|-------------|
+| `automated_workflow` | Run the full active learning loop (train → select → label → repeat) |
+| `batch_runner` | Run multiple experiment configs sequentially |
+| `train` | Train a model on a training set CSV |
+| `active_learning` | Run candidate selection on a trained model's predictions |
+| `label_audio` | CLI labeling interface for candidate audio clips |
+| `webui` | Web-based labeling interface (recommended) |
+| `merge_labels` | Merge human labels back into a training set |
+| `auto_label_candidates` | Auto-label candidates from ground truth (evaluation mode) |
+| `create_specs` | Pre-generate spectrograms from audio files |
+| `create_subset` | Create a training-ready subset from a large dataset |
+| `prepare_subset_specs` | Create a subset-specific spectrogram directory for remote deployment |
+| `track_metrics` | View and plot learning curves across cycles |
+| `init_project` | Initialize a new project directory |
+| `utils.create_bootstrap_set` | Create an initial seed training set |
 
 
 ## Core Concepts
@@ -115,7 +134,7 @@ It supports two types of use cases:
 1) Dataset constuction ('label' mode): train a model to produce dataset-wide labels with less manual effort than traditional random sampling. Example: I want to label all the positive and negative examples of blue whale "A" calls in a dataset too large to reasonably label by hand.
 2) Rare-event search ('search' mode): surface positive examples of whatever you're looking for in your dataset. This use case creates a model that prioritizes recall over calibrated classification. Example: I want to find more blue whale "A" calls in my hydrophone recording dataset.
 
-### Active learning loop
+### Active Learning Loop
 
 Audioloop's core idea is that we can save human labeling time by starting with a small known set of labels and iteratively creating models that get better and better at correctly identifying positive and negative examples. Audio clips that would be especially helpful to add to the training set get selected for explicit human classification. This way human labelers can focus on the useful cases and not on random sets of examples.
 
@@ -131,7 +150,7 @@ Each of these steps can be run individually, but the automated_workflow action, 
 
 This is one of the core mechanisms of the Audioloop process. Examples are selected for human review via the current active candidate selection method. Candidate selection strategies are tunable, pluggable, and extensible, but some basic strategies are provided in the Audioloop package--current options are entropy, confidence, and mixed strategies.
 
-### Production vs evaluation mode
+### Production vs Evaluation Mode
 
 There are two running modes:
 1) Production mode: This mode is the normal working mode of Audioloop. It runs the loop as expected, creating models for dataset labeling. It doesn't report overall metrics because it doesn't have ground truth data, which makes sense because producing ground truth data is the main point of Audioloop. It does report metrics on the current model's performance on the newest set of candidates once they are human-labeled.
@@ -147,10 +166,10 @@ Audioloop is designed to be pluggable and extensible--see EXTENDING.md to add cu
 
 ## Current Limitations
 
-### Binary classification
+### Binary Classification
 
 In the alpha release, Audioloop is focused on binary classification--is a specific example audio clip a "positive" or "negative" example of a desired sound--for simplicity. Multi-class and multi-label datasets are not supported at the moment. Multi-label or multi-class labeling would currently have to be performed one class at a time.
 
-### Single-user labeling
+### Single-user Labeling
 
 There are currently no facilities for multi-user, asynchronous labeling. All labeling needs to be done by one user at a time. Future releases will allow for spreading labeling workload across multiple users.

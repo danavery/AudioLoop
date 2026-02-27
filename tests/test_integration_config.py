@@ -139,6 +139,40 @@ class TestVersionedWorkflow:
         assert "exp2" in str(model2)
 
 
+class TestSpecsDirPathConfig:
+    """Test specs_dir_path YAML configuration."""
+
+    def test_specs_dir_path_relative(self):
+        """Test that specs_dir_path in yaml resolves relative to project root."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Create audioloop.yaml so get_project_root() works
+            yaml_path = Path(temp_dir) / "audioloop.yaml"
+            yaml_path.write_text(
+                "config:\n  specs_dir_path: data/my_specs\n  experiment_name: test\n"
+            )
+            with patch(
+                "audioloop.utils.paths.get_project_root", return_value=Path(temp_dir)
+            ), patch(
+                "audioloop.config.get_project_root", return_value=Path(temp_dir)
+            ):
+                config = AudioLoopConfig.from_yaml(yaml_path)
+                assert config.specs_dir == Path(temp_dir) / "data" / "my_specs"
+
+    def test_specs_dir_path_absolute(self):
+        """Test that absolute specs_dir_path is used as-is."""
+        config = AudioLoopConfig(specs_dir_path="/mnt/fast/specs")
+        assert config.specs_dir == Path("/mnt/fast/specs")
+
+    def test_specs_dir_path_none_falls_back(self):
+        """Test that None specs_dir_path falls back to get_specs_dir()."""
+        config = AudioLoopConfig()
+        assert config.specs_dir_path is None
+        # Should delegate to get_specs_dir() which uses env var / defaults
+        from audioloop.utils.paths import get_specs_dir
+
+        assert config.specs_dir == get_specs_dir()
+
+
 class TestRealUsagePatterns:
     """Test realistic usage patterns."""
 
