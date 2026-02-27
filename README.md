@@ -1,6 +1,6 @@
 # AudioLoop: Active Learning Framework for Audio Classification
 
-AudioLoop is an active learning framework for binary audio classification that minimizes human labeling effort through strategic sample selection.
+AudioLoop is an active learning framework for binary audio classification that minimizes human labeling effort through strategic sample selection. Designed for scenarios like marine bioacoustics, where labeling is expensive and positive examples are rare.
 
 Label smarter, not harder!
 
@@ -131,7 +131,7 @@ All actions are run as `python -m audioloop.<action>`. Use `--help` on any actio
 AudioLoop is a framework for iterative, human-in-the-loop binary labeling over large, unlabeled audio corpora using uncertainty-driven sampling.
 
 It supports two types of use cases:
-1) Dataset constuction ('label' mode): train a model to produce dataset-wide labels with less manual effort than traditional random sampling. Example: I want to label all the positive and negative examples of blue whale "A" calls in a dataset too large to reasonably label by hand.
+1) Dataset construction ('label' mode): train a model to produce dataset-wide labels with less manual effort than traditional random sampling. Example: I want to label all the positive and negative examples of blue whale "A" calls in a dataset too large to reasonably label by hand.
 2) Rare-event search ('search' mode): surface positive examples of whatever you're looking for in your dataset. This use case creates a model that prioritizes recall over calibrated classification. Example: I want to find more blue whale "A" calls in my hydrophone recording dataset.
 
 ### Active Learning Loop
@@ -140,7 +140,7 @@ AudioLoop's core idea is that we can save human labeling time by starting with a
 
 1) A user manually creates an initial small positive/negative training set CSV of discrete audio clips for classification
 2) A model is trained on that training set
-3) AudioLoop selects candidate example clips--ones particulaly helpful for models to train on based on the current candidate selection strategy--for human review
+3) AudioLoop selects candidate example clips--ones particularly helpful for models to train on based on the current candidate selection strategy--for human review
 4) A human hand-labels the candidate examples (using web UI or CLI), which are added to the current training set
 5) AudioLoop returns to step 2 with the new larger training set, unless the cycle stopping criteria are met, in which case we're done and hopefully have a model we can use to label the remainder of our dataset
 
@@ -162,7 +162,7 @@ There are two running modes:
 2) Project: A project is a container for a set of experiments. It includes data, configuration, and experiments which are confined to a single project directory. All AudioLoop experiments happen inside a project directory, which is created with the "init_project" action. Your dataset needs to be present inside this directory or symlinked to it.
 
 ### Extensibility:
-AudioLoop is designed to be pluggable and extensible--see EXTENDING.md to add custom datasets, models, and strategies.
+AudioLoop is designed to be pluggable and extensible--see [docs/extending.md](docs/extending.md) to add custom datasets, models, and strategies.
 
 ## Current Limitations
 
