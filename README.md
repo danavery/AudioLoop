@@ -56,7 +56,7 @@ mv UrbanSound8K/audio/* ${PROJECT_DIR}/data/urbansound8k
 mv UrbanSound8K/metadata/UrbanSound8K.csv ${PROJECT_DIR}/data/urbansound8k
 ```
 
-### 4. Edit the Audioloop config file to use the UrbanSound8K presets
+### 4. Edit the AudioLoop config file to use the UrbanSound8K presets
 
 ```bash
 # Uncomment and replace `dataset: fsd50k` in ${PROJECT_DIR}/audioloop.yaml with `dataset: urbansound8k`
@@ -128,7 +128,7 @@ All actions are run as `python -m audioloop.<action>`. Use `--help` on any actio
 
 ## Core Concepts
 
-Audioloop is a framework for iterative, human-in-the-loop binary labeling over large, unlabeled audio corpora using uncertainty-driven sampling.
+AudioLoop is a framework for iterative, human-in-the-loop binary labeling over large, unlabeled audio corpora using uncertainty-driven sampling.
 
 It supports two types of use cases:
 1) Dataset constuction ('label' mode): train a model to produce dataset-wide labels with less manual effort than traditional random sampling. Example: I want to label all the positive and negative examples of blue whale "A" calls in a dataset too large to reasonably label by hand.
@@ -136,39 +136,39 @@ It supports two types of use cases:
 
 ### Active Learning Loop
 
-Audioloop's core idea is that we can save human labeling time by starting with a small known set of labels and iteratively creating models that get better and better at correctly identifying positive and negative examples. Audio clips that would be especially helpful to add to the training set get selected for explicit human classification. This way human labelers can focus on the useful cases and not on random sets of examples.
+AudioLoop's core idea is that we can save human labeling time by starting with a small known set of labels and iteratively creating models that get better and better at correctly identifying positive and negative examples. Audio clips that would be especially helpful to add to the training set get selected for explicit human classification. This way human labelers can focus on the useful cases and not on random sets of examples.
 
 1) A user manually creates an initial small positive/negative training set CSV of discrete audio clips for classification
 2) A model is trained on that training set
-3) Audioloop selects candidate example clips--ones particulaly helpful for models to train on based on the current candidate selection strategy--for human review
+3) AudioLoop selects candidate example clips--ones particulaly helpful for models to train on based on the current candidate selection strategy--for human review
 4) A human hand-labels the candidate examples (using web UI or CLI), which are added to the current training set
-5) Audioloop returns to step 2 with the new larger training set, unless the cycle stopping criteria are met, in which case we're done and hopefully have a model we can use to label the remainder of our dataset
+5) AudioLoop returns to step 2 with the new larger training set, unless the cycle stopping criteria are met, in which case we're done and hopefully have a model we can use to label the remainder of our dataset
 
 Each of these steps can be run individually, but the automated_workflow action, which guides the workflow in the above sequence of steps, is strongly preferred.
 
 ### Candidate Selection Strategies
 
-This is one of the core mechanisms of the Audioloop process. Examples are selected for human review via the current active candidate selection method. Candidate selection strategies are tunable, pluggable, and extensible, but some basic strategies are provided in the Audioloop package--current options are entropy, confidence, and mixed strategies.
+This is one of the core mechanisms of the AudioLoop process. Examples are selected for human review via the current active candidate selection method. Candidate selection strategies are tunable, pluggable, and extensible, but some basic strategies are provided in the AudioLoop package--current options are entropy, confidence, and mixed strategies.
 
 ### Production vs Evaluation Mode
 
 There are two running modes:
-1) Production mode: This mode is the normal working mode of Audioloop. It runs the loop as expected, creating models for dataset labeling. It doesn't report overall metrics because it doesn't have ground truth data, which makes sense because producing ground truth data is the main point of Audioloop. It does report metrics on the current model's performance on the newest set of candidates once they are human-labeled.
+1) Production mode: This mode is the normal working mode of AudioLoop. It runs the loop as expected, creating models for dataset labeling. It doesn't report overall metrics because it doesn't have ground truth data, which makes sense because producing ground truth data is the main point of AudioLoop. It does report metrics on the current model's performance on the newest set of candidates once they are human-labeled.
 2) Evaluation mode (ground truth mode):  This mode runs the active learning loop like production mode but produces metrics for the current working model based on the actual ground truth labels for the _entire_ dataset being labeled. A CSV of ground truth labels for the dataset in question is required. The pre-existing labels are compared to the current model's performance over the entire dataset. This mode is used to test selection strategies and simulate performance on known, labeled datasets.
 
 ### Experiments/Projects:
 
-1) Experiment: Each Audioloop run is given an "experiment" name to distinguish it from other experiments for storing and retrieving training sets and models for each cycle of the experiment. Experiment directories hold the models, predictions, candidates, and training sets generated.
-2) Project: A project is a container for a set of experiments. It includes data, configuration, and experiments which are confined to a single project directory. All Audioloop experiments happen inside a project directory, which is created with the "init_project" action. Your dataset needs to be present inside this directory or symlinked to it.
+1) Experiment: Each AudioLoop run is given an "experiment" name to distinguish it from other experiments for storing and retrieving training sets and models for each cycle of the experiment. Experiment directories hold the models, predictions, candidates, and training sets generated.
+2) Project: A project is a container for a set of experiments. It includes data, configuration, and experiments which are confined to a single project directory. All AudioLoop experiments happen inside a project directory, which is created with the "init_project" action. Your dataset needs to be present inside this directory or symlinked to it.
 
 ### Extensibility:
-Audioloop is designed to be pluggable and extensible--see EXTENDING.md to add custom datasets, models, and strategies.
+AudioLoop is designed to be pluggable and extensible--see EXTENDING.md to add custom datasets, models, and strategies.
 
 ## Current Limitations
 
 ### Binary Classification
 
-In the alpha release, Audioloop is focused on binary classification--is a specific example audio clip a "positive" or "negative" example of a desired sound--for simplicity. Multi-class and multi-label datasets are not supported at the moment. Multi-label or multi-class labeling would currently have to be performed one class at a time.
+In the alpha release, AudioLoop is focused on binary classification--is a specific example audio clip a "positive" or "negative" example of a desired sound--for simplicity. Multi-class and multi-label datasets are not supported at the moment. Multi-label or multi-class labeling would currently have to be performed one class at a time.
 
 ### Single-user Labeling
 

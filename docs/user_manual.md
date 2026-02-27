@@ -1,8 +1,8 @@
-# Audioloop User Manual
+# AudioLoop User Manual
 
 ## The Loop
 
-The core workflow of Audioloop is training->candidate_selection->labeling->training->candidate_selection->labeling->...
+The core workflow of AudioLoop is training->candidate_selection->labeling->training->candidate_selection->labeling->...
 
 * A initial training set with positive and negative examples of a particular class is used to train a model from scratch
 * That model is used to select candidates from the larger dataset for human labeling 
@@ -27,9 +27,9 @@ AudioLoop has two running modes: **production mode** (the default) for real-worl
 
 Per-dataset handling is configured in specific instances of `DatasetConfig` in the `datasets` project directory (apart from pre-supplied dataset configs for Audioset, FSD50K, and UrbanSound8K). 
 
-Dataset configuration tells Audioloop where the clip files are, where the metadata is, what splits are available, a list of classes, and any custom spectrogram parameters.
+Dataset configuration tells AudioLoop where the clip files are, where the metadata is, what splits are available, a list of classes, and any custom spectrogram parameters.
 
-Examples of dataset configuration are available in the current project directory's `datasets/templates`. Copy that template to `datasets` and alter as needed. Examples of complete pre-supplied configurations are in the Audioloop source directory `src/audioloop/datasets`
+Examples of dataset configuration are available in the current project directory's `datasets/templates`. Copy that template to `datasets` and alter as needed. Examples of complete pre-supplied configurations are in the AudioLoop source directory `src/audioloop/datasets`
 
 ### audioloop.yaml
 
