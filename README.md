@@ -173,3 +173,7 @@ In the alpha release, AudioLoop is focused on binary classification--is a specif
 ### Single-user Labeling
 
 There are currently no facilities for multi-user, asynchronous labeling. All labeling needs to be done by one user at a time. Future releases will allow for spreading labeling workload across multiple users.
+
+### Audioset not ready-to-use
+
+To use the supplied Audioset configuration, the audio files need to be arranged in a certain directory structure. Instructions and scripts for acquiring and arranging Audioset are pending.
