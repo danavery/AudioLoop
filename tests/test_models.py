@@ -3,8 +3,10 @@
 import pytest
 import torch
 
+from audioloop.active_learning_core import load_model
 from audioloop.models import AudioLoopModel
 from audioloop.models.cnn5layer import CNN5Layer
+from audioloop.models.cnn7layer import CNN7Layer
 from audioloop.models.simplecnn import SimpleCnn
 
 
@@ -238,6 +240,46 @@ class TestCNN5Layer:
         assert output1.shape == (1, 2)
         assert output2.shape == (1, 3)
         assert not torch.equal(output1[:, :2], output2[:, :2])  # Should be different
+
+
+class TestModelCheckpointMetadata:
+    """Test model checkpoint metadata round-trips through inference loading."""
+
+    @pytest.mark.parametrize(
+        ("model_type", "model_class", "init_kwargs"),
+        [
+            ("cnn5layer", CNN5Layer, {"num_classes": 2, "dataset_size": 50}),
+            ("cnn7layer", CNN7Layer, {"num_classes": 3, "dataset_size": 150}),
+            ("simplecnn", SimpleCnn, {"num_classes": 4}),
+        ],
+    )
+    def test_builtin_model_checkpoint_round_trip(
+        self, tmp_path, model_type, model_class, init_kwargs
+    ):
+        """Test that built-in model metadata can reconstruct saved checkpoints."""
+        model = model_class(**init_kwargs)
+        model.eval()
+
+        model_info = model.get_model_info()
+        checkpoint = {
+            "model_state_dict": model.state_dict(),
+            **{k: v for k, v in model_info.items() if k != "num_parameters"},
+        }
+        checkpoint_path = tmp_path / f"{model_type}.pt"
+        torch.save(checkpoint, checkpoint_path)
+
+        loaded_model = load_model(checkpoint_path, torch.device("cpu"))
+
+        assert isinstance(loaded_model, model_class)
+        assert loaded_model.training is False
+        assert loaded_model.get_model_info()["model_type"] == model_type
+        assert loaded_model.get_model_info()["num_classes"] == init_kwargs["num_classes"]
+
+        if "use_batchnorm" in model_info:
+            assert loaded_model.get_model_info()["use_batchnorm"] == model_info["use_batchnorm"]
+
+        for name, parameter in model.state_dict().items():
+            assert torch.equal(parameter, loaded_model.state_dict()[name])
 
 
 class TestSimpleCnn:
