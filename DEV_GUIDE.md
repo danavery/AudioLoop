@@ -79,8 +79,8 @@ AudioLoop uses a pluggable strategy pattern for candidate selection:
 
 ### Models
 - **`models/audio_loop_model.py`**: Abstract base class (`AudioLoopModel`) defining the pluggable model interface
-- **`models/cnn_5layer.py`**: Primary CNN architecture with adaptive pooling
-- **`models/simple_cnn.py`**: Alternative lightweight CNN model
+- **`models/cnn5layer.py`**: Primary CNN architecture with adaptive pooling
+- **`models/simplecnn.py`**: Alternative lightweight CNN model
 
 AudioLoop uses a pluggable model architecture where all models implement the `AudioLoopModel` abstract base class. This allows easy integration of custom PyTorch models or HuggingFace models while maintaining compatibility with the existing training and inference pipeline.
 

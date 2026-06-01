@@ -23,7 +23,7 @@
 # weight_decay: 0.00001            # L2 regularization
 
 # Model
-# model_type: cnn5layer            # Available: cnn5layer, simple_cnn
+# model_type: cnn5layer            # Available: cnn5layer, cnn7layer, simplecnn
 # class_weighting: 0.70            # Options: null (none), "adaptive", or float (0.0-1.0)
 
 # ------------------------------------------------------------------------------
