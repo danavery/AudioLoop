@@ -105,6 +105,8 @@ Some training parameters:
 
 * model_type (default: `cnn5layer`): model architecture to use. Current options are `cnn5layer`, `cnn7layer`, and `simplecnn`. The default works reasonably well, but other models (coming soon), especially pre-trained ones, will probably work better. See also [extending.md](extending.md) for how to add your own.
 
+* model_kwargs (default: `{}`): model-specific constructor parameters for the selected model. Configure these in YAML or through the Python API; the CLI currently supports `--model-type` but does not expose arbitrary model-specific kwargs as command-line flags.
+
 * class_weighting (default: 0.70): controls how the loss function balances positive and negative examples. A value of 0.70 down-weights positive-class errors relative to negative-class errors, which biases the model toward predicting positive — it would rather flag something incorrectly than miss a true positive. This surfaces more rare positive examples during candidate selection.
 
   - A float (0.0–1.0): higher values bias the model more toward positive predictions. The default 0.70 works well for rare-event search.

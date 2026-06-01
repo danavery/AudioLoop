@@ -25,6 +25,9 @@ AudioLoop discovers models automatically by file naming convention, the same way
 - **Auto-discovery**: No registration needed
 
 ### Custom Parameters
+
+Model-specific parameters are passed through `model_kwargs` in YAML or when constructing `AudioLoopConfig` in Python:
+
 ```python
 config = AudioLoopConfig(
     model_type="resnet",
@@ -32,7 +35,9 @@ config = AudioLoopConfig(
 )
 ```
 
-Constructor parameters from `get_model_info()` are automatically saved and restored.
+The CLI currently supports selecting a model with `--model-type`; arbitrary model-specific kwargs are configured through YAML/API rather than command-line flags.
+
+Constructor parameters from `get_model_info()` are automatically saved and restored. Include any architecture-affecting kwargs there so checkpoints load with the same model configuration used during training.
 
 For a complete walkthrough with code examples and testing guidance, see [adding_new_models.md](adding_new_models.md).
 

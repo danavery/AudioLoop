@@ -24,6 +24,7 @@
 
 # Model
 # model_type: cnn5layer            # Available: cnn5layer, cnn7layer, simplecnn
+# model_kwargs: {}                 # Model-specific constructor kwargs (YAML/API only; not CLI flags)
 # class_weighting: 0.70            # Options: null (none), "adaptive", or float (0.0-1.0)
 
 # ------------------------------------------------------------------------------

@@ -90,7 +90,7 @@ python -m audioloop.train --list-models
 python -m audioloop.train training_set_v1.csv --model-type my_model
 ```
 
-Pass custom parameters to your model via `model_kwargs` in `audioloop.yaml`:
+Pass custom parameters to your model via `model_kwargs` in `audioloop.yaml` or when constructing `AudioLoopConfig` in Python. The CLI currently supports choosing the model with `--model-type`, but arbitrary model-specific kwargs are configured through YAML/API rather than command-line flags:
 
 ```yaml
 model_type: my_model
@@ -99,7 +99,7 @@ model_kwargs:
   dropout_rate: 0.2
 ```
 
-These are passed as `**kwargs` to your model's constructor.
+These are passed as `**kwargs` to your model's constructor during training. If the parameters affect the model architecture, include the resolved values in `get_model_info()` so checkpoints can be reconstructed for inference.
 
 ## See Also
 - [User Manual: Training](user_manual.md#training) — training options and model types
