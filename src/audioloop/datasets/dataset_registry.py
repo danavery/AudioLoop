@@ -31,8 +31,8 @@ def _get_project_datasets_dir() -> Path | None:
     return None
 
 
-def _load_dataset_module(name: str) -> ModuleType:
-    """Load the module for a dataset by name.
+def _load_dataset_module(name: str) -> ModuleType | None:
+    """Load the module for a dataset by name, or None if it cannot be imported.
 
     Project-level datasets/{name}_config.py (loaded by file path) takes precedence
     over the built-in audioloop.datasets.{name}_config package module. This is the
@@ -40,8 +40,8 @@ def _load_dataset_module(name: str) -> ModuleType:
     datasets: project files are loose on disk (loaded by path), built-ins are
     package members (imported so their relative imports resolve).
 
-    Raises:
-        ValueError: If no dataset module can be found for the given name.
+    A present-but-broken project file lets its import error propagate, so the user
+    sees the real problem. An absent or unimportable built-in module returns None.
     """
     # 1. Project-level datasets/ directory first (loaded by file path)
     project_dir = _get_project_datasets_dir()
@@ -60,12 +60,16 @@ def _load_dataset_module(name: str) -> ModuleType:
         module_name = f"{name}_config"
         return __import__(f"audioloop.datasets.{module_name}", fromlist=[module_name])
     except ImportError:
-        available = list_available_datasets()
-        raise ValueError(
-            f"Dataset '{name}' not found. Available: {', '.join(sorted(available))}\n"
-            f"To add '{name}': Create datasets/{name}_config.py with a class "
-            f"that inherits from DatasetConfig"
-        ) from None
+        return None
+
+
+def _find_dataset_subclass(module: ModuleType) -> type[DatasetConfig] | None:
+    """Return the first DatasetConfig subclass in a module, or None if there is none."""
+    for attr_name in dir(module):
+        attr = getattr(module, attr_name)
+        if isinstance(attr, type) and issubclass(attr, DatasetConfig) and attr is not DatasetConfig:
+            return attr
+    return None
 
 
 def get_dataset_config_class(name: str) -> type[DatasetConfig]:
@@ -76,14 +80,21 @@ def get_dataset_config_class(name: str) -> type[DatasetConfig]:
     be named anything.
 
     Raises:
-        ValueError: If the module has no DatasetConfig subclass.
+        ValueError: If no module is found for `name`, or it has no DatasetConfig
+            subclass.
     """
     module = _load_dataset_module(name)
+    if module is None:
+        available = list_available_datasets()
+        raise ValueError(
+            f"Dataset '{name}' not found. Available: {', '.join(available)}\n"
+            f"To add '{name}': Create datasets/{name}_config.py with a class "
+            f"that inherits from DatasetConfig"
+        )
 
-    for attr_name in dir(module):
-        attr = getattr(module, attr_name)
-        if isinstance(attr, type) and issubclass(attr, DatasetConfig) and attr is not DatasetConfig:
-            return attr
+    config_class = _find_dataset_subclass(module)
+    if config_class is not None:
+        return config_class
 
     raise ValueError(f"No DatasetConfig subclass found in {name}_config.py")
 
@@ -117,20 +128,32 @@ def create_dataset(name: str, subset_csv: Path | None = None) -> DatasetConfig:
 
 
 def list_available_datasets() -> list[str]:
-    """List available datasets by scanning both project and built-in directories."""
-    available = set()
+    """List available datasets: every *_config.py file that contains a DatasetConfig subclass.
 
-    # 1. Scan built-in package directory
+    Uses the same predicate as get_dataset_config_class (load the module, look for a
+    subclass), so a name is listed if and only if it resolves. The base
+    dataset_config.py is excluded automatically because it contains only the
+    DatasetConfig base, not a concrete subclass. The *_config.py glob is retained
+    only so the derived names round-trip back through the resolver's name->file rule.
+    """
+    candidate_names = set()
     builtin_dir = Path(__file__).parent
-    for py_file in builtin_dir.glob("*_config.py"):
-        if py_file.name == "dataset_config.py" or "templates/" in str(py_file):
-            continue
-        available.add(py_file.stem.replace("_config", ""))
-
-    # 2. Scan project-level datasets/ directory
+    candidate_names.update(
+        py_file.stem.replace("_config", "") for py_file in builtin_dir.glob("*_config.py")
+    )
     project_dir = _get_project_datasets_dir()
     if project_dir is not None:
-        for py_file in project_dir.glob("*_config.py"):
-            available.add(py_file.stem.replace("_config", ""))
+        candidate_names.update(
+            py_file.stem.replace("_config", "") for py_file in project_dir.glob("*_config.py")
+        )
+
+    available = set()
+    for name in candidate_names:
+        try:
+            module = _load_dataset_module(name)
+        except Exception:
+            continue  # present-but-broken file: skip from the listing
+        if module is not None and _find_dataset_subclass(module) is not None:
+            available.add(name)
 
     return sorted(available)

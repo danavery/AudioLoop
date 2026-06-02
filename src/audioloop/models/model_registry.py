@@ -17,9 +17,6 @@ from types import ModuleType
 
 from .audio_loop_model import AudioLoopModel
 
-# Files to skip when scanning for models
-_SKIP_FILES = {"__init__.py", "audio_loop_model.py", "model_registry.py"}
-
 
 def _get_project_models_dir() -> Path | None:
     """Get the project-level models directory, if it exists."""
@@ -34,8 +31,8 @@ def _get_project_models_dir() -> Path | None:
     return None
 
 
-def _load_model_module(name: str) -> ModuleType:
-    """Load the module for a model by name.
+def _load_model_module(name: str) -> ModuleType | None:
+    """Load the module for a model by name, or None if it cannot be imported.
 
     Project-level models/{name}.py (loaded by file path) takes precedence over the
     built-in audioloop.models.{name} package module. This is the only part of
@@ -43,8 +40,8 @@ def _load_model_module(name: str) -> ModuleType:
     project files are loose on disk (loaded by path), built-ins are package members
     (imported so their relative imports resolve).
 
-    Raises:
-        ValueError: If no model module can be found for the given name.
+    A present-but-broken project file lets its import error propagate, so the user
+    sees the real problem. An absent or unimportable built-in module returns None.
     """
     # 1. Project-level models/ directory first (loaded by file path)
     project_dir = _get_project_models_dir()
@@ -62,11 +59,20 @@ def _load_model_module(name: str) -> ModuleType:
     try:
         return __import__(f"audioloop.models.{name}", fromlist=[name])
     except ImportError:
-        available = list_available_models()
-        raise ValueError(
-            f"Model '{name}' not found. Available: {', '.join(sorted(available))}\n"
-            f"To add '{name}': Create models/{name}.py with a class that inherits from AudioLoopModel"
-        ) from None
+        return None
+
+
+def _find_model_subclass(module: ModuleType) -> type[AudioLoopModel] | None:
+    """Return the first AudioLoopModel subclass in a module, or None if there is none."""
+    for attr_name in dir(module):
+        attr = getattr(module, attr_name)
+        if (
+            isinstance(attr, type)
+            and issubclass(attr, AudioLoopModel)
+            and attr is not AudioLoopModel
+        ):
+            return attr
+    return None
 
 
 def get_model_class(name: str) -> type[AudioLoopModel]:
@@ -77,40 +83,50 @@ def get_model_class(name: str) -> type[AudioLoopModel]:
     can be named anything.
 
     Raises:
-        ValueError: If the module has no AudioLoopModel subclass.
+        ValueError: If no module is found for `name`, or it has no AudioLoopModel
+            subclass.
     """
     module = _load_model_module(name)
+    if module is None:
+        available = list_available_models()
+        raise ValueError(
+            f"Model '{name}' not found. Available: {', '.join(available)}\n"
+            f"To add '{name}': Create models/{name}.py with a class that inherits from AudioLoopModel"
+        )
 
-    for attr_name in dir(module):
-        attr = getattr(module, attr_name)
-        if (
-            isinstance(attr, type)
-            and issubclass(attr, AudioLoopModel)
-            and attr is not AudioLoopModel
-        ):
-            return attr
+    model_class = _find_model_subclass(module)
+    if model_class is not None:
+        return model_class
 
     raise ValueError(f"No AudioLoopModel subclass found in {name}.py")
 
 
 def list_available_models() -> list[str]:
-    """List available models by scanning both project and built-in directories."""
-    available = set()
+    """List available models: every file that actually contains an AudioLoopModel subclass.
 
-    # 1. Scan built-in package directory
+    Uses the same predicate as get_model_class (load the module, look for a
+    subclass), so a name is listed if and only if it resolves. Infrastructure
+    files (the base class, this registry, __init__.py) are excluded automatically
+    because they contain no concrete subclass; dunder files are skipped outright as
+    language infrastructure that can never be a model name.
+    """
+    candidate_stems = set()
     builtin_dir = Path(__file__).parent
-    for py_file in builtin_dir.glob("*.py"):
-        if py_file.name in _SKIP_FILES or "templates/" in str(py_file):
-            continue
-        available.add(py_file.stem)
-
-    # 2. Scan project-level models/ directory
+    candidate_stems.update(py_file.stem for py_file in builtin_dir.glob("*.py"))
     project_dir = _get_project_models_dir()
     if project_dir is not None:
-        for py_file in project_dir.glob("*.py"):
-            if py_file.name.startswith("__"):
-                continue
-            available.add(py_file.stem)
+        candidate_stems.update(py_file.stem for py_file in project_dir.glob("*.py"))
+
+    available = set()
+    for stem in candidate_stems:
+        if stem.startswith("__"):
+            continue
+        try:
+            module = _load_model_module(stem)
+        except Exception:
+            continue  # present-but-broken file: skip from the listing
+        if module is not None and _find_model_subclass(module) is not None:
+            available.add(stem)
 
     return sorted(available)
 

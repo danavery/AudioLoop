@@ -90,3 +90,36 @@ def test_create_dataset_missing_subset_csv_raises(monkeypatch):
 
     with pytest.raises(FileNotFoundError, match="Subset CSV not found"):
         dataset_registry.create_dataset("fsd50k", subset_csv=Path("/no/such/subset.csv"))
+
+
+def test_listing_includes_only_files_with_subclass(tmp_path, monkeypatch):
+    """A *_config.py file is listed iff it actually contains a DatasetConfig subclass."""
+    datasets_dir = tmp_path / "datasets"
+    datasets_dir.mkdir()
+    (datasets_dir / "good_config.py").write_text(_NONSTANDARD_CONFIG)  # has a subclass
+    (datasets_dir / "broken_config.py").write_text(_EMPTY_CONFIG)  # no subclass
+    monkeypatch.setattr(dataset_registry, "_get_project_datasets_dir", lambda: datasets_dir)
+
+    names = dataset_registry.list_available_datasets()
+
+    assert "good" in names
+    assert "broken" not in names
+    # built-ins are still discovered alongside project datasets
+    assert {"fsd50k", "urbansound8k", "audioset"} <= set(names)
+
+
+def test_listing_matches_resolvability(tmp_path, monkeypatch):
+    """Listed datasets all resolve; an unlisted broken file does not (one predicate)."""
+    datasets_dir = tmp_path / "datasets"
+    datasets_dir.mkdir()
+    (datasets_dir / "broken_config.py").write_text(_EMPTY_CONFIG)
+    monkeypatch.setattr(dataset_registry, "_get_project_datasets_dir", lambda: datasets_dir)
+
+    names = dataset_registry.list_available_datasets()
+
+    for name in names:
+        assert issubclass(dataset_registry.get_dataset_config_class(name), DatasetConfig)
+
+    assert "broken" not in names
+    with pytest.raises(ValueError, match="No DatasetConfig subclass found"):
+        dataset_registry.get_dataset_config_class("broken")
