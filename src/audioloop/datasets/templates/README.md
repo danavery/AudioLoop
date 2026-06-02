@@ -14,7 +14,7 @@ mkdir -p datasets
 cp src/audioloop/datasets/templates/simple_audio_template.py datasets/my_dataset_config.py
 
 # 2. Edit the copied file:
-#    - Rename class from TemplateAudioConfig to MyDatasetConfig
+#    - Rename the class (any name works; AudioLoop finds the DatasetConfig subclass)
 #    - Update paths to point to your data
 #    - Customize class vocabulary
 

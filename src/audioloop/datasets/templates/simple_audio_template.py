@@ -3,11 +3,14 @@ TEMPLATE: Simple audio dataset configuration for folder + CSV pattern.
 
 ⚠️  THIS IS A TEMPLATE FILE - DO NOT MODIFY DIRECTLY!
 
-Instead:
-1. Copy this file to: audioloop/datasets/your_dataset_name_config.py
-2. Rename the class from TemplateAudioConfig to YourDatasetNameConfig
+Instead, from your project root (alongside audioloop.yaml):
+1. Copy this file to: datasets/your_dataset_name_config.py
+2. Rename the class (any name works — AudioLoop finds the DatasetConfig subclass)
 3. Customize the paths and settings for your dataset
 4. Use with: --dataset your_dataset_name
+
+The project-level datasets/ directory is recommended: it survives reinstalls and
+keeps your code out of the installed package. See docs/custom_datasets.md.
 
 This template provides a complete DatasetConfig implementation with:
 - Audio file loading from directory structures
@@ -28,8 +31,8 @@ Or with additional metadata:
     audio2.wav,music,speaker_002,3.1
 
 Copy and customize example:
-    cp audioloop/datasets/templates/simple_audio_template.py \\
-       audioloop/datasets/my_dataset_config.py
+    cp src/audioloop/datasets/templates/simple_audio_template.py \\
+       datasets/my_dataset_config.py
 
 Then edit: class name, paths, vocabulary, and audio parameters.
 """
