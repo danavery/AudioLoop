@@ -88,6 +88,34 @@ def get_dataset_config_class(name: str) -> type[DatasetConfig]:
     raise ValueError(f"No DatasetConfig subclass found in {name}_config.py")
 
 
+def create_dataset(name: str, subset_csv: Path | None = None) -> DatasetConfig:
+    """Create a dataset config instance by name.
+
+    The construction counterpart to discovery: resolves the DatasetConfig subclass
+    for `name` and instantiates it. If `subset_csv` is given, the dataset is
+    restricted to that custom CSV. This is the single construction point for
+    datasets, mirroring `create_model` for models.
+
+    Args:
+        name: Dataset name (e.g. "fsd50k").
+        subset_csv: Optional CSV restricting the dataset to a subset of files.
+
+    Raises:
+        ValueError: If no dataset/subclass is found for `name`.
+        FileNotFoundError: If `subset_csv` is given but does not exist.
+        NotImplementedError: If the dataset does not support custom CSV files.
+    """
+    config_class = get_dataset_config_class(name)
+    dataset_config = config_class()
+
+    if subset_csv is not None:
+        if not subset_csv.exists():
+            raise FileNotFoundError(f"Subset CSV not found: {subset_csv}")
+        dataset_config.set_custom_csv(subset_csv)
+
+    return dataset_config
+
+
 def list_available_datasets() -> list[str]:
     """List available datasets by scanning both project and built-in directories."""
     available = set()

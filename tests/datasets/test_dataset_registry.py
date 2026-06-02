@@ -6,6 +6,8 @@ and the loaded module is scanned for any DatasetConfig subclass (the class name
 no longer has to match a derived pattern).
 """
 
+from pathlib import Path
+
 import pytest
 
 from audioloop.datasets import dataset_registry
@@ -71,3 +73,20 @@ def test_unknown_dataset_raises_with_available_list(monkeypatch):
 
     with pytest.raises(ValueError, match="not found"):
         dataset_registry.get_dataset_config_class("does_not_exist")
+
+
+def test_create_dataset_builds_instance(monkeypatch):
+    """create_dataset returns a ready DatasetConfig instance for a built-in dataset."""
+    monkeypatch.setattr(dataset_registry, "_get_project_datasets_dir", lambda: None)
+
+    dataset = dataset_registry.create_dataset("fsd50k")
+
+    assert isinstance(dataset, DatasetConfig)
+
+
+def test_create_dataset_missing_subset_csv_raises(monkeypatch):
+    """A subset_csv that does not exist raises FileNotFoundError at construction."""
+    monkeypatch.setattr(dataset_registry, "_get_project_datasets_dir", lambda: None)
+
+    with pytest.raises(FileNotFoundError, match="Subset CSV not found"):
+        dataset_registry.create_dataset("fsd50k", subset_csv=Path("/no/such/subset.csv"))

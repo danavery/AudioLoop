@@ -413,18 +413,9 @@ class AudioLoopConfig:
 
         If subset_csv is specified, automatically applies it to restrict the dataset files.
         """
-        from .datasets.dataset_registry import get_dataset_config_class
+        from .datasets.dataset_registry import create_dataset
 
-        config_class = get_dataset_config_class(self.dataset)
-        dataset_config = config_class()
-
-        # Apply subset restriction if specified
-        if self.subset_csv:
-            if not self.subset_csv.exists():
-                raise FileNotFoundError(f"Subset CSV not found: {self.subset_csv}")
-            dataset_config.set_custom_csv(self.subset_csv)
-
-        return dataset_config
+        return create_dataset(self.dataset, subset_csv=self.subset_csv)
 
     def create_directories(self) -> None:
         """Create all necessary directories for this configuration."""
