@@ -1,0 +1,73 @@
+"""
+Tests for dataset discovery in dataset_registry.
+
+Focused on the scan-for-subclass behavior: the dataset name selects the file,
+and the loaded module is scanned for any DatasetConfig subclass (the class name
+no longer has to match a derived pattern).
+"""
+
+import pytest
+
+from audioloop.datasets import dataset_registry
+from audioloop.datasets.dataset_config import DatasetConfig
+
+# A project dataset file whose class is deliberately NOT named "<Name>Config",
+# proving discovery resolves by subclass rather than by a derived class name.
+_NONSTANDARD_CONFIG = """\
+from audioloop.datasets.dataset_config import DatasetConfig
+
+
+class TotallyUnrelatedName(DatasetConfig):
+    pass
+"""
+
+# A file with no DatasetConfig subclass at all.
+_EMPTY_CONFIG = """\
+class NotADatasetConfig:
+    pass
+"""
+
+
+def _write_project_dataset(tmp_path, monkeypatch, filename, contents):
+    """Create a project datasets/ dir with one config file and point discovery at it."""
+    datasets_dir = tmp_path / "datasets"
+    datasets_dir.mkdir()
+    (datasets_dir / filename).write_text(contents)
+    monkeypatch.setattr(dataset_registry, "_get_project_datasets_dir", lambda: datasets_dir)
+    return datasets_dir
+
+
+def test_resolves_class_with_nonstandard_name(tmp_path, monkeypatch):
+    """A DatasetConfig subclass is found regardless of its class name."""
+    _write_project_dataset(tmp_path, monkeypatch, "weird_config.py", _NONSTANDARD_CONFIG)
+
+    cls = dataset_registry.get_dataset_config_class("weird")
+
+    assert cls.__name__ == "TotallyUnrelatedName"
+    assert issubclass(cls, DatasetConfig)
+
+
+def test_missing_subclass_fails_loud(tmp_path, monkeypatch):
+    """A project file with no DatasetConfig subclass raises instead of silently falling through."""
+    _write_project_dataset(tmp_path, monkeypatch, "empty_config.py", _EMPTY_CONFIG)
+
+    with pytest.raises(ValueError, match="No DatasetConfig subclass found"):
+        dataset_registry.get_dataset_config_class("empty")
+
+
+def test_builtin_datasets_still_resolve(monkeypatch):
+    """Built-in datasets resolve via the package-import path (no project dir)."""
+    monkeypatch.setattr(dataset_registry, "_get_project_datasets_dir", lambda: None)
+
+    for name in ("fsd50k", "urbansound8k", "audioset"):
+        cls = dataset_registry.get_dataset_config_class(name)
+        assert issubclass(cls, DatasetConfig)
+        assert cls is not DatasetConfig
+
+
+def test_unknown_dataset_raises_with_available_list(monkeypatch):
+    """An unknown name raises a helpful error listing available datasets."""
+    monkeypatch.setattr(dataset_registry, "_get_project_datasets_dir", lambda: None)
+
+    with pytest.raises(ValueError, match="not found"):
+        dataset_registry.get_dataset_config_class("does_not_exist")

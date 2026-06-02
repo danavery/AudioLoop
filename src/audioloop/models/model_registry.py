@@ -13,6 +13,7 @@ Discovery locations (checked in order):
 
 import importlib.util
 from pathlib import Path
+from types import ModuleType
 
 from .audio_loop_model import AudioLoopModel
 
@@ -33,64 +34,63 @@ def _get_project_models_dir() -> Path | None:
     return None
 
 
-def _load_class_from_file(file_path: Path) -> type[AudioLoopModel] | None:
-    """Dynamically load an AudioLoopModel subclass from an arbitrary file path."""
-    module_name = f"audioloop_project_models.{file_path.stem}"
+def _load_model_module(name: str) -> ModuleType:
+    """Load the module for a model by name.
 
-    spec = importlib.util.spec_from_file_location(module_name, file_path)
-    if spec is None or spec.loader is None:
-        return None
+    Project-level models/{name}.py (loaded by file path) takes precedence over the
+    built-in audioloop.models.{name} package module. This is the only part of
+    discovery that legitimately differs between project and built-in models:
+    project files are loose on disk (loaded by path), built-ins are package members
+    (imported so their relative imports resolve).
 
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
-    # Find any class that inherits from AudioLoopModel (excluding the base class)
-    for attr_name in dir(module):
-        attr = getattr(module, attr_name)
-        if (
-            isinstance(attr, type)
-            and issubclass(attr, AudioLoopModel)
-            and attr != AudioLoopModel
-        ):
-            return attr
-    return None
-
-
-def get_model_class(name: str) -> type[AudioLoopModel]:
-    """Get model class by name.
-
-    Checks project-level models/ directory first, then built-in package models.
+    Raises:
+        ValueError: If no model module can be found for the given name.
     """
-    # 1. Try project-level models/ directory first
+    # 1. Project-level models/ directory first (loaded by file path)
     project_dir = _get_project_models_dir()
     if project_dir is not None:
         project_file = project_dir / f"{name}.py"
         if project_file.is_file():
-            model_class = _load_class_from_file(project_file)
-            if model_class is not None:
-                return model_class
+            module_name = f"audioloop_project_models.{name}"
+            spec = importlib.util.spec_from_file_location(module_name, project_file)
+            if spec is not None and spec.loader is not None:
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                return module
 
-    # 2. Try built-in package models
+    # 2. Built-in package models (imported by dotted name)
     try:
-        module = __import__(f"audioloop.models.{name}", fromlist=[name])
-
-        for attr_name in dir(module):
-            attr = getattr(module, attr_name)
-            if (
-                isinstance(attr, type)
-                and issubclass(attr, AudioLoopModel)
-                and attr != AudioLoopModel
-            ):
-                return attr
-
-        raise ValueError(f"No AudioLoopModel subclass found in {name}.py")
-
+        return __import__(f"audioloop.models.{name}", fromlist=[name])
     except ImportError:
         available = list_available_models()
         raise ValueError(
             f"Model '{name}' not found. Available: {', '.join(sorted(available))}\n"
             f"To add '{name}': Create models/{name}.py with a class that inherits from AudioLoopModel"
         ) from None
+
+
+def get_model_class(name: str) -> type[AudioLoopModel]:
+    """Get model class by name.
+
+    Checks project-level models/ directory first, then built-in package models.
+    The resolved module is scanned for any AudioLoopModel subclass, so the class
+    can be named anything.
+
+    Raises:
+        ValueError: If the module has no AudioLoopModel subclass.
+    """
+    module = _load_model_module(name)
+
+    for attr_name in dir(module):
+        attr = getattr(module, attr_name)
+        if (
+            isinstance(attr, type)
+            and issubclass(attr, AudioLoopModel)
+            and attr is not AudioLoopModel
+        ):
+            return attr
+
+    raise ValueError(f"No AudioLoopModel subclass found in {name}.py")
 
 
 def list_available_models() -> list[str]:

@@ -3,7 +3,7 @@ Simple dataset discovery for AudioLoop.
 
 Convention:
 - Filename determines dataset name: my_dataset_config.py -> "my_dataset"
-- Class name follows pattern: my_dataset_config.py -> MyDatasetConfig
+- Class name can be anything — the system finds the DatasetConfig subclass automatically
 - Direct import approach - no complex discovery needed
 
 Discovery locations (checked in order):
@@ -13,6 +13,7 @@ Discovery locations (checked in order):
 
 import importlib.util
 from pathlib import Path
+from types import ModuleType
 
 from .dataset_config import DatasetConfig
 
@@ -30,66 +31,61 @@ def _get_project_datasets_dir() -> Path | None:
     return None
 
 
-def _derive_class_name(name: str) -> str:
-    """Derive expected class name from dataset name.
+def _load_dataset_module(name: str) -> ModuleType:
+    """Load the module for a dataset by name.
 
-    Handles special cases for built-in datasets with non-standard casing.
+    Project-level datasets/{name}_config.py (loaded by file path) takes precedence
+    over the built-in audioloop.datasets.{name}_config package module. This is the
+    only part of discovery that legitimately differs between project and built-in
+    datasets: project files are loose on disk (loaded by path), built-ins are
+    package members (imported so their relative imports resolve).
+
+    Raises:
+        ValueError: If no dataset module can be found for the given name.
     """
-    if name == "fsd50k":
-        return "FSD50KConfig"
-    if name == "urbansound8k":
-        return "UrbanSound8KConfig"
-    return f"{''.join(word.capitalize() for word in name.split('_'))}Config"
+    # 1. Project-level datasets/ directory first (loaded by file path)
+    project_dir = _get_project_datasets_dir()
+    if project_dir is not None:
+        project_file = project_dir / f"{name}_config.py"
+        if project_file.is_file():
+            module_name = f"audioloop_project_datasets.{name}_config"
+            spec = importlib.util.spec_from_file_location(module_name, project_file)
+            if spec is not None and spec.loader is not None:
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                return module
 
-
-def _load_class_from_file(file_path: Path, name: str) -> type[DatasetConfig] | None:
-    """Dynamically load a DatasetConfig subclass from an arbitrary file path."""
-    class_name = _derive_class_name(name)
-    module_name = f"audioloop_project_datasets.{name}_config"
-
-    spec = importlib.util.spec_from_file_location(module_name, file_path)
-    if spec is None or spec.loader is None:
-        return None
-
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
-    if hasattr(module, class_name):
-        return getattr(module, class_name)
-    return None
+    # 2. Built-in package datasets (imported by dotted name)
+    try:
+        module_name = f"{name}_config"
+        return __import__(f"audioloop.datasets.{module_name}", fromlist=[module_name])
+    except ImportError:
+        available = list_available_datasets()
+        raise ValueError(
+            f"Dataset '{name}' not found. Available: {', '.join(sorted(available))}\n"
+            f"To add '{name}': Create datasets/{name}_config.py with a class "
+            f"that inherits from DatasetConfig"
+        ) from None
 
 
 def get_dataset_config_class(name: str) -> type[DatasetConfig]:
     """Get dataset config class by name.
 
     Checks project-level datasets/ directory first, then built-in package datasets.
+    The resolved module is scanned for any DatasetConfig subclass, so the class can
+    be named anything.
+
+    Raises:
+        ValueError: If the module has no DatasetConfig subclass.
     """
-    # 1. Try project-level datasets/ directory first
-    project_dir = _get_project_datasets_dir()
-    if project_dir is not None:
-        project_file = project_dir / f"{name}_config.py"
-        if project_file.is_file():
-            config_class = _load_class_from_file(project_file, name)
-            if config_class is not None:
-                return config_class
+    module = _load_dataset_module(name)
 
-    # 2. Try built-in package datasets
-    try:
-        module_name = f"{name}_config"
-        module = __import__(f"audioloop.datasets.{module_name}", fromlist=[module_name])
+    for attr_name in dir(module):
+        attr = getattr(module, attr_name)
+        if isinstance(attr, type) and issubclass(attr, DatasetConfig) and attr is not DatasetConfig:
+            return attr
 
-        class_name = _derive_class_name(name)
-        if hasattr(module, class_name):
-            return getattr(module, class_name)
-        raise ValueError(f"Expected class '{class_name}' not found in {module_name}.py")
-
-    except ImportError:
-        available = list_available_datasets()
-        raise ValueError(
-            f"Dataset '{name}' not found. Available: {', '.join(sorted(available))}\n"
-            f"To add '{name}': Create datasets/{name}_config.py with class "
-            f"{''.join(word.capitalize() for word in name.split('_'))}Config"
-        ) from None
+    raise ValueError(f"No DatasetConfig subclass found in {name}_config.py")
 
 
 def list_available_datasets() -> list[str]:
