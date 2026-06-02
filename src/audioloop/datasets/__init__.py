@@ -1,14 +1,5 @@
-"""
-Dataset configurations for AudioLoop.
+"""Dataset configurations for AudioLoop active learning framework."""
 
-This module provides dataset-specific configurations
-for different audio datasets used in the AudioLoop framework.
-"""
+from .dataset_config import DatasetConfig
 
-from .fsd50k_config import FSD50KConfig
-from .urbansound8k_config import UrbanSound8KConfig
-
-__all__ = [
-    "FSD50KConfig",
-    "UrbanSound8KConfig",
-]
+__all__ = ["DatasetConfig"]
