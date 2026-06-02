@@ -104,6 +104,8 @@ def list_classes(vocab_path: Path | None = None) -> None:
 class UrbanSound8KConfig(DatasetConfig):
     """Configuration for UrbanSound8K dataset."""
 
+    description = "UrbanSound8K: 10 urban sound classes, 10 predefined folds"
+
     # Audio processing parameters
     _sample_rate: int = 44100
     _n_fft: int = 1024
@@ -116,7 +118,6 @@ class UrbanSound8KConfig(DatasetConfig):
     metadata_csv: Path = Path("data/urbansound8k/UrbanSound8K.csv")
     _dataset_csv: Path = Path("data/urbansound8k/UrbanSound8K.csv")  # Common interface
     _audio_root: Path = Path("data/urbansound8k")
-
 
     # === Core Dataset Properties ===
     @property

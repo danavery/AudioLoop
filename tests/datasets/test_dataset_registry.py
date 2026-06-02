@@ -123,3 +123,15 @@ def test_listing_matches_resolvability(tmp_path, monkeypatch):
     assert "broken" not in names
     with pytest.raises(ValueError, match="No DatasetConfig subclass found"):
         dataset_registry.get_dataset_config_class("broken")
+
+
+def test_descriptions_use_class_attribute(monkeypatch):
+    """get_dataset_descriptions surfaces each config's description class attribute."""
+    monkeypatch.setattr(dataset_registry, "_get_project_datasets_dir", lambda: None)
+
+    descriptions = dataset_registry.get_dataset_descriptions()
+
+    # One entry per listed dataset, and built-ins carry their declared (non-generic) text.
+    assert set(descriptions) == set(dataset_registry.list_available_datasets())
+    assert descriptions["fsd50k"] != "fsd50k dataset"
+    assert "FSD50K" in descriptions["fsd50k"]

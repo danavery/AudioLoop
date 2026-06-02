@@ -157,3 +157,28 @@ def list_available_datasets() -> list[str]:
             available.add(name)
 
     return sorted(available)
+
+
+def get_dataset_descriptions() -> dict[str, str]:
+    """Get descriptions for all available datasets.
+
+    Returns:
+        Dict mapping dataset names to their descriptions.
+
+    Notes:
+        - Accesses class-level description attribute without instantiation
+        - Falls back to generic description if attribute missing or import fails
+        - Safe to call even if some datasets have errors
+    """
+    descriptions = {}
+    for name in list_available_datasets():
+        try:
+            config_class = get_dataset_config_class(name)
+            # Access class-level description attribute
+            description = getattr(config_class, "description", f"{name} dataset")
+            descriptions[name] = description
+        except (ImportError, ValueError):
+            # If dataset can't be imported, use generic description
+            descriptions[name] = f"{name} dataset"
+
+    return descriptions

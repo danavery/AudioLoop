@@ -3,6 +3,7 @@ import logging
 import re
 
 from .config import AudioLoopConfig
+from .datasets.dataset_registry import get_dataset_descriptions
 from .models.model_registry import get_model_descriptions, list_available_models
 from .training_core import run_training, set_seed, train_epoch
 
@@ -15,6 +16,13 @@ def list_models():
     print("Available model types:")
     for model_type, description in get_model_descriptions().items():
         print(f"  {model_type}: {description}")
+
+
+def list_datasets():
+    """Print available datasets and exit."""
+    print("Available datasets:")
+    for dataset, description in get_dataset_descriptions().items():
+        print(f"  {dataset}: {description}")
 
 
 def main():
@@ -44,6 +52,9 @@ def main():
     )
     parser.add_argument(
         "--list-models", action="store_true", help="List available model types and exit"
+    )
+    parser.add_argument(
+        "--list-datasets", action="store_true", help="List available datasets and exit"
     )
     parser.add_argument(
         "-lr", "--learning-rate", type=float, help="Learning rate (default from config: 0.001)"
@@ -94,14 +105,18 @@ def main():
 
     args = parser.parse_args()
 
-    # Handle list-models command
+    # Handle list-* commands
     if args.list_models:
         list_models()
         return
 
-    # Check if labels_file is provided when not listing models
+    if args.list_datasets:
+        list_datasets()
+        return
+
+    # Check if labels_file is provided when not listing
     if args.labels_file is None:
-        parser.error("labels_file is required unless using --list-models")
+        parser.error("labels_file is required unless using --list-models or --list-datasets")
 
     # Auto-detect version from training set filename if not specified
     if args.version is None:

@@ -15,7 +15,12 @@ from torchcodec.decoders import AudioDecoder
 
 
 class DatasetConfig(ABC):
-    """Common interface for dataset configurations used in active learning."""
+    """Common interface for dataset configurations used in active learning.
+
+    Class Attributes:
+        description: Human-readable description of the dataset (optional, used for
+            --list-datasets)
+    """
 
     # === Bad Files Exclusion ===
     def get_bad_files(self) -> set[str]:

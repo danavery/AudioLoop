@@ -149,6 +149,8 @@ def list_semantic_groups() -> None:
 class FSD50KConfig(DatasetConfig):
     """Configuration for FSD50K dataset."""
 
+    description = "FSD50K: 200 Freesound classes, variable-length clips (multi-label)"
+
     # Audio processing parameters (matching UrbanSound8K for consistency)
     _sample_rate: int = 44100
     _n_fft: int = 1024
@@ -159,7 +161,6 @@ class FSD50KConfig(DatasetConfig):
 
     # Default paths
     _audio_root: Path = Path("data/FSD50K")  # Base directory, split determines subdirectory
-
 
     # Specific files
     vocabulary_csv: Path = Path("data/FSD50K/FSD50K.ground_truth/vocabulary.csv")

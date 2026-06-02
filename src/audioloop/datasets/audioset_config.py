@@ -37,6 +37,8 @@ def load_audioset_ontology(ontology_path: Path) -> dict[str, str]:
 class AudiosetConfig(DatasetConfig):
     """Configuration for AudioSet dataset."""
 
+    description = "AudioSet: 527 classes, 10s YouTube clips (multi-label)"
+
     # Audio processing parameters (matching other datasets for consistency)
     _sample_rate: int = 44100
     _n_fft: int = 1024
@@ -47,7 +49,6 @@ class AudiosetConfig(DatasetConfig):
 
     # Default paths - adjust to your mount point
     _audio_root: Path = Path("/mnt/audioset/audioset")
-
 
     # Specific files
     ontology_json: Path = Path("/mnt/audioset/audioset/metadata/ontology.json")
