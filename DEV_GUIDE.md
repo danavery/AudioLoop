@@ -80,7 +80,9 @@ AudioLoop uses a pluggable strategy pattern for candidate selection:
 ### Models
 - **`models/audio_loop_model.py`**: Abstract base class (`AudioLoopModel`) defining the pluggable model interface
 - **`models/cnn5layer.py`**: Primary CNN architecture with adaptive pooling
+- **`models/cnn7layer.py`**: Deeper CNN architecture with adaptive pooling
 - **`models/simplecnn.py`**: Alternative lightweight CNN model
+- **`models/model_registry.py`**: Dynamic model discovery system (scans files for `AudioLoopModel` subclasses)
 
 AudioLoop uses a pluggable model architecture where all models implement the `AudioLoopModel` abstract base class. This allows easy integration of custom PyTorch models or HuggingFace models while maintaining compatibility with the existing training and inference pipeline.
 
@@ -136,7 +138,8 @@ This system allows for domain-specific optimizations (e.g., whale calls with few
 - **`datasets/dataset_config.py`**: Abstract base class defining common dataset interface
 - **`datasets/fsd50k_config.py`**: FSD50K dataset configuration
 - **`datasets/urbansound8k_config.py`**: UrbanSound8K dataset configuration
-- **`datasets/registry.py`**: Dynamic dataset discovery system
+- **`datasets/audioset_config.py`**: AudioSet dataset configuration
+- **`datasets/dataset_registry.py`**: Dynamic dataset discovery system (scans files for `DatasetConfig` subclasses; parallels `models/model_registry.py`)
 
 ### Strategy Pattern Infrastructure
 - **`utils/stopping_criteria.py`**: Pluggable stopping criteria architecture

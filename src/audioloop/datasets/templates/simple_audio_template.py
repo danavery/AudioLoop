@@ -56,10 +56,15 @@ class TemplateAudioConfig(DatasetConfig):
 
     ⚠️  RENAME THIS CLASS when you copy this file!
     Example: MyDatasetConfig, SpeechDatasetConfig, etc.
+    (The class can be named anything — AudioLoop finds the DatasetConfig
+    subclass automatically — but a descriptive name is good practice.)
 
     Then customize the paths, vocabulary, and audio parameters below.
     This template provides all required DatasetConfig methods for full AudioLoop compatibility.
     """
+
+    # Human-readable description shown by `--list-datasets` (optional)
+    description = "Simple folder + CSV audio dataset (edit this description)"
 
     # =============================================================================
     # 🚨 CUSTOMIZE THESE PATHS FOR YOUR DATASET 🚨

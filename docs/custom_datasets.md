@@ -53,10 +53,13 @@ Where `label` is `1` for positive (matches your target class) and `0` for negati
 
 ## What to Customize
 
-The setup steps above copy the template into your project's `datasets/` directory as a new file (e.g., `datasets/my_dataset_config.py`). This file defines your own `DatasetConfig` subclass. Rename the class from `TemplateAudioConfig` to match your dataset (the naming convention is `{DatasetName}Config`), then customize the fields at the top:
+The setup steps above copy the template into your project's `datasets/` directory as a new file (e.g., `datasets/my_dataset_config.py`). This file defines your own `DatasetConfig` subclass. Rename the class from `TemplateAudioConfig` to something descriptive — the class can be named anything, since AudioLoop scans the file for the `DatasetConfig` subclass automatically — then customize the fields at the top:
 
 ```python
 class MyDatasetConfig(DatasetConfig):   # Was TemplateAudioConfig
+
+    # Shown by `--list-datasets` (optional)
+    description = "My dataset: speech/music/noise, 22kHz clips"
 
     # Point to your data
     _dataset_csv = Path("data/my_dataset/labels.csv")
@@ -92,10 +95,12 @@ AudioLoop scans two locations for dataset config files, in order of precedence:
 2. **Built-in**: `audioloop/datasets/*_config.py` in the AudioLoop package
 
 Naming conventions:
-- **File naming**: `{dataset_name}_config.py` → dataset name `{dataset_name}`
-- **Class naming**: `{DatasetName}Config` (e.g., `MyDatasetConfig`, `CommonVoiceConfig`)
+- **File naming**: `{dataset_name}_config.py` → dataset name `{dataset_name}`. This mapping is required: the file stem (minus `_config`) is the name you pass to `--dataset`.
+- **Class naming**: Any name — AudioLoop scans the file for the `DatasetConfig` subclass automatically. No registration needed.
 
 Project-level configs take precedence over built-in ones with the same name, so you can override built-in dataset behavior for your project.
+
+To confirm your dataset was discovered, run `python -m audioloop.train --list-datasets`, which lists every discovered dataset alongside its `description`. A file is only listed if it actually contains a `DatasetConfig` subclass, so this is also a quick check that your class is wired up correctly.
 
 ## The DatasetConfig Interface
 
