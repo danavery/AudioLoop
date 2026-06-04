@@ -177,8 +177,9 @@ def run_binary_inference(
         logger.info(f"Running inference on {row_count} files")
 
         # Load dataset from temporary CSV with lazy generation support
+        extractor = config.get_feature_extractor(dataset_config)
         dataset = SpectrogramDataset(
-            csv_file=str(temp_csv), specs_dir=str(config.specs_dir), dataset_config=dataset_config
+            csv_file=str(temp_csv), extractor=extractor, specs_dir=str(config.specs_dir)
         )
 
         # Binary classification

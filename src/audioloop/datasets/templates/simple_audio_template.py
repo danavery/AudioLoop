@@ -20,9 +20,10 @@ This template provides a complete DatasetConfig implementation with:
 - Automatic file extension detection
 - Dataset split interface (single "all" split for simple datasets)
 
-Note: audio->tensor production (load -> spectrogram transform -> length fix) lives on the
-feature extractor, not the dataset config. You only declare the parameters via
-get_audio_processing_params(); the extractor reads them. See audioloop/feature_extractor.py.
+Note: audio->tensor production (load -> spectrogram transform -> length fix) AND its
+parameters (sample_rate, n_fft, ...) live on the feature extractor, not the dataset config.
+This template declares only dataset identity/metadata/labeling. See
+audioloop/feature_extractor.py.
 
 Supported CSV formats:
     filename,label
@@ -89,13 +90,11 @@ class TemplateAudioConfig(DatasetConfig):
         2: "class_three",
     }
 
-    # Audio processing parameters (customize if needed)
-    _sample_rate = 22050
-    _n_fft = 1024
-    _hop_length = 512
-    _n_mels = 128
-    _top_db = 80
-    _max_spectrogram_length = 993  # Spectrograms longer than this are cropped
+    # Audio processing parameters (sample_rate, n_fft, hop_length, n_mels, top_db,
+    # max_spectrogram_length) are NOT set here — they are owned by the feature extractor
+    # (audioloop/feature_extractor.py: SpectrogramExtractor), which currently uses sensible
+    # defaults (44.1kHz log-mel). Per-experiment override of these is coming via
+    # AudioLoopConfig; until then, edit the extractor defaults if you need different values.
 
     # =============================================================================
     # INTERFACE IMPLEMENTATION (usually no need to modify below this line)
@@ -241,17 +240,6 @@ class TemplateAudioConfig(DatasetConfig):
         # Return the preferred path even if file doesn't exist (for error messages)
         return self.audio_root / f"{base_name}{self._audio_extension}"
 
-    def get_audio_processing_params(self) -> dict[str, Any]:
-        """Get audio processing parameters for spectrogram generation."""
-        return {
-            "sample_rate": self._sample_rate,
-            "n_fft": self._n_fft,
-            "hop_length": self._hop_length,
-            "n_mels": self._n_mels,
-            "top_db": self._top_db,
-            "max_spectrogram_length": self._max_spectrogram_length,
-        }
-
     def is_positive_class(self, class_name: str, positive_class: str | int) -> bool:
         """Determine if a class matches the positive class for binary classification."""
         if isinstance(positive_class, str):
@@ -297,4 +285,5 @@ class TemplateAudioConfig(DatasetConfig):
 
     # Note: offline spectrogram building (load -> transform -> fix -> save, with skip/guard
     # policy) is handled by the feature extractor's process_one(); the config only supplies
-    # get_audio_processing_params() and get_spectrogram_path(). No process_single_file needed.
+    # file-level knowledge it reads (get_spectrogram_path, get_bad_files, min_audio_file_size).
+    # No process_single_file needed.

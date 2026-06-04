@@ -146,14 +146,6 @@ class FSD50KConfig(DatasetConfig):
 
     description = "FSD50K: 200 Freesound classes, variable-length clips (multi-label)"
 
-    # Audio processing parameters (matching UrbanSound8K for consistency)
-    _sample_rate: int = 44100
-    _n_fft: int = 1024
-    _hop_length: int = 256
-    _n_mels: int = 128
-    _top_db: int = 80
-    _max_spectrogram_length: int = 2048
-
     # Default paths
     _audio_root: Path = Path("data/FSD50K")  # Base directory, split determines subdirectory
 
@@ -279,19 +271,6 @@ class FSD50KConfig(DatasetConfig):
         """Get path where spectrogram should be stored."""
         spec_filename = filename.replace(".wav", "") + ".pt"
         return specs_dir / spec_filename
-
-    # === Audio Processing ===
-
-    def get_audio_processing_params(self) -> dict[str, Any]:
-        """Get audio processing parameters for spectrogram generation."""
-        return {
-            "sample_rate": self._sample_rate,
-            "n_fft": self._n_fft,
-            "hop_length": self._hop_length,
-            "n_mels": self._n_mels,
-            "top_db": self._top_db,
-            "max_spectrogram_length": self._max_spectrogram_length,
-        }
 
     # === Binary Classification ===
     def is_positive_class(self, class_name: str, positive_class: str | int) -> bool:

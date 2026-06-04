@@ -101,14 +101,6 @@ class UrbanSound8KConfig(DatasetConfig):
 
     description = "UrbanSound8K: 10 urban sound classes, 10 predefined folds"
 
-    # Audio processing parameters
-    _sample_rate: int = 44100
-    _n_fft: int = 1024
-    _hop_length: int = 256
-    _n_mels: int = 128
-    _top_db: int = 80
-    _max_spectrogram_length: int = 993  # Max length from training data analysis
-
     # Default paths
     metadata_csv: Path = Path("data/urbansound8k/UrbanSound8K.csv")
     _dataset_csv: Path = Path("data/urbansound8k/UrbanSound8K.csv")  # Common interface
@@ -215,19 +207,6 @@ class UrbanSound8KConfig(DatasetConfig):
         """Get path where spectrogram should be stored."""
         spec_filename = filename.replace(".wav", ".pt")
         return specs_dir / spec_filename
-
-    # === Audio Processing ===
-
-    def get_audio_processing_params(self) -> dict[str, Any]:
-        """Get audio processing parameters for spectrogram generation."""
-        return {
-            "sample_rate": self._sample_rate,
-            "n_fft": self._n_fft,
-            "hop_length": self._hop_length,
-            "n_mels": self._n_mels,
-            "top_db": self._top_db,
-            "max_spectrogram_length": self._max_spectrogram_length,
-        }
 
     # === Binary Classification ===
     def is_positive_class(self, class_name: str, positive_class: str | int) -> bool:

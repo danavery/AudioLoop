@@ -312,13 +312,13 @@ def run_training(
     set_seed(config.seed)
 
     # Get dataset config for lazy spec generation
-    dataset_config = config.get_dataset_config()
+    extractor = config.get_feature_extractor()
 
     # Create dataset with lazy spec generation support
     train_dataset = SpectrogramDataset(
         csv_file=labels_file,
+        extractor=extractor,  # Enables lazy generation from audio_path
         specs_dir=str(config.specs_dir),
-        dataset_config=dataset_config,  # Enable lazy generation from audio_path
     )
     logger.info(f"Dataset size: {len(train_dataset)}")
 
@@ -357,7 +357,7 @@ def run_training(
     ).to(device)
 
     # Check dataset/model compatibility
-    dataset_shape = dataset_config.feature_extractor.get_output_shape()
+    dataset_shape = extractor.get_output_shape()
 
     if not model.can_handle_shape(dataset_shape):
         available_models = list_available_models()

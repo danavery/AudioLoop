@@ -94,6 +94,10 @@ class AudioLoopConfig:
 
     model_type: str = "cnn5layer"
     model_kwargs: dict[str, Any] = field(default_factory=dict)
+
+    # Feature extractor parameters (audio->tensor production), e.g. sample_rate, n_fft,
+    # n_mels, max_spectrogram_length. Empty = SpectrogramExtractor defaults (44.1kHz log-mel).
+    feature_extractor_kwargs: dict[str, Any] = field(default_factory=dict)
     class_weighting: str | float | None = (
         0.70  # "adaptive", float (target positive ratio 0.0-1.0), or None
     )
@@ -416,6 +420,20 @@ class AudioLoopConfig:
         from .datasets.dataset_registry import create_dataset
 
         return create_dataset(self.dataset, subset_csv=self.subset_csv)
+
+    def get_feature_extractor(self, dataset_config: DatasetConfig | None = None):
+        """Build the feature extractor for this experiment, with params from config.
+
+        This is the config-scoped construction point: feature_extractor_kwargs (sample_rate,
+        n_fft, n_mels, ...) come from the experiment config, so offline (create_specs) and
+        lazy (SpectrogramDataset) builds share identical params. Pass an existing
+        dataset_config to reuse it; otherwise one is built from this config.
+        """
+        from .feature_extractor import SpectrogramExtractor
+
+        if dataset_config is None:
+            dataset_config = self.get_dataset_config()
+        return SpectrogramExtractor(dataset_config, **self.feature_extractor_kwargs)
 
     def create_directories(self) -> None:
         """Create all necessary directories for this configuration."""

@@ -176,14 +176,13 @@ def create_specs(config, dataset_config, clear_output=False, limit=None) -> tupl
 
     # Process files
     stats = ProcessingStats()
+    extractor = config.get_feature_extractor(dataset_config)
 
     with tqdm(audio_files, desc="Creating spectrograms") as pbar:
         for file_info in pbar:
             start_time = time.time()
 
-            success, spec_length = dataset_config.feature_extractor.process_one(
-                file_info, config.specs_dir
-            )
+            success, spec_length = extractor.process_one(file_info, config.specs_dir)
 
             processing_time = time.time() - start_time
 

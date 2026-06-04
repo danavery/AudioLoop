@@ -21,25 +21,26 @@ class SpectrogramDataset(torch.utils.data.Dataset):
     not a full path. The actual spec file path is determined by the specs_dir parameter.
     """
 
-    def __init__(self, csv_file, specs_dir="data/specs", dataset_config=None):
+    def __init__(self, csv_file, extractor, specs_dir="data/specs"):
         """
         Initialize the dataset.
 
         Args:
             csv_file: Path to CSV file containing labels with headers
+            extractor: SpectrogramExtractor used to generate spectrograms on-the-fly when a
+                       cached .pt is missing (lazy generation). Its dataset_config supplies
+                       spectrogram path resolution (get_spectrogram_path) and corruption
+                       guards (min_audio_file_size).
             specs_dir: Directory containing precomputed .pt spectrogram files
-            dataset_config: DatasetConfig for spectrogram path resolution and lazy generation.
-                           Used to resolve spectrogram paths via get_spectrogram_path() and
-                           to generate spectrograms on-the-fly when missing (if audio_path
-                           is present in CSV).
         """
-        if dataset_config is None:
+        if extractor is None:
             raise ValueError(
-                "dataset_config is required. SpectrogramDataset uses it for spectrogram "
-                "path resolution (get_spectrogram_path) and lazy generation."
+                "extractor is required. SpectrogramDataset uses it for lazy spectrogram "
+                "generation, and its dataset_config for spectrogram path resolution."
             )
         self.specs_dir = specs_dir
-        self.dataset_config = dataset_config
+        self.extractor = extractor
+        self.dataset_config = extractor.dataset_config
         self.samples = []
 
         # Load from CSV file
@@ -134,7 +135,7 @@ class SpectrogramDataset(torch.utils.data.Dataset):
 
         # Produce the feature tensor (load -> transform -> fix)
         try:
-            return self.dataset_config.feature_extractor.extract_one(audio_path)
+            return self.extractor.extract_one(audio_path)
         except Exception as e:
             # Corrupt or unsupported audio file
             raise RuntimeError(f"Failed to extract features from {audio_path}: {e}") from e

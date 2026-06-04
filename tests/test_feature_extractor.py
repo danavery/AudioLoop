@@ -2,7 +2,7 @@
 
 These cover the behavior that previously lived on DatasetConfig as
 create_spectrogram_transform / fix_spectrogram_length / get_output_shape, now owned by the
-extractor and parameterized by the dataset config's get_audio_processing_params().
+extractor and parameterized by its own constructor args (default 44.1kHz log-mel).
 """
 
 from pathlib import Path
@@ -30,12 +30,13 @@ def test_feature_extractor_property_caches():
 def test_get_output_shape(config_class):
     """Output shape is (n_mels, -1): correct freq dim and variable-time sentinel."""
     config = config_class()
-    shape = config.feature_extractor.get_output_shape()
+    fx = config.feature_extractor
+    shape = fx.get_output_shape()
 
     assert isinstance(shape, tuple)
     assert len(shape) == 2
     assert all(isinstance(dim, int) for dim in shape)
-    assert shape[0] == config._n_mels
+    assert shape[0] == fx.n_mels
     assert shape[1] == -1  # variable time dimension
 
 
@@ -44,7 +45,7 @@ def test_fix_length_crops_outliers_and_preserves_short(config_class):
     """_fix_length center-crops above max_spectrogram_length, never pads short clips."""
     config = config_class()
     fx = config.feature_extractor
-    max_length = config._max_spectrogram_length
+    max_length = fx.max_spectrogram_length
 
     # Short: preserved, no padding.
     assert fx._fix_length(torch.randn(1, 128, 100)).shape[-1] == 100
@@ -62,7 +63,7 @@ def test_extract_one_composes_load_transform_fix(monkeypatch):
     """extract_one runs load -> transform -> fix, in that order."""
     config = FSD50KConfig()
     fx = config.feature_extractor
-    max_length = config._max_spectrogram_length
+    max_length = fx.max_spectrogram_length
 
     seen = {}
 

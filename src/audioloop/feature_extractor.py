@@ -1,18 +1,17 @@
 """Feature extraction: audio file -> feature tensor.
 
 `SpectrogramExtractor` owns the audio->spectrogram production pipeline (load -> transform
--> fix) that previously lived on `DatasetConfig`. It is the unification point for the
-offline build path (`create_specs`) and the lazy path (`SpectrogramDataset`).
+-> fix) AND the audio-processing parameters (sample_rate, n_fft, ...) that previously lived
+on `DatasetConfig`. It is the unification point for the offline build path (`create_specs`)
+and the lazy path (`SpectrogramDataset`).
 
-(a)-phase note: the extractor currently reads its audio-processing parameters back from a
-`DatasetConfig` via `get_audio_processing_params()`. A later step (A2c) relocates those
-values onto the extractor itself (constructed from `AudioLoopConfig`), at which point the
-dataset config sheds audio processing entirely.
+Params are currently constructor defaults; experiment-level overrides (sourced from
+`AudioLoopConfig`) arrive in A3, when a FeatureSet built from config flows the configured
+extractor into both build paths consistently.
 """
 
 import logging
 from pathlib import Path
-from typing import Any
 
 import torch
 import torchaudio
@@ -28,16 +27,35 @@ class SpectrogramExtractor:
     """Produce log-mel spectrogram tensors from audio files.
 
     The load -> transform -> fix behavior is identical across all datasets; only the
-    parameter *values* differ, so this is a single concrete class parameterized by the
-    config's `get_audio_processing_params()` rather than a per-dataset subclass.
+    parameter *values* differ, so this is a single concrete class parameterized by its
+    constructor arguments rather than a per-dataset subclass. These are *feature* params
+    (the decode/STFT/mel target), owned by the extractor — not dataset identity.
+
+    The `dataset_config` reference is retained for file-level dataset knowledge used by the
+    build step (get_spectrogram_path, get_bad_files, min_audio_file_size), not for params.
+
+    Experiment-level overrides of these defaults arrive in A3 (FeatureSet, built from
+    AudioLoopConfig, flows the configured extractor into both build paths consistently).
     """
 
-    def __init__(self, dataset_config):
+    def __init__(
+        self,
+        dataset_config,
+        *,
+        sample_rate: int = 44100,
+        n_fft: int = 1024,
+        hop_length: int = 256,
+        n_mels: int = 128,
+        top_db: int = 80,
+        max_spectrogram_length: int = 2048,
+    ):
         self.dataset_config = dataset_config
-
-    @property
-    def _params(self) -> dict[str, Any]:
-        return self.dataset_config.get_audio_processing_params()
+        self.sample_rate = sample_rate
+        self.n_fft = n_fft
+        self.hop_length = hop_length
+        self.n_mels = n_mels
+        self.top_db = top_db
+        self.max_spectrogram_length = max_spectrogram_length
 
     def extract_one(self, audio_path: Path) -> torch.Tensor:
         """Produce the feature tensor for one audio file: load -> transform -> fix.
@@ -88,32 +106,29 @@ class SpectrogramExtractor:
 
     def _load_audio(self, audio_path: Path) -> torch.Tensor:
         """Load audio with torchcodec, resampling to the target rate and converting to mono."""
-        target_sample_rate = self._params["sample_rate"]
-        decoder = AudioDecoder(str(audio_path), sample_rate=target_sample_rate, num_channels=1)
+        decoder = AudioDecoder(str(audio_path), sample_rate=self.sample_rate, num_channels=1)
         return decoder.get_all_samples().data
 
     def _create_transform(self) -> nn.Sequential:
         """Build the mel-spectrogram + log-normalize transform pipeline."""
-        p = self._params
         return nn.Sequential(
             torchaudio.transforms.MelSpectrogram(
-                sample_rate=p["sample_rate"],
-                n_fft=p["n_fft"],
-                hop_length=p["hop_length"],
-                n_mels=p["n_mels"],
+                sample_rate=self.sample_rate,
+                n_fft=self.n_fft,
+                hop_length=self.hop_length,
+                n_mels=self.n_mels,
             ),
-            LogNormalize(top_db=p["top_db"]),
+            LogNormalize(top_db=self.top_db),
         )
 
     def _fix_length(self, spec: torch.Tensor) -> torch.Tensor:
         """Crop outliers longer than max_spectrogram_length (center crop); never pad short."""
-        max_length = self._params["max_spectrogram_length"]
         current_length = spec.shape[-1]  # Time dimension is last
-        if current_length > max_length:
-            start_idx = (current_length - max_length) // 2
-            spec = spec[..., start_idx : start_idx + max_length]
+        if current_length > self.max_spectrogram_length:
+            start_idx = (current_length - self.max_spectrogram_length) // 2
+            spec = spec[..., start_idx : start_idx + self.max_spectrogram_length]
         return spec
 
     def get_output_shape(self) -> tuple[int, ...]:
         """Shape of tensors this extractor produces (excluding batch dim)."""
-        return (self._params["n_mels"], -1)  # -1 indicates variable time dimension
+        return (self.n_mels, -1)  # -1 indicates variable time dimension

@@ -34,14 +34,6 @@ class AudiosetConfig(DatasetConfig):
 
     description = "AudioSet: 527 classes, 10s YouTube clips (multi-label)"
 
-    # Audio processing parameters (matching other datasets for consistency)
-    _sample_rate: int = 44100
-    _n_fft: int = 1024
-    _hop_length: int = 256
-    _n_mels: int = 128
-    _top_db: int = 80
-    _max_spectrogram_length: int = 2048  # AudioSet clips are ~10s, so allow longer spectrograms
-
     # Default paths - adjust to your mount point
     _audio_root: Path = Path("/mnt/audioset/audioset")
 
@@ -312,19 +304,6 @@ class AudiosetConfig(DatasetConfig):
         """Get path where spectrogram should be stored."""
         spec_filename = filename.replace(".flac", "") + ".pt"
         return specs_dir / spec_filename
-
-    # === Audio Processing ===
-
-    def get_audio_processing_params(self) -> dict[str, Any]:
-        """Get audio processing parameters for spectrogram generation."""
-        return {
-            "sample_rate": self._sample_rate,
-            "n_fft": self._n_fft,
-            "hop_length": self._hop_length,
-            "n_mels": self._n_mels,
-            "top_db": self._top_db,
-            "max_spectrogram_length": self._max_spectrogram_length,
-        }
 
     # === Dataset Subsetting ===
     def create_subset(

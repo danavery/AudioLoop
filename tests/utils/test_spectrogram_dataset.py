@@ -11,10 +11,16 @@ import torch
 from audioloop.utils.spectrogram_dataset import SpectrogramDataset
 
 
-def _make_mock_config():
-    """Create a mock dataset config with get_spectrogram_path that mimics standard behavior."""
+def _make_mock_extractor():
+    """Create a mock SpectrogramExtractor wrapping a mock dataset config.
+
+    SpectrogramDataset uses the extractor for lazy generation (extract_one) and reaches its
+    dataset_config for spectrogram-path resolution (get_spectrogram_path) + corruption
+    guards (min_audio_file_size). Tests stub the seam:
+    extractor.extract_one.return_value = <spec tensor>. (The audio->tensor composition
+    itself is covered by tests/test_feature_extractor.py.)
+    """
     mock_config = Mock()
-    mock_config.sample_rate = 44100
     mock_config.min_audio_file_size = None
 
     def _get_spec_path(filename, specs_dir):
@@ -26,10 +32,9 @@ def _make_mock_config():
 
     mock_config.get_spectrogram_path = _get_spec_path
 
-    # SpectrogramDataset's lazy path delegates production to the extractor, so tests stub
-    # the seam: mock_config.feature_extractor.extract_one.return_value = <spec tensor>.
-    # (The audio->tensor composition itself is covered by tests/test_feature_extractor.py.)
-    return mock_config
+    extractor = Mock()
+    extractor.dataset_config = mock_config
+    return extractor
 
 
 class TestSpectrogramDatasetCSVParsing:
@@ -48,7 +53,7 @@ class TestSpectrogramDatasetCSVParsing:
             writer.writerow(["test.flac", "1", "Dog", "bal_train", "/mnt/audio/test.flac"])
 
         dataset = SpectrogramDataset(
-            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=_make_mock_config()
+            csv_file=str(csv_file), specs_dir=str(specs_dir), extractor=_make_mock_extractor()
         )
 
         assert len(dataset.samples) == 1
@@ -69,7 +74,7 @@ class TestSpectrogramDatasetCSVParsing:
             writer.writerow(["test.wav", "1", "Speech"])
 
         dataset = SpectrogramDataset(
-            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=_make_mock_config()
+            csv_file=str(csv_file), specs_dir=str(specs_dir), extractor=_make_mock_extractor()
         )
 
         assert dataset.samples[0]["original_class"] == "Speech"
@@ -87,7 +92,7 @@ class TestSpectrogramDatasetCSVParsing:
             writer.writerow(["test.wav", "1", "5"])
 
         dataset = SpectrogramDataset(
-            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=_make_mock_config()
+            csv_file=str(csv_file), specs_dir=str(specs_dir), extractor=_make_mock_extractor()
         )
 
         assert dataset.samples[0]["original_class"] == 5
@@ -106,15 +111,15 @@ class TestSpectrogramDatasetCSVParsing:
             writer.writerow(["test.ogg", "1"])
 
         dataset = SpectrogramDataset(
-            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=_make_mock_config()
+            csv_file=str(csv_file), specs_dir=str(specs_dir), extractor=_make_mock_extractor()
         )
 
         # All should map to .pt files
         assert all(sample["spec_filepath"].endswith(".pt") for sample in dataset.samples)
         assert dataset.samples[0]["spec_filepath"].endswith("test.pt")
 
-    def test_dataset_config_required(self, tmp_path):
-        """Test that omitting dataset_config raises ValueError."""
+    def test_extractor_required(self, tmp_path):
+        """Test that omitting the extractor raises ValueError."""
         csv_file = tmp_path / "test.csv"
         specs_dir = tmp_path / "specs"
         specs_dir.mkdir()
@@ -126,8 +131,8 @@ class TestSpectrogramDatasetCSVParsing:
 
         import pytest
 
-        with pytest.raises(ValueError, match="dataset_config is required"):
-            SpectrogramDataset(csv_file=str(csv_file), specs_dir=str(specs_dir))
+        with pytest.raises(ValueError, match="extractor is required"):
+            SpectrogramDataset(csv_file=str(csv_file), extractor=None, specs_dir=str(specs_dir))
 
 
 class TestLazySpectrogramGeneration:
@@ -151,7 +156,7 @@ class TestLazySpectrogramGeneration:
             writer.writerow(["test.wav", "1"])
 
         dataset = SpectrogramDataset(
-            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=_make_mock_config()
+            csv_file=str(csv_file), specs_dir=str(specs_dir), extractor=_make_mock_extractor()
         )
 
         # Should load the existing file
@@ -175,11 +180,11 @@ class TestLazySpectrogramGeneration:
             writer.writerow(["test.flac", "1", str(audio_dir / "test.flac")])
 
         # Mock dataset config: the extractor produces the spec.
-        mock_config = _make_mock_config()
-        mock_config.feature_extractor.extract_one.return_value = torch.randn(1, 128, 100)
+        extractor = _make_mock_extractor()
+        extractor.extract_one.return_value = torch.randn(1, 128, 100)
 
         dataset = SpectrogramDataset(
-            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=mock_config
+            csv_file=str(csv_file), specs_dir=str(specs_dir), extractor=extractor
         )
 
         with patch("pathlib.Path.exists", return_value=True):
@@ -206,12 +211,12 @@ class TestLazySpectrogramGeneration:
             writer.writerow(["test.flac", "1", str(audio_file)])
 
         # Mock dataset config: the extractor produces the spec.
-        mock_config = _make_mock_config()
+        extractor = _make_mock_extractor()
         spec_data = torch.randn(1, 128, 100)
-        mock_config.feature_extractor.extract_one.return_value = spec_data
+        extractor.extract_one.return_value = spec_data
 
         dataset = SpectrogramDataset(
-            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=mock_config
+            csv_file=str(csv_file), specs_dir=str(specs_dir), extractor=extractor
         )
 
         with (
@@ -241,7 +246,7 @@ class TestLazySpectrogramGeneration:
             writer.writerow(["missing.wav", "1"])
 
         dataset = SpectrogramDataset(
-            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=_make_mock_config()
+            csv_file=str(csv_file), specs_dir=str(specs_dir), extractor=_make_mock_extractor()
         )
 
         # Should return None for missing files (graceful skip behavior)
@@ -274,7 +279,7 @@ class TestSpectrogramDatasetReturnValues:
             writer.writerow(["test.wav", "1", "Dog"])
 
         dataset = SpectrogramDataset(
-            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=_make_mock_config()
+            csv_file=str(csv_file), specs_dir=str(specs_dir), extractor=_make_mock_extractor()
         )
 
         item = dataset[0]
@@ -304,7 +309,7 @@ class TestSpectrogramDatasetReturnValues:
             writer.writerow(["test.wav", "1"])
 
         dataset = SpectrogramDataset(
-            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=_make_mock_config()
+            csv_file=str(csv_file), specs_dir=str(specs_dir), extractor=_make_mock_extractor()
         )
 
         item = dataset[0]
@@ -315,8 +320,8 @@ class TestSpectrogramDatasetReturnValues:
 class TestDatasetConfigIntegration:
     """Test integration with dataset configs."""
 
-    def test_dataset_config_stored(self, tmp_path):
-        """Test that dataset_config is stored on the instance."""
+    def test_extractor_stored(self, tmp_path):
+        """Test that the extractor (and its dataset_config) is stored on the instance."""
         csv_file = tmp_path / "test.csv"
         specs_dir = tmp_path / "specs"
         specs_dir.mkdir()
@@ -327,11 +332,12 @@ class TestDatasetConfigIntegration:
             writer.writerow(["filename", "label", "audio_path"])
             writer.writerow(["test.flac", "1", "/fake/path.flac"])
 
-        mock_config = _make_mock_config()
+        extractor = _make_mock_extractor()
         dataset = SpectrogramDataset(
-            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=mock_config
+            csv_file=str(csv_file), specs_dir=str(specs_dir), extractor=extractor
         )
-        assert dataset.dataset_config == mock_config
+        assert dataset.extractor is extractor
+        assert dataset.dataset_config is extractor.dataset_config
 
     def test_error_when_audio_file_missing(self, tmp_path):
         """Test that FileNotFoundError is raised when audio file doesn't exist."""
@@ -345,10 +351,10 @@ class TestDatasetConfigIntegration:
             writer.writerow(["filename", "label", "audio_path"])
             writer.writerow(["test.flac", "1", "/nonexistent/path.flac"])
 
-        mock_config = _make_mock_config()
+        extractor = _make_mock_extractor()
 
         dataset = SpectrogramDataset(
-            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=mock_config
+            csv_file=str(csv_file), specs_dir=str(specs_dir), extractor=extractor
         )
 
         with patch("audioloop.utils.spectrogram_dataset.os.path.exists", return_value=False):
@@ -373,9 +379,9 @@ class TestDatasetConfigIntegration:
             writer.writerow(["filename", "label", "audio_path"])
             writer.writerow(["test.wav", "1", str(tmp_path / "test.wav")])
 
-        mock_config = _make_mock_config()
+        extractor = _make_mock_extractor()
         dataset = SpectrogramDataset(
-            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=mock_config
+            csv_file=str(csv_file), specs_dir=str(specs_dir), extractor=extractor
         )
 
         # Load the item - should use existing file, not trigger lazy generation
@@ -385,7 +391,7 @@ class TestDatasetConfigIntegration:
         assert torch.allclose(item["data"], spec_data)
 
         # Extractor should not have been invoked (cached spec used directly)
-        mock_config.feature_extractor.extract_one.assert_not_called()
+        extractor.extract_one.assert_not_called()
 
     def test_lazy_generation_without_audio_path_fails_gracefully(self, tmp_path):
         """Test that missing spec without audio_path gives graceful skip."""
@@ -400,7 +406,7 @@ class TestDatasetConfigIntegration:
             writer.writerow(["missing.wav", "1", str(tmp_path / "missing.wav")])
 
         dataset = SpectrogramDataset(
-            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=_make_mock_config()
+            csv_file=str(csv_file), specs_dir=str(specs_dir), extractor=_make_mock_extractor()
         )
 
         # Should return None for files that can't be loaded (graceful skip behavior)
@@ -423,12 +429,12 @@ class TestDatasetConfigIntegration:
             writer.writerow(["test.flac", "1", str(audio_file)])
 
         # Mock dataset config: the extractor produces the spec.
-        mock_config = _make_mock_config()
+        extractor = _make_mock_extractor()
         spec_data = torch.randn(1, 128, 100)
-        mock_config.feature_extractor.extract_one.return_value = spec_data
+        extractor.extract_one.return_value = spec_data
 
         dataset = SpectrogramDataset(
-            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=mock_config
+            csv_file=str(csv_file), specs_dir=str(specs_dir), extractor=extractor
         )
 
         with patch("pathlib.Path.exists", return_value=True):

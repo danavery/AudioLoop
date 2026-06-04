@@ -71,9 +71,6 @@ class TestDatasetConfigInterface:
             def get_audio_path(self, filename, fold=None):
                 return Path(filename)
 
-            def get_audio_processing_params(self):
-                return {}
-
             def is_positive_class(self, class_name, positive_class):
                 return class_name == positive_class
 
@@ -221,30 +218,9 @@ class TestDatasetConfigBehavior:
         # Should include fold in path
         assert "fold3" in str(path)
 
-    def test_different_max_spectrogram_lengths(self):
-        """Test that datasets have different fixed lengths for spectrograms."""
-        fsd50k = FSD50KConfig()
-        urbansound8k = UrbanSound8KConfig()
-
-        # Both return variable time dimension (-1) in output shape
-        assert fsd50k.feature_extractor.get_output_shape()[1] == -1
-        assert urbansound8k.feature_extractor.get_output_shape()[1] == -1
-
-        # But still have different max length limits for outlier handling
-        assert fsd50k._max_spectrogram_length != urbansound8k._max_spectrogram_length
-        assert fsd50k._max_spectrogram_length == 2048
-        assert urbansound8k._max_spectrogram_length == 993
-
-    def test_consistent_audio_parameters(self):
-        """Test that datasets use consistent audio processing parameters."""
-        fsd50k = FSD50KConfig()
-        urbansound8k = UrbanSound8KConfig()
-
-        # These should be the same for consistency
-        assert fsd50k._sample_rate == urbansound8k._sample_rate
-        assert fsd50k._n_fft == urbansound8k._n_fft
-        assert fsd50k._hop_length == urbansound8k._hop_length
-        assert fsd50k._n_mels == urbansound8k._n_mels
+    # Audio-processing parameters (sample_rate/n_fft/.../max_spectrogram_length) moved off
+    # DatasetConfig onto SpectrogramExtractor; their behavior is covered by
+    # tests/test_feature_extractor.py, not here.
 
 
 class TestMetadataHandling:
@@ -511,9 +487,6 @@ class TestCreateSubsetInterface:
 
             def get_audio_path(self, filename, fold=None):
                 return Path(filename)
-
-            def get_audio_processing_params(self):
-                return {}
 
             def is_positive_class(self, class_name, positive_class):
                 return False

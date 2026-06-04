@@ -174,23 +174,15 @@ class DatasetConfig(ABC):
         """
         pass
 
-    # === Audio Processing ===
-    @abstractmethod
-    def get_audio_processing_params(self) -> dict[str, Any]:
-        """Get audio processing parameters for spectrogram generation.
-
-        Returns:
-            Dict with keys: sample_rate, n_fft, hop_length, n_mels, top_db, max_spectrogram_length
-        """
-        pass
-
+    # === Feature Extraction ===
     @property
     def feature_extractor(self):
-        """Lazily build and cache this dataset's feature extractor (the (a)-phase seam).
+        """Lazily build and cache this dataset's feature extractor.
 
-        The extractor owns the audio->tensor production (load -> transform -> fix) and
-        reads its parameters back from this config via get_audio_processing_params().
-        A later step (A2c) relocates those values onto the extractor itself.
+        The extractor owns audio->tensor production (load -> transform -> fix) AND the
+        audio-processing parameters (sample_rate, n_fft, ... — feature concerns, not
+        dataset identity). The dataset config is passed in only for file-level knowledge
+        the build step needs (get_spectrogram_path, get_bad_files, min_audio_file_size).
         """
         fx = getattr(self, "_feature_extractor", None)
         if fx is None:
