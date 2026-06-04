@@ -10,6 +10,7 @@ values onto the extractor itself (constructed from `AudioLoopConfig`), at which 
 dataset config sheds audio processing entirely.
 """
 
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +20,8 @@ from torch import nn
 from torchcodec.decoders import AudioDecoder
 
 from audioloop.utils.log_normalize import LogNormalize
+
+logger = logging.getLogger(__name__)
 
 
 class SpectrogramExtractor:
@@ -45,6 +48,43 @@ class SpectrogramExtractor:
         waveform = self._load_audio(audio_path)
         spec = self._create_transform()(waveform)
         return self._fix_length(spec)
+
+    def process_one(self, file_info: dict, output_dir: Path) -> tuple[bool, int | None]:
+        """Build and cache one file's feature tensor: the offline (create_specs) build step.
+
+        Applies all guards uniformly before extraction — resumable skip, audio existence,
+        the dataset's known-bad files, and minimum file size — then runs extract_one and
+        caches the result under get_spectrogram_path. Returns (success, feature_length):
+        length is None for files skipped because they were already built. Per-file
+        skips/failures are counted by the caller, not logged here, to keep the progress
+        bar readable; only unexpected exceptions are logged.
+        """
+        config = self.dataset_config
+        try:
+            audio_path = file_info["audio_path"]
+            filename = file_info["filename"]
+            output_path = config.get_spectrogram_path(filename, output_dir)
+
+            # Resumable: skip files already built (forced rebuild via create_specs clear_output).
+            if output_path.exists():
+                return True, None
+
+            # Skip missing / known-bad / too-small files (counted in stats, not logged per-file).
+            if not audio_path.exists():
+                return False, None
+            if filename in config.get_bad_files():
+                return False, None
+            min_size = config.min_audio_file_size
+            if min_size is not None and audio_path.stat().st_size < min_size:
+                return False, None
+
+            spec = self.extract_one(audio_path)
+            torch.save(spec, output_path)
+            return True, spec.shape[-1]
+
+        except Exception as e:
+            logger.error(f"Error processing {file_info['filename']}: {e}")
+            return False, None
 
     def _load_audio(self, audio_path: Path) -> torch.Tensor:
         """Load audio with torchcodec, resampling to the target rate and converting to mono."""

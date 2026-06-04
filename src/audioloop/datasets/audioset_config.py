@@ -4,8 +4,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import torch
-
 from audioloop.utils.paths import get_project_root
 
 from .dataset_config import DatasetConfig
@@ -327,49 +325,6 @@ class AudiosetConfig(DatasetConfig):
             "top_db": self._top_db,
             "max_spectrogram_length": self._max_spectrogram_length,
         }
-
-    def process_single_file(self, file_info: dict, output_dir: Path) -> tuple[bool, int | None]:
-        """Process a single audio file and save its spectrogram."""
-        try:
-            audio_path = file_info["audio_path"]
-            filename = file_info["filename"]
-
-            # Check if spec already exists (lazy creation for resumable runs)
-            output_filename = filename.replace(".flac", "") + ".pt"
-            output_path = output_dir / output_filename
-            if output_path.exists():
-                # Spec already exists, skip processing
-                return True, None
-
-            # Check if audio file exists
-            if not audio_path.exists():
-                # Don't log individual missing files to avoid disrupting tqdm progress bar
-                # Failure count will be shown in progress bar postfix and final summary
-                return False, None
-
-            # Skip known bad files that cause segfaults
-            if filename in self.get_bad_files():
-                return False, None
-
-            # Skip files that are too small (corrupt FLAC headers)
-            min_size = self.min_audio_file_size
-            if min_size is not None and audio_path.stat().st_size < min_size:
-                return False, None
-
-            # Produce the feature tensor (load -> transform -> fix)
-            spec = self.feature_extractor.extract_one(audio_path)
-            spec_length = spec.shape[-1]
-
-            # Save spectrogram
-            output_filename = filename.replace(".flac", "") + ".pt"
-            output_path = output_dir / output_filename
-            torch.save(spec, output_path)
-
-            return True, spec_length
-
-        except Exception as e:
-            logger.error(f"Error processing {file_info['filename']}: {e}")
-            return False, None
 
     # === Dataset Subsetting ===
     def create_subset(

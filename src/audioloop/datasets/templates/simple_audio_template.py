@@ -42,16 +42,11 @@ Then edit: class name, paths, vocabulary, and audio parameters.
 """
 
 import csv
-import logging
 from pathlib import Path
 from typing import Any, ClassVar
 
-import torch
-
 from audioloop.datasets.dataset_config import DatasetConfig
 from audioloop.utils.paths import get_project_root
-
-logger = logging.getLogger(__name__)
 
 
 class TemplateAudioConfig(DatasetConfig):
@@ -300,29 +295,6 @@ class TemplateAudioConfig(DatasetConfig):
             else 0
         )
 
-    def process_single_file(self, file_info: dict, output_dir: Path) -> tuple[bool, int | None]:
-        """Process a single audio file and save its spectrogram."""
-        try:
-            audio_path = file_info["audio_path"]
-            filename = file_info["filename"]
-
-            # Check if audio file exists
-            if not audio_path.exists():
-                logger.warning(f"Audio file not found: {audio_path}")
-                return False, None
-
-            # Produce the feature tensor (load -> transform -> fix) via the extractor
-            spec = self.feature_extractor.extract_one(audio_path)
-            spec_length = spec.shape[-1]
-
-            # Save spectrogram
-            base_filename = filename.split(".")[0]  # Remove extension
-            output_filename = f"{base_filename}.pt"
-            output_path = output_dir / output_filename
-            torch.save(spec, output_path)
-
-            return True, spec_length
-
-        except Exception as e:
-            logger.error(f"Error processing {file_info['filename']}: {e}")
-            return False, None
+    # Note: offline spectrogram building (load -> transform -> fix -> save, with skip/guard
+    # policy) is handled by the feature extractor's process_one(); the config only supplies
+    # get_audio_processing_params() and get_spectrogram_path(). No process_single_file needed.

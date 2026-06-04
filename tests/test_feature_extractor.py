@@ -85,3 +85,59 @@ def test_extract_one_composes_load_transform_fix(monkeypatch):
     assert seen["loaded"] == Path("clip.wav")  # load ran first, on the given path
     assert seen["transformed"] == (1, 16000)  # transform ran on the loaded waveform
     assert out.shape[-1] == max_length  # fix ran on the transform output (cropped)
+
+
+def test_process_one_builds_and_saves(tmp_path, monkeypatch):
+    """process_one extracts and caches the spec under get_spectrogram_path, returns length."""
+    config = FSD50KConfig()
+    fx = config.feature_extractor
+
+    audio = tmp_path / "clip.wav"
+    audio.write_bytes(b"ignored")  # must exist; content irrelevant (extract_one is stubbed)
+    out_dir = tmp_path / "specs"
+    out_dir.mkdir()
+
+    monkeypatch.setattr(fx, "extract_one", lambda p: torch.zeros(128, 42))
+
+    ok, length = fx.process_one({"audio_path": audio, "filename": "clip.wav"}, out_dir)
+
+    assert ok is True
+    assert length == 42
+    assert config.get_spectrogram_path("clip.wav", out_dir).exists()
+
+
+def test_process_one_skips_already_built(tmp_path, monkeypatch):
+    """Resumable: an existing spec is skipped (True, None) without invoking the extractor."""
+    config = FSD50KConfig()
+    fx = config.feature_extractor
+
+    audio = tmp_path / "clip.wav"
+    audio.write_bytes(b"ignored")
+    out_dir = tmp_path / "specs"
+    out_dir.mkdir()
+    # Pre-build the cached spec.
+    torch.save(torch.zeros(128, 10), config.get_spectrogram_path("clip.wav", out_dir))
+
+    calls = []
+    monkeypatch.setattr(fx, "extract_one", lambda p: calls.append(p) or torch.zeros(128, 10))
+
+    ok, length = fx.process_one({"audio_path": audio, "filename": "clip.wav"}, out_dir)
+
+    assert ok is True
+    assert length is None  # skipped: no length recorded
+    assert calls == []  # extractor never ran
+
+
+def test_process_one_missing_audio_is_failure(tmp_path):
+    """A missing audio file is a quiet failure (False, None)."""
+    config = FSD50KConfig()
+    fx = config.feature_extractor
+    out_dir = tmp_path / "specs"
+    out_dir.mkdir()
+
+    ok, length = fx.process_one(
+        {"audio_path": tmp_path / "nope.wav", "filename": "nope.wav"}, out_dir
+    )
+
+    assert ok is False
+    assert length is None

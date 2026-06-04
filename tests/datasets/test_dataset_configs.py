@@ -86,9 +86,6 @@ class TestDatasetConfigInterface:
             def get_binary_label(self, item, positive_class_id, positive_class_name):
                 return 1
 
-            def process_single_file(self, file_info, output_dir):
-                return True, None
-
         config = CompleteConfig()
         assert isinstance(config, DatasetConfig)
 
@@ -102,15 +99,15 @@ class TestDatasetConfigInterface:
         assert hasattr(config, "get_available_splits")
         assert hasattr(config, "get_default_split")
         assert hasattr(config, "get_audio_path")
-        assert hasattr(config, "process_single_file")
-        # Audio->tensor production now lives on the feature extractor, not the config.
+        # Audio->tensor production + the offline build step now live on the feature
+        # extractor, not the config.
         assert hasattr(config, "feature_extractor")
         assert callable(config.load_metadata)
         assert callable(config.get_available_splits)
         assert callable(config.get_default_split)
         assert callable(config.get_audio_path)
-        assert callable(config.process_single_file)
         assert callable(config.feature_extractor.get_output_shape)
+        assert callable(config.feature_extractor.process_one)
 
 
 class TestDatasetSplitInterface:
@@ -282,21 +279,6 @@ class TestMetadataHandling:
 
         assert isinstance(entries, list)
         assert len(entries) > 0  # Should have some test data
-
-
-class TestNewAbstractMethods:
-    """Test the newly added abstract methods."""
-
-    @pytest.mark.parametrize("config_class", [FSD50KConfig, UrbanSound8KConfig])
-    def test_process_single_file_signature(self, config_class):
-        """Test that process_single_file has correct signature."""
-        config = config_class()
-
-        # Should have the method (don't actually call it - might need real files)
-        assert hasattr(config, "process_single_file")
-        assert callable(config.process_single_file)
-
-        # Just verify it's callable - actual testing would need file mocking
 
 
 class TestPathGeneration:
@@ -544,9 +526,6 @@ class TestCreateSubsetInterface:
 
             def get_binary_label(self, item, positive_class_id, positive_class_name):
                 return 0
-
-            def process_single_file(self, file_info, output_dir):
-                return True, None
 
         config = MinimalConfig()
 

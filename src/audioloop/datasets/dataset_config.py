@@ -231,20 +231,6 @@ class DatasetConfig(ABC):
         """
         pass
 
-    # === Audio Processing Pipeline ===
-    @abstractmethod
-    def process_single_file(self, file_info: dict, output_dir: Path) -> tuple[bool, int | None]:
-        """Process a single audio file and save its spectrogram.
-
-        Args:
-            file_info: Metadata dict with 'filename', 'audio_path', etc.
-            output_dir: Directory to save the processed spectrogram
-
-        Returns:
-            Tuple of (success: bool, original_length: int | None)
-        """
-        pass
-
     # === Dataset Subsetting ===
     def create_subset(
         self,

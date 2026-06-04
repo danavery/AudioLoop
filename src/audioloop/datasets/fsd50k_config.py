@@ -4,8 +4,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-import torch
-
 from audioloop.utils.paths import get_project_root
 
 from .dataset_config import DatasetConfig
@@ -294,32 +292,6 @@ class FSD50KConfig(DatasetConfig):
             "top_db": self._top_db,
             "max_spectrogram_length": self._max_spectrogram_length,
         }
-
-    def process_single_file(self, file_info: dict, output_dir: Path) -> tuple[bool, int | None]:
-        """Process a single audio file and save its spectrogram."""
-        try:
-            audio_path = file_info["audio_path"]
-            filename = file_info["filename"]
-
-            # Check if audio file exists
-            if not audio_path.exists():
-                logger.warning(f"Audio file not found: {audio_path}")
-                return False, None
-
-            # Produce the feature tensor (load -> transform -> fix)
-            spec = self.feature_extractor.extract_one(audio_path)
-            spec_length = spec.shape[-1]
-
-            # Save spectrogram
-            output_filename = f"{filename}.pt"
-            output_path = output_dir / output_filename
-            torch.save(spec, output_path)
-
-            return True, spec_length
-
-        except Exception as e:
-            logger.error(f"Error processing {file_info['filename']}: {e}")
-            return False, None
 
     # === Binary Classification ===
     def is_positive_class(self, class_name: str, positive_class: str | int) -> bool:
