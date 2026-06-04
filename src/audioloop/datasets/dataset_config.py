@@ -269,6 +269,25 @@ class DatasetConfig(ABC):
         """
         pass
 
+    def extract_one(self, audio_path: Path) -> torch.Tensor:
+        """Produce the feature tensor for one audio file: load -> transform -> fix.
+
+        Unifies the load_audio -> create_spectrogram_transform -> fix_spectrogram_length
+        sequence that is byte-identical across offline spectrogram creation
+        (process_single_file) and lazy on-the-fly generation (SpectrogramDataset). This is
+        the pure audio->tensor core; callers retain their own surrounding policy
+        (existence/corruption guards, caching, stats, filename derivation).
+
+        Args:
+            audio_path: Path to the audio file.
+
+        Returns:
+            The length-fixed feature tensor for this file.
+        """
+        waveform = self.load_audio(audio_path)
+        spec = self.create_spectrogram_transform()(waveform)
+        return self.fix_spectrogram_length(spec)
+
     @abstractmethod
     def process_single_file(self, file_info: dict, output_dir: Path) -> tuple[bool, int | None]:
         """Process a single audio file and save its spectrogram.

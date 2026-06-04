@@ -132,21 +132,12 @@ class SpectrogramDataset(torch.utils.data.Dataset):
                     f"Likely corrupt (e.g., FLAC header with no data)."
                 )
 
-        # Load audio (resamples and converts to mono)
+        # Produce the feature tensor (load -> transform -> fix)
         try:
-            waveform = self.dataset_config.load_audio(audio_path)
+            return self.dataset_config.extract_one(audio_path)
         except Exception as e:
             # Corrupt or unsupported audio file
-            raise RuntimeError(f"Failed to load audio file {audio_path}: {e}") from e
-
-        # Generate spectrogram using dataset config
-        spec_transform = self.dataset_config.create_spectrogram_transform()
-        spec = spec_transform(waveform)
-
-        # Fix spectrogram length
-        spec = self.dataset_config.fix_spectrogram_length(spec)
-
-        return spec
+            raise RuntimeError(f"Failed to extract features from {audio_path}: {e}") from e
 
     def __len__(self):
         return len(self.samples)

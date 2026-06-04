@@ -25,6 +25,16 @@ def _make_mock_config():
         return Path(specs_dir) / spec_name
 
     mock_config.get_spectrogram_path = _get_spec_path
+
+    # Mirror DatasetConfig.extract_one's composition so tests that stub the constituent
+    # methods (load_audio / create_spectrogram_transform / fix_spectrogram_length) still
+    # exercise them through the seam SpectrogramDataset now calls.
+    def _extract_one(audio_path):
+        waveform = mock_config.load_audio(audio_path)
+        spec = mock_config.create_spectrogram_transform()(waveform)
+        return mock_config.fix_spectrogram_length(spec)
+
+    mock_config.extract_one = _extract_one
     return mock_config
 
 

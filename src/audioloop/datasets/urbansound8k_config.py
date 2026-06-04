@@ -275,25 +275,16 @@ class UrbanSound8KConfig(DatasetConfig):
                 logger.warning(f"Audio file not found: {audio_path}")
                 return False, None
 
-            # Load audio (resamples and converts to mono)
-            waveform = self.load_audio(audio_path)
-
-            # Create spectrogram
-            spec_transform = self.create_spectrogram_transform()
-            spec = spec_transform(waveform)
-
-            # Store original length before fixing
-            original_length = spec.shape[-1]
-
-            # Fix spectrogram length
-            spec = self.fix_spectrogram_length(spec)
+            # Produce the feature tensor (load -> transform -> fix)
+            spec = self.extract_one(audio_path)
+            spec_length = spec.shape[-1]
 
             # Save spectrogram
             output_filename = filename.replace(".wav", ".pt")
             output_path = output_dir / output_filename
             torch.save(spec, output_path)
 
-            return True, original_length
+            return True, spec_length
 
         except Exception as e:
             logger.error(f"Error processing {file_info['filename']}: {e}")
