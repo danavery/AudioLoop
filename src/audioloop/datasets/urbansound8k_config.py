@@ -5,10 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import torch
-import torchaudio
-from torch import nn
 
-from audioloop.utils.log_normalize import LogNormalize
 from audioloop.utils.paths import get_project_root
 
 from .dataset_config import DatasetConfig
@@ -234,36 +231,6 @@ class UrbanSound8KConfig(DatasetConfig):
             "max_spectrogram_length": self._max_spectrogram_length,
         }
 
-    def create_spectrogram_transform(self):
-        """Create PyTorch transform pipeline for generating spectrograms."""
-        return nn.Sequential(
-            torchaudio.transforms.MelSpectrogram(
-                sample_rate=self._sample_rate,
-                n_fft=self._n_fft,
-                hop_length=self._hop_length,
-                n_mels=self._n_mels,
-            ),
-            LogNormalize(top_db=self._top_db),
-        )
-
-    def get_output_shape(self) -> tuple[int, ...]:
-        """Get the shape of tensors produced by this dataset."""
-        return (self._n_mels, -1)  # -1 indicates variable time dimension
-
-    def fix_spectrogram_length(self, spec: torch.Tensor) -> torch.Tensor:
-        """Fix spectrogram length by cropping outliers but preserving natural variation."""
-        current_length = spec.shape[-1]  # Time dimension is last
-        max_length = self._max_spectrogram_length
-
-        # Only crop if it exceeds reasonable maximum (handles outliers)
-        if current_length > max_length:
-            # Crop from the center
-            start_idx = (current_length - max_length) // 2
-            spec = spec[..., start_idx : start_idx + max_length]
-
-        # Don't pad short spectrograms - preserve natural length
-        return spec
-
     def process_single_file(self, file_info: dict, output_dir: Path) -> tuple[bool, int | None]:
         """Process a single audio file and save its spectrogram."""
         try:
@@ -276,7 +243,7 @@ class UrbanSound8KConfig(DatasetConfig):
                 return False, None
 
             # Produce the feature tensor (load -> transform -> fix)
-            spec = self.extract_one(audio_path)
+            spec = self.feature_extractor.extract_one(audio_path)
             spec_length = spec.shape[-1]
 
             # Save spectrogram

@@ -134,7 +134,7 @@ class SpectrogramDataset(torch.utils.data.Dataset):
 
         # Produce the feature tensor (load -> transform -> fix)
         try:
-            return self.dataset_config.extract_one(audio_path)
+            return self.dataset_config.feature_extractor.extract_one(audio_path)
         except Exception as e:
             # Corrupt or unsupported audio file
             raise RuntimeError(f"Failed to extract features from {audio_path}: {e}") from e

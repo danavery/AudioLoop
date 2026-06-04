@@ -92,8 +92,9 @@ class TestDatasetIntegration:
         # Should have required interface
         assert hasattr(dataset_config, "get_audio_path")
         assert hasattr(dataset_config, "load_metadata")
-        assert hasattr(dataset_config, "fix_spectrogram_length")
         assert hasattr(dataset_config, "process_single_file")
+        # Audio->tensor production moved to the feature extractor.
+        assert hasattr(dataset_config, "feature_extractor")
 
 
 class TestVersionedWorkflow:

@@ -9,10 +9,6 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
-import torch
-import torch.nn as nn
-from torchcodec.decoders import AudioDecoder
-
 
 class DatasetConfig(ABC):
     """Common interface for dataset configurations used in active learning.
@@ -188,43 +184,22 @@ class DatasetConfig(ABC):
         """
         pass
 
-    def load_audio(self, audio_path: Path) -> torch.Tensor:
-        """Load audio file, resample if needed, and convert to mono.
+    @property
+    def feature_extractor(self):
+        """Lazily build and cache this dataset's feature extractor (the (a)-phase seam).
 
-        This is the standard audio loading method that handles:
-        - Loading audio with torchcodec
-        - Resampling to the dataset's configured sample_rate
-        - Converting stereo to mono by averaging channels
-
-        Args:
-            audio_path: Path to audio file
-
-        Returns:
-            Mono waveform tensor at the dataset's sample_rate
+        The extractor owns the audio->tensor production (load -> transform -> fix) and
+        reads its parameters back from this config via get_audio_processing_params().
+        A later step (A2c) relocates those values onto the extractor itself.
         """
-        target_sample_rate = self.get_audio_processing_params()["sample_rate"]
-        decoder = AudioDecoder(str(audio_path), sample_rate=target_sample_rate, num_channels=1)
-        waveform = decoder.get_all_samples().data
+        fx = getattr(self, "_feature_extractor", None)
+        if fx is None:
+            # Local import avoids a module-level datasets <-> feature_extractor cycle.
+            from audioloop.feature_extractor import SpectrogramExtractor
 
-        return waveform
-
-    @abstractmethod
-    def create_spectrogram_transform(self) -> nn.Sequential:
-        """Create PyTorch transform pipeline for generating spectrograms.
-
-        Returns:
-            PyTorch Sequential transform for audio -> spectrogram conversion
-        """
-        pass
-
-    @abstractmethod
-    def get_output_shape(self) -> tuple[int, ...]:
-        """Get the shape of tensors produced by this dataset.
-
-        Returns:
-            Tuple representing tensor shape (excluding batch dimension)
-        """
-        pass
+            fx = SpectrogramExtractor(self)
+            self._feature_extractor = fx
+        return fx
 
     # === Binary Classification ===
     @abstractmethod
@@ -257,37 +232,6 @@ class DatasetConfig(ABC):
         pass
 
     # === Audio Processing Pipeline ===
-    @abstractmethod
-    def fix_spectrogram_length(self, spec: torch.Tensor) -> torch.Tensor:
-        """Fix spectrogram to target length by padding or cropping.
-
-        Args:
-            spec: Input spectrogram tensor
-
-        Returns:
-            Spectrogram tensor with fixed length matching dataset configuration
-        """
-        pass
-
-    def extract_one(self, audio_path: Path) -> torch.Tensor:
-        """Produce the feature tensor for one audio file: load -> transform -> fix.
-
-        Unifies the load_audio -> create_spectrogram_transform -> fix_spectrogram_length
-        sequence that is byte-identical across offline spectrogram creation
-        (process_single_file) and lazy on-the-fly generation (SpectrogramDataset). This is
-        the pure audio->tensor core; callers retain their own surrounding policy
-        (existence/corruption guards, caching, stats, filename derivation).
-
-        Args:
-            audio_path: Path to the audio file.
-
-        Returns:
-            The length-fixed feature tensor for this file.
-        """
-        waveform = self.load_audio(audio_path)
-        spec = self.create_spectrogram_transform()(waveform)
-        return self.fix_spectrogram_length(spec)
-
     @abstractmethod
     def process_single_file(self, file_info: dict, output_dir: Path) -> tuple[bool, int | None]:
         """Process a single audio file and save its spectrogram.

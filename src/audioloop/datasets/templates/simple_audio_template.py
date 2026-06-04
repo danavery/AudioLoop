@@ -15,10 +15,14 @@ keeps your code out of the installed package. See docs/custom_datasets.md.
 This template provides a complete DatasetConfig implementation with:
 - Audio file loading from directory structures
 - CSV metadata parsing with flexible column names
-- Spectrogram preprocessing pipeline
+- Audio processing parameters (consumed by the feature extractor)
 - Binary classification support
 - Automatic file extension detection
 - Dataset split interface (single "all" split for simple datasets)
+
+Note: audio->tensor production (load -> spectrogram transform -> length fix) lives on the
+feature extractor, not the dataset config. You only declare the parameters via
+get_audio_processing_params(); the extractor reads them. See audioloop/feature_extractor.py.
 
 Supported CSV formats:
     filename,label
@@ -43,11 +47,8 @@ from pathlib import Path
 from typing import Any, ClassVar
 
 import torch
-import torch.nn as nn
-import torchaudio
 
 from audioloop.datasets.dataset_config import DatasetConfig
-from audioloop.utils.log_normalize import LogNormalize
 from audioloop.utils.paths import get_project_root
 
 logger = logging.getLogger(__name__)
@@ -117,6 +118,11 @@ class TemplateAudioConfig(DatasetConfig):
             return self._audio_root
         # Resolve relative paths against project root
         return get_project_root() / self._audio_root
+
+    @property
+    def audio_extension(self) -> str:
+        """Audio file extension for this dataset (e.g. '.wav', '.flac')."""
+        return self._audio_extension
 
     @property
     def name_to_id(self) -> dict[str, int]:
@@ -268,22 +274,6 @@ class TemplateAudioConfig(DatasetConfig):
         base_filename = filename.split(".")[0]
         return specs_dir / f"{base_filename}.pt"
 
-    def create_spectrogram_transform(self) -> nn.Sequential:
-        """Create PyTorch transform pipeline for generating spectrograms."""
-        return nn.Sequential(
-            torchaudio.transforms.MelSpectrogram(
-                sample_rate=self._sample_rate,
-                n_fft=self._n_fft,
-                hop_length=self._hop_length,
-                n_mels=self._n_mels,
-            ),
-            LogNormalize(top_db=self._top_db),
-        )
-
-    def get_output_shape(self) -> tuple[int, ...]:
-        """Get the shape of tensors produced by this dataset."""
-        return (self._n_mels, -1)  # -1 indicates variable time dimension
-
     def parse_metadata_row(self, row: dict[str, str], split: str | None = None) -> dict[str, Any]:
         """Parse a single CSV row into standardized metadata format."""
         filename = row[self._filename_column].strip()
@@ -310,20 +300,6 @@ class TemplateAudioConfig(DatasetConfig):
             else 0
         )
 
-    def fix_spectrogram_length(self, spec: torch.Tensor) -> torch.Tensor:
-        """Fix spectrogram length by cropping outliers but preserving natural variation."""
-        current_length = spec.shape[-1]  # Time dimension is last
-        max_length = self._max_spectrogram_length
-
-        # Only crop if it exceeds reasonable maximum (handles outliers)
-        if current_length > max_length:
-            # Crop from the center
-            start_idx = (current_length - max_length) // 2
-            spec = spec[..., start_idx : start_idx + max_length]
-
-        # Don't pad short spectrograms - preserve natural length
-        return spec
-
     def process_single_file(self, file_info: dict, output_dir: Path) -> tuple[bool, int | None]:
         """Process a single audio file and save its spectrogram."""
         try:
@@ -335,18 +311,9 @@ class TemplateAudioConfig(DatasetConfig):
                 logger.warning(f"Audio file not found: {audio_path}")
                 return False, None
 
-            # Load audio (resamples and converts to mono)
-            waveform = self.load_audio(audio_path)
-
-            # Create spectrogram
-            spec_transform = self.create_spectrogram_transform()
-            spec = spec_transform(waveform)
-
-            # Store original length before fixing
-            original_length = spec.shape[-1]
-
-            # Fix spectrogram length
-            spec = self.fix_spectrogram_length(spec)
+            # Produce the feature tensor (load -> transform -> fix) via the extractor
+            spec = self.feature_extractor.extract_one(audio_path)
+            spec_length = spec.shape[-1]
 
             # Save spectrogram
             base_filename = filename.split(".")[0]  # Remove extension
@@ -354,7 +321,7 @@ class TemplateAudioConfig(DatasetConfig):
             output_path = output_dir / output_filename
             torch.save(spec, output_path)
 
-            return True, original_length
+            return True, spec_length
 
         except Exception as e:
             logger.error(f"Error processing {file_info['filename']}: {e}")

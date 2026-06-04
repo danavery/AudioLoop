@@ -26,15 +26,9 @@ def _make_mock_config():
 
     mock_config.get_spectrogram_path = _get_spec_path
 
-    # Mirror DatasetConfig.extract_one's composition so tests that stub the constituent
-    # methods (load_audio / create_spectrogram_transform / fix_spectrogram_length) still
-    # exercise them through the seam SpectrogramDataset now calls.
-    def _extract_one(audio_path):
-        waveform = mock_config.load_audio(audio_path)
-        spec = mock_config.create_spectrogram_transform()(waveform)
-        return mock_config.fix_spectrogram_length(spec)
-
-    mock_config.extract_one = _extract_one
+    # SpectrogramDataset's lazy path delegates production to the extractor, so tests stub
+    # the seam: mock_config.feature_extractor.extract_one.return_value = <spec tensor>.
+    # (The audio->tensor composition itself is covered by tests/test_feature_extractor.py.)
     return mock_config
 
 
@@ -180,22 +174,15 @@ class TestLazySpectrogramGeneration:
             writer.writerow(["filename", "label", "audio_path"])
             writer.writerow(["test.flac", "1", str(audio_dir / "test.flac")])
 
-        # Mock dataset config
+        # Mock dataset config: the extractor produces the spec.
         mock_config = _make_mock_config()
-        mock_config.create_spectrogram_transform.return_value = Mock()
-        mock_config.fix_spectrogram_length.return_value = torch.randn(1, 128, 100)
+        mock_config.feature_extractor.extract_one.return_value = torch.randn(1, 128, 100)
 
         dataset = SpectrogramDataset(
             csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=mock_config
         )
 
-        # Mock the audio file existence and loading
-        mock_config.load_audio.return_value = torch.randn(1, 16000)
         with patch("pathlib.Path.exists", return_value=True):
-            # Mock the transform
-            mock_transform = mock_config.create_spectrogram_transform.return_value
-            mock_transform.return_value = torch.randn(1, 128, 100)
-
             # Should generate spec
             item = dataset[0]
             assert item is not None
@@ -218,28 +205,21 @@ class TestLazySpectrogramGeneration:
             writer.writerow(["filename", "label", "audio_path"])
             writer.writerow(["test.flac", "1", str(audio_file)])
 
-        # Mock dataset config
+        # Mock dataset config: the extractor produces the spec.
         mock_config = _make_mock_config()
         spec_data = torch.randn(1, 128, 100)
-        mock_config.create_spectrogram_transform.return_value = Mock()
-        mock_config.fix_spectrogram_length.return_value = spec_data
+        mock_config.feature_extractor.extract_one.return_value = spec_data
 
         dataset = SpectrogramDataset(
             csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=mock_config
         )
 
-        # Mock the audio loading
-        mock_config.load_audio.return_value = torch.randn(1, 16000)
         with (
             patch("pathlib.Path.exists", return_value=True),
             patch("audioloop.utils.spectrogram_dataset.os.path.exists", return_value=False),
             patch("audioloop.utils.spectrogram_dataset.os.makedirs"),
             patch("audioloop.utils.spectrogram_dataset.torch.save") as mock_save,
         ):
-            # Mock the transform
-            mock_transform = mock_config.create_spectrogram_transform.return_value
-            mock_transform.return_value = spec_data
-
             # Generate spec
             _ = dataset[0]
 
@@ -268,49 +248,9 @@ class TestLazySpectrogramGeneration:
         result = dataset[0]
         assert result is None
 
-    def test_stereo_to_mono_conversion(self, tmp_path):
-        """Test that stereo audio is converted to mono."""
-        csv_file = tmp_path / "test.csv"
-        specs_dir = tmp_path / "specs"
-        specs_dir.mkdir()
-
-        audio_dir = tmp_path / "audio"
-        audio_dir.mkdir()
-
-        # Write CSV with audio_path
-        with open(csv_file, "w", newline="") as f:
-            writer = csv.writer(f)
-            writer.writerow(["filename", "label", "audio_path"])
-            writer.writerow(["test.flac", "1", str(audio_dir / "test.flac")])
-
-        # Mock dataset config
-        mock_config = _make_mock_config()
-        mock_config.create_spectrogram_transform.return_value = Mock()
-        mock_config.fix_spectrogram_length.return_value = torch.randn(1, 128, 100)
-
-        dataset = SpectrogramDataset(
-            csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=mock_config
-        )
-
-        # Mock audio loading - load_audio returns mono since torchcodec handles conversion
-        mock_config.load_audio.return_value = torch.randn(1, 16000)
-        with (
-            patch("pathlib.Path.exists", return_value=True),
-            patch("audioloop.utils.spectrogram_dataset.os.path.exists", return_value=False),
-            patch("audioloop.utils.spectrogram_dataset.torch.save"),
-        ):
-            # Mock the transform to check what it receives
-            mock_transform = mock_config.create_spectrogram_transform.return_value
-
-            def check_mono(waveform):
-                # Should receive mono (1 channel) from load_audio
-                assert waveform.shape[0] == 1
-                return torch.randn(1, 128, 100)
-
-            mock_transform.side_effect = check_mono
-
-            # Should receive mono audio from load_audio
-            _ = dataset[0]
+    # Note: mono conversion is now the extractor's concern (SpectrogramExtractor._load_audio
+    # decodes via torchcodec num_channels=1); SpectrogramDataset no longer touches waveforms.
+    # See tests/test_feature_extractor.py.
 
 
 class TestSpectrogramDatasetReturnValues:
@@ -444,8 +384,8 @@ class TestDatasetConfigIntegration:
         # Should have loaded the existing spec
         assert torch.allclose(item["data"], spec_data)
 
-        # Mock config methods should not have been called
-        mock_config.create_spectrogram_transform.assert_not_called()
+        # Extractor should not have been invoked (cached spec used directly)
+        mock_config.feature_extractor.extract_one.assert_not_called()
 
     def test_lazy_generation_without_audio_path_fails_gracefully(self, tmp_path):
         """Test that missing spec without audio_path gives graceful skip."""
@@ -482,22 +422,16 @@ class TestDatasetConfigIntegration:
             writer.writerow(["filename", "label", "audio_path"])
             writer.writerow(["test.flac", "1", str(audio_file)])
 
-        # Mock dataset config
+        # Mock dataset config: the extractor produces the spec.
         mock_config = _make_mock_config()
         spec_data = torch.randn(1, 128, 100)
-        mock_config.create_spectrogram_transform.return_value = Mock()
-        mock_config.fix_spectrogram_length.return_value = spec_data
+        mock_config.feature_extractor.extract_one.return_value = spec_data
 
         dataset = SpectrogramDataset(
             csv_file=str(csv_file), specs_dir=str(specs_dir), dataset_config=mock_config
         )
 
-        # Mock audio loading
-        mock_config.load_audio.return_value = torch.randn(1, 16000)
         with patch("pathlib.Path.exists", return_value=True):
-            mock_transform = mock_config.create_spectrogram_transform.return_value
-            mock_transform.return_value = spec_data
-
             # Generate spec
             _ = dataset[0]
 

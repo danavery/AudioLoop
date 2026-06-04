@@ -357,7 +357,7 @@ def run_training(
     ).to(device)
 
     # Check dataset/model compatibility
-    dataset_shape = dataset_config.get_output_shape()
+    dataset_shape = dataset_config.feature_extractor.get_output_shape()
 
     if not model.can_handle_shape(dataset_shape):
         available_models = list_available_models()
