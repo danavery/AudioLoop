@@ -3,6 +3,7 @@ import csv
 import logging
 import shutil
 import statistics
+import sys
 import time
 from pathlib import Path
 
@@ -250,7 +251,7 @@ def create_inference_csv(config, dataset_config, limit=None) -> Path:
     return inference_csv_path
 
 
-if __name__ == "__main__":
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Create spectrograms for audio datasets",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -324,7 +325,7 @@ Examples:
     logger.info(f"Processing {dataset_name} dataset")
 
     # Create spectrograms
-    successful, failed = create_specs(
+    successful, _ = create_specs(
         config, dataset_config, clear_output=args.clear, limit=args.limit
     )
 
@@ -332,5 +333,11 @@ Examples:
     if successful > 0:
         inference_csv = create_inference_csv(config, dataset_config, limit=args.limit)
         logger.info(f"Ready for inference! Use: {inference_csv}")
-    else:
-        logger.error("No spectrograms were created successfully")
+        return 0
+
+    logger.error("No spectrograms were created successfully")
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

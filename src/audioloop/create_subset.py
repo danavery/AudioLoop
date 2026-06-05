@@ -11,6 +11,7 @@ Usage:
 """
 
 import argparse
+import sys
 from pathlib import Path
 
 
@@ -156,4 +157,4 @@ Examples:
 
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())
