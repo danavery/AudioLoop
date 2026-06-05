@@ -194,31 +194,40 @@ class TestLabelModeStoppingCriterion:
         assert criterion.cycles_without_improvement == 0
 
     def test_does_not_stop_if_unstable(self):
-        """Test doesn't stop if performance is unstable."""
+        """Test doesn't stop when patience is exhausted but the window is too volatile.
+
+        F1 oscillates 0.60/0.70 every cycle: the 2-cycle rolling average is a flat 0.65 (so
+        patience accrues), but each window's standard deviation (~0.071) stays above the 0.05
+        stability threshold, which is the gate that must keep it from stopping.
+        """
         config = AudioLoopConfig(
             cycle_min_cycles=3,
             cycle_patience=2,
-            cycle_window=3,
+            cycle_window=2,
+            cycle_min_delta=0.02,
             cycle_std_threshold=0.05,
         )
 
-        # High variance
         metrics_history = {
-            1: {"f1_score": 0.50},
+            1: {"f1_score": 0.60},
             2: {"f1_score": 0.70},
-            3: {"f1_score": 0.55},
-            4: {"f1_score": 0.65},
+            3: {"f1_score": 0.60},
+            4: {"f1_score": 0.70},
             5: {"f1_score": 0.60},
         }
 
         criterion = LabelModeStoppingCriterion(config, metrics_history)
 
-        # Even if patience exhausted, should not stop if unstable
-        for cycle in range(3, 6):
-            if criterion.should_stop(cycle):
-                # Check if std is actually below threshold
-                std = criterion._calculate_rolling_std("f1_score", 3, cycle)
-                assert std < config.cycle_std_threshold
+        assert criterion.should_stop(3) is False  # establishes best rolling avg
+        assert criterion.should_stop(4) is False  # patience 1 of 2
+        # Patience is now exhausted, so the only thing preventing a stop is the instability...
+        assert criterion.should_stop(5) is False
+        assert criterion.cycles_without_improvement == config.cycle_patience  # patience exhausted
+        # ...confirm the window really is above the stability threshold (the true blocker).
+        assert (
+            criterion._calculate_rolling_std("f1_score", config.cycle_window, 5)
+            >= config.cycle_std_threshold
+        )
 
     def test_tracks_best_cycle(self):
         """Test tracks cycle with best rolling average."""
@@ -265,31 +274,35 @@ class TestSearchModeStoppingCriterion:
     """Test SearchMode stopping logic."""
 
     def test_stops_when_all_conditions_met(self):
-        """Test stopping when recall plateaus and precision above floor."""
+        """Test stopping when recall plateaus, stays stable, and precision stays above floor."""
         config = AudioLoopConfig(
             cycle_min_cycles=3,
             cycle_patience=2,
             cycle_window=2,
+            cycle_min_delta=0.02,
             precision_floor="auto",
         )
 
+        # Recall jumps once then plateaus flat at 0.76 (zero variance in any 2-cycle window);
+        # precision holds at 0.47, comfortably above the auto floor of 0.40.
         metrics_history = {
-            1: {"recall": 0.70, "precision": 0.50},  # Floor will be max(0.30, 0.40)=0.40
-            2: {"recall": 0.75, "precision": 0.48},
-            3: {"recall": 0.76, "precision": 0.47},  # Plateau starts
-            4: {"recall": 0.765, "precision": 0.46},
-            5: {"recall": 0.77, "precision": 0.45},  # Still above floor
+            1: {"recall": 0.70, "precision": 0.50},  # Floor = max(0.30, 0.50 - 0.1) = 0.40
+            2: {"recall": 0.76, "precision": 0.47},
+            3: {"recall": 0.76, "precision": 0.47},  # Plateau (rolling avg becomes best here)
+            4: {"recall": 0.76, "precision": 0.47},  # No improvement -> patience 1
+            5: {"recall": 0.76, "precision": 0.47},  # No improvement -> patience 2 (exhausted)
         }
 
         criterion = SearchModeStoppingCriterion(config, metrics_history)
 
-        # Should eventually stop when stable and above floor
-        criterion.should_stop(3)
-        criterion.should_stop(4)
-        criterion.should_stop(5)
-
-        # Verify precision floor was calculated correctly
+        # Auto floor derived from cycle 1's precision.
         assert criterion._precision_floor == 0.40
+
+        # Patience builds while the recall plateau holds, then stopping fires once it is
+        # exhausted with a stable window and precision above the floor.
+        assert criterion.should_stop(3) is False  # establishes best rolling avg
+        assert criterion.should_stop(4) is False  # patience 1 of 2
+        assert criterion.should_stop(5) is True  # patience exhausted, stable, above floor
 
     def test_does_not_stop_when_precision_below_floor(self):
         """Test doesn't stop if precision drops below floor."""
@@ -448,8 +461,9 @@ class TestEdgeCases:
         }
 
         criterion = LabelModeStoppingCriterion(config, metrics_history)
-        # Should handle gracefully, using available cycles
-        criterion.should_stop(6)  # Should not crash
+        # Should handle gaps gracefully (counting only the cycles present); this first
+        # qualifying call registers an improvement rather than stopping.
+        assert criterion.should_stop(6) is False
 
     def test_status_message(self):
         """Test status message generation."""

@@ -1,6 +1,5 @@
 """Tests for YAML configuration file loading."""
 
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -9,7 +8,18 @@ import yaml
 from audioloop.config import AudioLoopConfig
 
 
-def test_from_yaml_basic():
+def _write_yaml(tmp_path, content: str) -> Path:
+    """Write YAML content to a real file under tmp_path and return its path.
+
+    tmp_path is auto-cleaned by pytest, so unlike NamedTemporaryFile(delete=False) this
+    leaves nothing behind in /tmp between runs.
+    """
+    path = tmp_path / "config.yaml"
+    path.write_text(content)
+    return path
+
+
+def test_from_yaml_basic(tmp_path):
     """Test loading basic YAML config."""
     yaml_content = """
 config:
@@ -17,10 +27,7 @@ config:
   dataset: "fsd50k"
   max_epochs: 500
 """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        f.write(yaml_content)
-        f.flush()
-        config = AudioLoopConfig.from_yaml(f.name)
+    config = AudioLoopConfig.from_yaml(_write_yaml(tmp_path, yaml_content))
 
     assert config.experiment_name == "test_exp"
     assert config.dataset == "fsd50k"
@@ -28,41 +35,37 @@ config:
     assert config.batch_size == 32  # Default value
 
 
-def test_from_yaml_with_overrides():
+def test_from_yaml_with_overrides(tmp_path):
     """Test YAML loading with kwargs overrides."""
     yaml_content = """
 config:
   max_epochs: 500
   batch_size: 32
 """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        f.write(yaml_content)
-        f.flush()
-        config = AudioLoopConfig.from_yaml(f.name, max_epochs=1000, learning_rate=0.01)
+    config = AudioLoopConfig.from_yaml(
+        _write_yaml(tmp_path, yaml_content), max_epochs=1000, learning_rate=0.01
+    )
 
     assert config.max_epochs == 1000  # Overridden
     assert config.batch_size == 32  # From YAML
     assert config.learning_rate == 0.01  # Overridden
 
 
-def test_from_yaml_flat_format():
+def test_from_yaml_flat_format(tmp_path):
     """Test loading flat YAML format (no sections)."""
     yaml_content = """
 experiment_name: "flat_test"
 dataset: "urbansound8k"
 max_epochs: 300
 """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        f.write(yaml_content)
-        f.flush()
-        config = AudioLoopConfig.from_yaml(f.name)
+    config = AudioLoopConfig.from_yaml(_write_yaml(tmp_path, yaml_content))
 
     assert config.experiment_name == "flat_test"
     assert config.dataset == "urbansound8k"
     assert config.max_epochs == 300
 
 
-def test_from_yaml_two_section_format():
+def test_from_yaml_two_section_format(tmp_path):
     """Test loading two-section format (workflow + config)."""
     yaml_content = """
 workflow:
@@ -74,10 +77,7 @@ config:
   dataset: "fsd50k"
   max_epochs: 500
 """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        f.write(yaml_content)
-        f.flush()
-        config = AudioLoopConfig.from_yaml(f.name)
+    config = AudioLoopConfig.from_yaml(_write_yaml(tmp_path, yaml_content))
 
     # Config section loaded
     assert config.experiment_name == "test"
@@ -88,19 +88,15 @@ config:
     # Just verify it doesn't cause errors
 
 
-def test_from_yaml_invalid_field():
+def test_from_yaml_invalid_field(tmp_path):
     """Test that invalid fields raise clear errors."""
     yaml_content = """
 config:
   invalid_field_name: "test"
   max_epochs: 500
 """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        f.write(yaml_content)
-        f.flush()
-
-        with pytest.raises(ValueError, match="Invalid config fields"):
-            AudioLoopConfig.from_yaml(f.name)
+    with pytest.raises(ValueError, match="Invalid config fields"):
+        AudioLoopConfig.from_yaml(_write_yaml(tmp_path, yaml_content))
 
 
 def test_from_yaml_file_not_found():
@@ -109,124 +105,100 @@ def test_from_yaml_file_not_found():
         AudioLoopConfig.from_yaml("nonexistent_config.yaml")
 
 
-def test_from_yaml_class_weighting_adaptive():
+def test_from_yaml_class_weighting_adaptive(tmp_path):
     """Test class_weighting handles 'adaptive' string."""
     yaml_content = """
 config:
   class_weighting: "adaptive"
 """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        f.write(yaml_content)
-        f.flush()
-        config = AudioLoopConfig.from_yaml(f.name)
+    config = AudioLoopConfig.from_yaml(_write_yaml(tmp_path, yaml_content))
 
     assert config.class_weighting == "adaptive"
 
 
-def test_from_yaml_class_weighting_float():
+def test_from_yaml_class_weighting_float(tmp_path):
     """Test class_weighting handles float values."""
     yaml_content = """
 config:
   class_weighting: 0.25
 """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        f.write(yaml_content)
-        f.flush()
-        config = AudioLoopConfig.from_yaml(f.name)
+    config = AudioLoopConfig.from_yaml(_write_yaml(tmp_path, yaml_content))
 
     assert config.class_weighting == 0.25
 
 
-def test_from_yaml_class_weighting_null():
+def test_from_yaml_class_weighting_null(tmp_path):
     """Test class_weighting handles null/None."""
     yaml_content = """
 config:
   class_weighting: null
 """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        f.write(yaml_content)
-        f.flush()
-        config = AudioLoopConfig.from_yaml(f.name)
+    config = AudioLoopConfig.from_yaml(_write_yaml(tmp_path, yaml_content))
 
     assert config.class_weighting is None
 
 
-def test_from_yaml_subset_csv_path_conversion():
+def test_from_yaml_subset_csv_path_conversion(tmp_path):
     """Test that subset_csv strings are converted to Path objects."""
     yaml_content = """
 config:
   subset_csv: "subsets/test.csv"
 """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        f.write(yaml_content)
-        f.flush()
-        config = AudioLoopConfig.from_yaml(f.name)
+    config = AudioLoopConfig.from_yaml(_write_yaml(tmp_path, yaml_content))
 
     assert isinstance(config.subset_csv, Path)
     assert str(config.subset_csv) == "subsets/test.csv"
 
 
-def test_from_yaml_empty_file():
+def test_from_yaml_empty_file(tmp_path):
     """Test handling of empty YAML file."""
-    yaml_content = ""
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        f.write(yaml_content)
-        f.flush()
-        config = AudioLoopConfig.from_yaml(f.name)
+    config = AudioLoopConfig.from_yaml(_write_yaml(tmp_path, ""))
 
     # Should create config with all defaults
     assert config.dataset == "fsd50k"  # Default
     assert config.max_epochs == 1000  # Default
 
 
-def test_from_yaml_null_config_section():
+def test_from_yaml_null_config_section(tmp_path):
     """Test handling of null config section."""
     yaml_content = """
 config: null
 """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        f.write(yaml_content)
-        f.flush()
-        config = AudioLoopConfig.from_yaml(f.name)
+    config = AudioLoopConfig.from_yaml(_write_yaml(tmp_path, yaml_content))
 
     # Should create config with all defaults
     assert config.dataset == "fsd50k"  # Default
 
 
-def test_from_yaml_malformed_yaml():
+def test_from_yaml_malformed_yaml(tmp_path):
     """Test error handling for malformed YAML."""
     yaml_content = """
 config:
   experiment_name: "test
   invalid yaml
 """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        f.write(yaml_content)
-        f.flush()
-
-        with pytest.raises(yaml.YAMLError):
-            AudioLoopConfig.from_yaml(f.name)
+    with pytest.raises(yaml.YAMLError):
+        AudioLoopConfig.from_yaml(_write_yaml(tmp_path, yaml_content))
 
 
-def test_from_yaml_override_none_filtered():
+def test_from_yaml_override_none_filtered(tmp_path):
     """Test that None values in overrides are filtered."""
     yaml_content = """
 config:
   max_epochs: 500
   batch_size: 64
 """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        f.write(yaml_content)
-        f.flush()
-        # Pass None override - should be ignored, YAML value used
-        config = AudioLoopConfig.from_yaml(f.name, max_epochs=None, learning_rate=0.01)
+    # Pass None override - should be ignored, YAML value used
+    config = AudioLoopConfig.from_yaml(
+        _write_yaml(tmp_path, yaml_content), max_epochs=None, learning_rate=0.01
+    )
 
     assert config.max_epochs == 500  # YAML value (None override filtered)
     assert config.batch_size == 64  # YAML value
     assert config.learning_rate == 0.01  # Override applied
 
 
-def test_from_yaml_boolean_flags():
+def test_from_yaml_boolean_flags(tmp_path):
     """Test boolean flag handling."""
     yaml_content = """
 config:
@@ -234,17 +206,14 @@ config:
   with_ground_truth: false
   use_lr_scheduler: true
 """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        f.write(yaml_content)
-        f.flush()
-        config = AudioLoopConfig.from_yaml(f.name)
+    config = AudioLoopConfig.from_yaml(_write_yaml(tmp_path, yaml_content))
 
     assert config.auto_thresholds is True
     assert config.with_ground_truth is False
     assert config.use_lr_scheduler is True
 
 
-def test_from_yaml_all_training_params():
+def test_from_yaml_all_training_params(tmp_path):
     """Test loading all training-related parameters."""
     yaml_content = """
 config:
@@ -259,10 +228,7 @@ config:
   lr_scheduler_patience: 10
   lr_scheduler_min_lr: 0.000001
 """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        f.write(yaml_content)
-        f.flush()
-        config = AudioLoopConfig.from_yaml(f.name)
+    config = AudioLoopConfig.from_yaml(_write_yaml(tmp_path, yaml_content))
 
     assert config.max_epochs == 800
     assert config.batch_size == 64
@@ -276,7 +242,7 @@ config:
     assert config.lr_scheduler_min_lr == 0.000001
 
 
-def test_from_yaml_all_active_learning_params():
+def test_from_yaml_all_active_learning_params(tmp_path):
     """Test loading all active learning parameters."""
     yaml_content = """
 config:
@@ -291,10 +257,7 @@ config:
   auto_thresholds: true
   estimated_positive_pct: 0.05
 """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        f.write(yaml_content)
-        f.flush()
-        config = AudioLoopConfig.from_yaml(f.name)
+    config = AudioLoopConfig.from_yaml(_write_yaml(tmp_path, yaml_content))
 
     assert config.total_candidates == 100
     assert config.positive_percentage == 0.3
@@ -308,21 +271,17 @@ config:
     assert config.estimated_positive_pct == 0.05
 
 
-def test_from_yaml_validation_still_works():
+def test_from_yaml_validation_still_works(tmp_path):
     """Test that __post_init__ validation still runs on YAML configs."""
     yaml_content = """
 config:
   max_epochs: -100
 """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        f.write(yaml_content)
-        f.flush()
-
-        with pytest.raises(ValueError, match="max_epochs must be positive"):
-            AudioLoopConfig.from_yaml(f.name)
+    with pytest.raises(ValueError, match="max_epochs must be positive"):
+        AudioLoopConfig.from_yaml(_write_yaml(tmp_path, yaml_content))
 
 
-def test_from_yaml_real_example_minimal():
+def test_from_yaml_real_example_minimal(tmp_path):
     """Test loading the actual minimal.yaml example."""
     yaml_content = """
 workflow:
@@ -333,16 +292,13 @@ workflow:
 config:
   experiment_name: "quick_test"
 """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        f.write(yaml_content)
-        f.flush()
-        config = AudioLoopConfig.from_yaml(f.name)
+    config = AudioLoopConfig.from_yaml(_write_yaml(tmp_path, yaml_content))
 
     assert config.experiment_name == "quick_test"
     assert config.dataset == "fsd50k"  # Default
 
 
-def test_from_yaml_real_example_search_mode():
+def test_from_yaml_real_example_search_mode(tmp_path):
     """Test loading a search mode configuration."""
     yaml_content = """
 workflow:
@@ -363,10 +319,7 @@ config:
   precision_floor: "auto"
   with_ground_truth: true
 """
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
-        f.write(yaml_content)
-        f.flush()
-        config = AudioLoopConfig.from_yaml(f.name)
+    config = AudioLoopConfig.from_yaml(_write_yaml(tmp_path, yaml_content))
 
     assert config.experiment_name == "dog_search"
     assert config.dataset == "urbansound8k"

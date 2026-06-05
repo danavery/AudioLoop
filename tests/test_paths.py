@@ -201,12 +201,13 @@ class TestPathIntegration:
             output_dir = get_output_dir("exp")
             training_dir = get_training_sets_dir("exp")
 
-            # Both should have nested structure under same root
-            if "exp" in str(output_dir):
-                assert output_dir.parent.parent == Path("/test/root")
-                assert training_dir.parent.parent == Path("/test/root")
-                assert output_dir.parent.name == "outputs"
-                assert training_dir.parent.name == "training_sets"
+            # Both should have nested structure under the same root.
+            assert output_dir.name == "exp"
+            assert training_dir.name == "exp"
+            assert output_dir.parent.parent == Path("/test/root")
+            assert training_dir.parent.parent == Path("/test/root")
+            assert output_dir.parent.name == "outputs"
+            assert training_dir.parent.name == "training_sets"
 
     def test_create_matches_get_functions(self):
         """Test that create_output_directories creates paths matching get functions."""

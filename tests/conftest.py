@@ -2,7 +2,33 @@
 Pytest configuration and fixtures for AudioLoop tests.
 """
 
+import csv
+
 import pytest
+
+
+@pytest.fixture
+def candidates_csv(tmp_path):
+    """Factory that writes a candidates CSV under tmp_path and returns its Path.
+
+    Replaces the per-file `create_test_candidates_csv` helpers (previously duplicated across
+    the auto-labeling / metrics / candidate-metrics suites, each leaking a delete=False temp
+    file). Callers pass explicit `fieldnames` because the column sets differ per function
+    under test; each row dict is padded with empty strings for any unspecified columns.
+    """
+
+    def _write(rows, fieldnames, *, name="candidates.csv"):
+        path = tmp_path / name
+        with path.open("w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in rows:
+                full_row = dict.fromkeys(fieldnames, "")
+                full_row.update(row)
+                writer.writerow(full_row)
+        return path
+
+    return _write
 
 
 @pytest.fixture(autouse=True)

@@ -5,7 +5,6 @@ Tests for candidate metrics persistence utilities.
 Tests the saving and loading of candidate metrics across cycles.
 """
 
-import csv
 import json
 import logging
 import tempfile
@@ -20,6 +19,18 @@ from audioloop.utils.candidate_metrics import (
     load_candidate_metrics_history,
     save_candidate_metrics,
 )
+
+# Column sets for the candidates CSVs consumed by the metrics functions (see the shared
+# `candidates_csv` fixture in tests/conftest.py).
+_SAVE_FIELDS = [
+    "filename",
+    "prediction",
+    "needs_human_label",
+    "target_class",
+    "confidence",
+    "entropy",
+]
+_COMPUTE_FIELDS = ["filename", "prediction", "needs_human_label", "target_class", "confidence"]
 
 
 class TestSaveCandidateMetrics:
@@ -163,29 +174,7 @@ class TestLoadCandidateMetricsHistory:
 class TestCalculateAndSaveCandidateMetrics:
     """Test cases for calculate_and_save_candidate_metrics function."""
 
-    def create_test_candidates_csv(self, tmpdir, candidates_data):
-        """Helper to create a test candidates CSV."""
-        candidates_file = Path(tmpdir) / "labeling_candidates_v1.csv"
-        fieldnames = [
-            "filename",
-            "prediction",
-            "needs_human_label",
-            "target_class",
-            "confidence",
-            "entropy",
-        ]
-
-        with candidates_file.open("w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            for data in candidates_data:
-                row = dict.fromkeys(fieldnames, "")
-                row.update(data)
-                writer.writerow(row)
-
-        return candidates_file
-
-    def test_calculate_and_save_success(self):
+    def test_calculate_and_save_success(self, candidates_csv):
         """Test successful calculation and saving of metrics."""
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
@@ -195,7 +184,9 @@ class TestCalculateAndSaveCandidateMetrics:
                 {"filename": "tp1.wav", "prediction": "True", "needs_human_label": "1"},
                 {"filename": "tn1.wav", "prediction": "False", "needs_human_label": "0"},
             ]
-            candidates_file = self.create_test_candidates_csv(tmpdir, candidates_data)
+            candidates_file = candidates_csv(
+                candidates_data, _SAVE_FIELDS, name="labeling_candidates_v1.csv"
+            )
 
             # Calculate and save
             metrics = calculate_and_save_candidate_metrics(candidates_file, output_dir, cycle=1)
@@ -209,7 +200,7 @@ class TestCalculateAndSaveCandidateMetrics:
             assert 1 in history
             assert history[1]["accuracy"] == 1.0
 
-    def test_calculate_no_labeled_candidates(self):
+    def test_calculate_no_labeled_candidates(self, candidates_csv):
         """Test handling when no candidates are labeled."""
         with tempfile.TemporaryDirectory() as tmpdir:
             output_dir = Path(tmpdir)
@@ -218,7 +209,9 @@ class TestCalculateAndSaveCandidateMetrics:
             candidates_data = [
                 {"filename": "u1.wav", "prediction": "True", "needs_human_label": ""},
             ]
-            candidates_file = self.create_test_candidates_csv(tmpdir, candidates_data)
+            candidates_file = candidates_csv(
+                candidates_data, _SAVE_FIELDS, name="labeling_candidates_v1.csv"
+            )
 
             # Should return empty dict
             metrics = calculate_and_save_candidate_metrics(candidates_file, output_dir, cycle=1)
@@ -241,28 +234,7 @@ class TestCalculateAndSaveCandidateMetrics:
 class TestComputeAndLogCandidateMetrics:
     """Test cases for compute_and_log_candidate_metrics function in merge_labels."""
 
-    def create_test_candidates_csv(self, tmpdir, filename, candidates_data):
-        """Helper to create a test candidates CSV."""
-        candidates_file = Path(tmpdir) / filename
-        fieldnames = [
-            "filename",
-            "prediction",
-            "needs_human_label",
-            "target_class",
-            "confidence",
-        ]
-
-        with candidates_file.open("w", newline="") as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            for data in candidates_data:
-                row = dict.fromkeys(fieldnames, "")
-                row.update(data)
-                writer.writerow(row)
-
-        return candidates_file
-
-    def test_compute_with_valid_config(self):
+    def test_compute_with_valid_config(self, candidates_csv):
         """Test computing metrics with valid config."""
         with tempfile.TemporaryDirectory() as tmpdir:
             # Create mock config
@@ -273,8 +245,8 @@ class TestComputeAndLogCandidateMetrics:
             candidates_data = [
                 {"filename": "tp1.wav", "prediction": "True", "needs_human_label": "1"},
             ]
-            candidates_file = self.create_test_candidates_csv(
-                tmpdir, "labeling_candidates_v5.csv", candidates_data
+            candidates_file = candidates_csv(
+                candidates_data, _COMPUTE_FIELDS, name="labeling_candidates_v5.csv"
             )
 
             # Compute metrics
@@ -288,20 +260,19 @@ class TestComputeAndLogCandidateMetrics:
             history = load_candidate_metrics_history(Path(tmpdir))
             assert 5 in history
 
-    def test_compute_with_no_config(self):
+    def test_compute_with_no_config(self, candidates_csv):
         """Test that no metrics are computed when config is None."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            candidates_data = [
-                {"filename": "tp1.wav", "prediction": "True", "needs_human_label": "1"},
-            ]
-            candidates_file = self.create_test_candidates_csv(
-                tmpdir, "labeling_candidates_v1.csv", candidates_data
-            )
+        candidates_data = [
+            {"filename": "tp1.wav", "prediction": "True", "needs_human_label": "1"},
+        ]
+        candidates_file = candidates_csv(
+            candidates_data, _COMPUTE_FIELDS, name="labeling_candidates_v1.csv"
+        )
 
-            metrics = compute_and_log_candidate_metrics(str(candidates_file), config=None)
-            assert metrics == {}
+        metrics = compute_and_log_candidate_metrics(str(candidates_file), config=None)
+        assert metrics == {}
 
-    def test_compute_with_invalid_filename(self):
+    def test_compute_with_invalid_filename(self, candidates_csv):
         """Test handling when cycle number can't be extracted from filename."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config = MagicMock()
@@ -311,14 +282,14 @@ class TestComputeAndLogCandidateMetrics:
             candidates_data = [
                 {"filename": "tp1.wav", "prediction": "True", "needs_human_label": "1"},
             ]
-            candidates_file = self.create_test_candidates_csv(
-                tmpdir, "weird_filename.csv", candidates_data
+            candidates_file = candidates_csv(
+                candidates_data, _COMPUTE_FIELDS, name="weird_filename.csv"
             )
 
             metrics = compute_and_log_candidate_metrics(str(candidates_file), config)
             assert metrics == {}
 
-    def test_compute_respects_log_level(self):
+    def test_compute_respects_log_level(self, candidates_csv):
         """Test that log level is respected."""
         with tempfile.TemporaryDirectory() as tmpdir:
             config = MagicMock()
@@ -327,8 +298,8 @@ class TestComputeAndLogCandidateMetrics:
             candidates_data = [
                 {"filename": "tp1.wav", "prediction": "True", "needs_human_label": "1"},
             ]
-            candidates_file = self.create_test_candidates_csv(
-                tmpdir, "labeling_candidates_v1.csv", candidates_data
+            candidates_file = candidates_csv(
+                candidates_data, _COMPUTE_FIELDS, name="labeling_candidates_v1.csv"
             )
 
             # Should not raise errors with different log levels

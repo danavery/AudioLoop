@@ -5,49 +5,33 @@ Tests for metrics calculation utilities.
 Tests the candidate metrics calculation functionality used in stopping criteria.
 """
 
-import csv
-import tempfile
 from pathlib import Path
 
 import pytest
 
 from audioloop.utils.metrics_utils import calculate_candidate_metrics
 
+_FIELDNAMES = [
+    "filename",
+    "prediction",
+    "confidence",
+    "needs_human_label",
+    "entropy",
+    "prob_negative",
+    "prob_positive",
+    "target_class",
+    "ground_truth",
+    "correct",
+    "original_class",
+    "fold",
+    "filepath",
+]
+
 
 class TestCalculateCandidateMetrics:
     """Test cases for the calculate_candidate_metrics function."""
 
-    def create_test_candidates_csv(self, candidates_data):
-        """Create a temporary candidates CSV file for testing."""
-        fieldnames = [
-            "filename",
-            "prediction",
-            "confidence",
-            "needs_human_label",
-            "entropy",
-            "prob_negative",
-            "prob_positive",
-            "target_class",
-            "ground_truth",
-            "correct",
-            "original_class",
-            "fold",
-            "filepath",
-        ]
-
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as temp_file:
-            writer = csv.DictWriter(temp_file, fieldnames=fieldnames)
-            writer.writeheader()
-
-            for data in candidates_data:
-                # Fill in defaults for missing fields
-                row = dict.fromkeys(fieldnames, "")
-                row.update(data)
-                writer.writerow(row)
-
-            return temp_file.name
-
-    def test_basic_functionality(self):
+    def test_basic_functionality(self, candidates_csv):
         """Test basic metrics calculation with labeled candidates."""
         candidates_data = [
             # True Positives (2)
@@ -62,32 +46,26 @@ class TestCalculateCandidateMetrics:
             {"filename": "tn2.wav", "prediction": "False", "needs_human_label": "0"},
         ]
 
-        csv_file = self.create_test_candidates_csv(candidates_data)
+        metrics = calculate_candidate_metrics(candidates_csv(candidates_data, _FIELDNAMES))
 
-        try:
-            metrics = calculate_candidate_metrics(Path(csv_file))
+        # Check confusion matrix
+        assert metrics["true_positives"] == 2
+        assert metrics["false_positives"] == 1
+        assert metrics["false_negatives"] == 1
+        assert metrics["true_negatives"] == 2
+        assert metrics["num_candidates"] == 6
 
-            # Check confusion matrix
-            assert metrics["true_positives"] == 2
-            assert metrics["false_positives"] == 1
-            assert metrics["false_negatives"] == 1
-            assert metrics["true_negatives"] == 2
-            assert metrics["num_candidates"] == 6
+        # Check calculated metrics
+        # Precision = TP / (TP + FP) = 2 / 3 = 0.667
+        assert abs(metrics["precision"] - 2 / 3) < 0.001
+        # Recall = TP / (TP + FN) = 2 / 3 = 0.667
+        assert abs(metrics["recall"] - 2 / 3) < 0.001
+        # F1 = 2 * (P * R) / (P + R) = 2 * (2/3 * 2/3) / (4/3) = 0.667
+        assert abs(metrics["f1_score"] - 2 / 3) < 0.001
+        # Accuracy = (TP + TN) / total = 4 / 6 = 0.667
+        assert abs(metrics["accuracy"] - 4 / 6) < 0.001
 
-            # Check calculated metrics
-            # Precision = TP / (TP + FP) = 2 / 3 = 0.667
-            assert abs(metrics["precision"] - 2 / 3) < 0.001
-            # Recall = TP / (TP + FN) = 2 / 3 = 0.667
-            assert abs(metrics["recall"] - 2 / 3) < 0.001
-            # F1 = 2 * (P * R) / (P + R) = 2 * (2/3 * 2/3) / (4/3) = 0.667
-            assert abs(metrics["f1_score"] - 2 / 3) < 0.001
-            # Accuracy = (TP + TN) / total = 4 / 6 = 0.667
-            assert abs(metrics["accuracy"] - 4 / 6) < 0.001
-
-        finally:
-            Path(csv_file).unlink()
-
-    def test_perfect_performance(self):
+    def test_perfect_performance(self, candidates_csv):
         """Test metrics when model predictions perfectly match human labels."""
         candidates_data = [
             {"filename": "tp1.wav", "prediction": "True", "needs_human_label": "1"},
@@ -96,22 +74,16 @@ class TestCalculateCandidateMetrics:
             {"filename": "tn2.wav", "prediction": "False", "needs_human_label": "0"},
         ]
 
-        csv_file = self.create_test_candidates_csv(candidates_data)
+        metrics = calculate_candidate_metrics(candidates_csv(candidates_data, _FIELDNAMES))
 
-        try:
-            metrics = calculate_candidate_metrics(Path(csv_file))
+        assert metrics["precision"] == 1.0
+        assert metrics["recall"] == 1.0
+        assert metrics["f1_score"] == 1.0
+        assert metrics["accuracy"] == 1.0
+        assert metrics["false_positives"] == 0
+        assert metrics["false_negatives"] == 0
 
-            assert metrics["precision"] == 1.0
-            assert metrics["recall"] == 1.0
-            assert metrics["f1_score"] == 1.0
-            assert metrics["accuracy"] == 1.0
-            assert metrics["false_positives"] == 0
-            assert metrics["false_negatives"] == 0
-
-        finally:
-            Path(csv_file).unlink()
-
-    def test_all_predictions_wrong(self):
+    def test_all_predictions_wrong(self, candidates_csv):
         """Test metrics when all predictions are incorrect."""
         candidates_data = [
             # Model predicts positive, human says negative
@@ -122,22 +94,16 @@ class TestCalculateCandidateMetrics:
             {"filename": "fn2.wav", "prediction": "False", "needs_human_label": "1"},
         ]
 
-        csv_file = self.create_test_candidates_csv(candidates_data)
+        metrics = calculate_candidate_metrics(candidates_csv(candidates_data, _FIELDNAMES))
 
-        try:
-            metrics = calculate_candidate_metrics(Path(csv_file))
+        assert metrics["precision"] == 0.0
+        assert metrics["recall"] == 0.0
+        assert metrics["f1_score"] == 0.0
+        assert metrics["accuracy"] == 0.0
+        assert metrics["true_positives"] == 0
+        assert metrics["true_negatives"] == 0
 
-            assert metrics["precision"] == 0.0
-            assert metrics["recall"] == 0.0
-            assert metrics["f1_score"] == 0.0
-            assert metrics["accuracy"] == 0.0
-            assert metrics["true_positives"] == 0
-            assert metrics["true_negatives"] == 0
-
-        finally:
-            Path(csv_file).unlink()
-
-    def test_high_recall_low_precision(self):
+    def test_high_recall_low_precision(self, candidates_csv):
         """Test metrics for high recall but low precision scenario."""
         candidates_data = [
             # True Positives (3)
@@ -155,20 +121,14 @@ class TestCalculateCandidateMetrics:
             # No False Negatives - caught all positives
         ]
 
-        csv_file = self.create_test_candidates_csv(candidates_data)
+        metrics = calculate_candidate_metrics(candidates_csv(candidates_data, _FIELDNAMES))
 
-        try:
-            metrics = calculate_candidate_metrics(Path(csv_file))
+        # Recall should be 1.0 (no false negatives)
+        assert metrics["recall"] == 1.0
+        # Precision should be low (3 / 10 = 0.3)
+        assert abs(metrics["precision"] - 0.3) < 0.001
 
-            # Recall should be 1.0 (no false negatives)
-            assert metrics["recall"] == 1.0
-            # Precision should be low (3 / 10 = 0.3)
-            assert abs(metrics["precision"] - 0.3) < 0.001
-
-        finally:
-            Path(csv_file).unlink()
-
-    def test_unlabeled_candidates_ignored(self):
+    def test_unlabeled_candidates_ignored(self, candidates_csv):
         """Test that unlabeled candidates are ignored in metrics calculation."""
         candidates_data = [
             # Labeled candidates
@@ -180,22 +140,16 @@ class TestCalculateCandidateMetrics:
             {"filename": "unlabeled3.wav", "prediction": "True", "needs_human_label": "   "},
         ]
 
-        csv_file = self.create_test_candidates_csv(candidates_data)
+        metrics = calculate_candidate_metrics(candidates_csv(candidates_data, _FIELDNAMES))
 
-        try:
-            metrics = calculate_candidate_metrics(Path(csv_file))
+        # Should only count the 2 labeled candidates
+        assert metrics["num_candidates"] == 2
+        assert metrics["true_positives"] == 1
+        assert metrics["true_negatives"] == 1
+        assert metrics["precision"] == 1.0
+        assert metrics["recall"] == 1.0
 
-            # Should only count the 2 labeled candidates
-            assert metrics["num_candidates"] == 2
-            assert metrics["true_positives"] == 1
-            assert metrics["true_negatives"] == 1
-            assert metrics["precision"] == 1.0
-            assert metrics["recall"] == 1.0
-
-        finally:
-            Path(csv_file).unlink()
-
-    def test_boolean_string_prediction_formats(self):
+    def test_boolean_string_prediction_formats(self, candidates_csv):
         """Test handling of different prediction string formats."""
         candidates_data = [
             # Different True formats
@@ -208,36 +162,24 @@ class TestCalculateCandidateMetrics:
             {"filename": "f3.wav", "prediction": "FALSE", "needs_human_label": "0"},
         ]
 
-        csv_file = self.create_test_candidates_csv(candidates_data)
+        metrics = calculate_candidate_metrics(candidates_csv(candidates_data, _FIELDNAMES))
 
-        try:
-            metrics = calculate_candidate_metrics(Path(csv_file))
-
-            # All should be correctly classified
-            assert metrics["accuracy"] == 1.0
-            assert metrics["true_positives"] == 3
-            assert metrics["true_negatives"] == 3
-
-        finally:
-            Path(csv_file).unlink()
+        # All should be correctly classified
+        assert metrics["accuracy"] == 1.0
+        assert metrics["true_positives"] == 3
+        assert metrics["true_negatives"] == 3
 
     def test_nonexistent_file(self):
         """Test handling of non-existent file."""
         metrics = calculate_candidate_metrics(Path("/nonexistent/file.csv"))
         assert metrics == {}
 
-    def test_empty_candidates_file(self):
+    def test_empty_candidates_file(self, candidates_csv):
         """Test handling of CSV file with no candidate rows."""
-        candidates_data = []
-        csv_file = self.create_test_candidates_csv(candidates_data)
+        metrics = calculate_candidate_metrics(candidates_csv([], _FIELDNAMES))
+        assert metrics == {}
 
-        try:
-            metrics = calculate_candidate_metrics(Path(csv_file))
-            assert metrics == {}
-        finally:
-            Path(csv_file).unlink()
-
-    def test_no_labeled_candidates(self):
+    def test_no_labeled_candidates(self, candidates_csv):
         """Test handling of file where all candidates are unlabeled."""
         candidates_data = [
             {"filename": "unlabeled1.wav", "prediction": "True", "needs_human_label": ""},
@@ -245,15 +187,10 @@ class TestCalculateCandidateMetrics:
             {"filename": "unlabeled3.wav", "prediction": "True", "needs_human_label": ""},
         ]
 
-        csv_file = self.create_test_candidates_csv(candidates_data)
+        metrics = calculate_candidate_metrics(candidates_csv(candidates_data, _FIELDNAMES))
+        assert metrics == {}
 
-        try:
-            metrics = calculate_candidate_metrics(Path(csv_file))
-            assert metrics == {}
-        finally:
-            Path(csv_file).unlink()
-
-    def test_all_positive_predictions(self):
+    def test_all_positive_predictions(self, candidates_csv):
         """Test edge case where model predicts all positive."""
         candidates_data = [
             {"filename": "tp1.wav", "prediction": "True", "needs_human_label": "1"},
@@ -261,21 +198,15 @@ class TestCalculateCandidateMetrics:
             {"filename": "fp2.wav", "prediction": "True", "needs_human_label": "0"},
         ]
 
-        csv_file = self.create_test_candidates_csv(candidates_data)
+        metrics = calculate_candidate_metrics(candidates_csv(candidates_data, _FIELDNAMES))
 
-        try:
-            metrics = calculate_candidate_metrics(Path(csv_file))
+        # Precision = 1/3, Recall = 1/1 = 1.0
+        assert abs(metrics["precision"] - 1 / 3) < 0.001
+        assert metrics["recall"] == 1.0
+        assert metrics["false_negatives"] == 0
+        assert metrics["true_negatives"] == 0
 
-            # Precision = 1/3, Recall = 1/1 = 1.0
-            assert abs(metrics["precision"] - 1 / 3) < 0.001
-            assert metrics["recall"] == 1.0
-            assert metrics["false_negatives"] == 0
-            assert metrics["true_negatives"] == 0
-
-        finally:
-            Path(csv_file).unlink()
-
-    def test_all_negative_predictions(self):
+    def test_all_negative_predictions(self, candidates_csv):
         """Test edge case where model predicts all negative."""
         candidates_data = [
             {"filename": "fn1.wav", "prediction": "False", "needs_human_label": "1"},
@@ -283,22 +214,16 @@ class TestCalculateCandidateMetrics:
             {"filename": "tn2.wav", "prediction": "False", "needs_human_label": "0"},
         ]
 
-        csv_file = self.create_test_candidates_csv(candidates_data)
+        metrics = calculate_candidate_metrics(candidates_csv(candidates_data, _FIELDNAMES))
 
-        try:
-            metrics = calculate_candidate_metrics(Path(csv_file))
+        # Precision = 0/0 = 0.0, Recall = 0/1 = 0.0
+        assert metrics["precision"] == 0.0
+        assert metrics["recall"] == 0.0
+        assert metrics["f1_score"] == 0.0
+        assert metrics["true_positives"] == 0
+        assert metrics["false_positives"] == 0
 
-            # Precision = 0/0 = 0.0, Recall = 0/1 = 0.0
-            assert metrics["precision"] == 0.0
-            assert metrics["recall"] == 0.0
-            assert metrics["f1_score"] == 0.0
-            assert metrics["true_positives"] == 0
-            assert metrics["false_positives"] == 0
-
-        finally:
-            Path(csv_file).unlink()
-
-    def test_ground_truth_not_used(self):
+    def test_ground_truth_not_used(self, candidates_csv):
         """Test that ground_truth column is never used, only needs_human_label."""
         candidates_data = [
             # Ground truth and human label match
@@ -317,21 +242,15 @@ class TestCalculateCandidateMetrics:
             },
         ]
 
-        csv_file = self.create_test_candidates_csv(candidates_data)
+        metrics = calculate_candidate_metrics(candidates_csv(candidates_data, _FIELDNAMES))
 
-        try:
-            metrics = calculate_candidate_metrics(Path(csv_file))
-
-            # Should use needs_human_label, not ground_truth
-            # TP: match.wav (pred=True, human=1)
-            # FN: differ.wav (pred=False, human=1)
-            assert metrics["true_positives"] == 1
-            assert metrics["false_negatives"] == 1
-            assert metrics["false_positives"] == 0
-            assert metrics["true_negatives"] == 0
-
-        finally:
-            Path(csv_file).unlink()
+        # Should use needs_human_label, not ground_truth
+        # TP: match.wav (pred=True, human=1)
+        # FN: differ.wav (pred=False, human=1)
+        assert metrics["true_positives"] == 1
+        assert metrics["false_negatives"] == 1
+        assert metrics["false_positives"] == 0
+        assert metrics["true_negatives"] == 0
 
 
 if __name__ == "__main__":

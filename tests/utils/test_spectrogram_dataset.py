@@ -6,6 +6,7 @@ import csv
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+import pytest
 import torch
 
 from audioloop.utils.spectrogram_dataset import SpectrogramDataset
@@ -129,8 +130,6 @@ class TestSpectrogramDatasetCSVParsing:
             writer.writerow(["filename", "label"])
             writer.writerow(["test.wav", "1"])
 
-        import pytest
-
         with pytest.raises(ValueError, match="extractor is required"):
             SpectrogramDataset(csv_file=str(csv_file), extractor=None, specs_dir=str(specs_dir))
 
@@ -172,12 +171,14 @@ class TestLazySpectrogramGeneration:
 
         audio_dir = tmp_path / "audio"
         audio_dir.mkdir()
+        audio_file = audio_dir / "test.flac"
+        audio_file.write_bytes(b"audio")  # real file so audio_path.exists() is genuinely true
 
         # Write CSV with audio_path
         with open(csv_file, "w", newline="") as f:
             writer = csv.writer(f)
             writer.writerow(["filename", "label", "audio_path"])
-            writer.writerow(["test.flac", "1", str(audio_dir / "test.flac")])
+            writer.writerow(["test.flac", "1", str(audio_file)])
 
         # Mock dataset config: the extractor produces the spec.
         extractor = _make_mock_extractor()
@@ -187,12 +188,11 @@ class TestLazySpectrogramGeneration:
             csv_file=str(csv_file), specs_dir=str(specs_dir), extractor=extractor
         )
 
-        with patch("pathlib.Path.exists", return_value=True):
-            # Should generate spec
-            item = dataset[0]
-            assert item is not None
-            assert "data" in item
-            assert item["data"].shape == (1, 128, 100)
+        # Spec is missing but the audio exists, so it is generated on the fly.
+        item = dataset[0]
+        assert item is not None
+        assert "data" in item
+        assert item["data"].shape == (1, 128, 100)
 
     def test_lazy_generation_caches_to_disk(self, tmp_path):
         """Test that generated specs are cached to disk."""
@@ -203,6 +203,7 @@ class TestLazySpectrogramGeneration:
         audio_dir = tmp_path / "audio"
         audio_dir.mkdir()
         audio_file = audio_dir / "test.flac"
+        audio_file.write_bytes(b"audio")  # real file so lazy generation proceeds
 
         # Write CSV with audio_path
         with open(csv_file, "w", newline="") as f:
@@ -219,13 +220,9 @@ class TestLazySpectrogramGeneration:
             csv_file=str(csv_file), specs_dir=str(specs_dir), extractor=extractor
         )
 
-        with (
-            patch("pathlib.Path.exists", return_value=True),
-            patch("audioloop.utils.spectrogram_dataset.os.path.exists", return_value=False),
-            patch("audioloop.utils.spectrogram_dataset.os.makedirs"),
-            patch("audioloop.utils.spectrogram_dataset.torch.save") as mock_save,
-        ):
-            # Generate spec
+        # The cached .pt genuinely doesn't exist yet, so generation must write it; stub only
+        # the write so we can assert the cache path without touching disk.
+        with patch("audioloop.utils.spectrogram_dataset.torch.save") as mock_save:
             _ = dataset[0]
 
             # Should have saved to disk
@@ -421,6 +418,7 @@ class TestDatasetConfigIntegration:
         audio_dir = tmp_path / "audio"
         audio_dir.mkdir()
         audio_file = audio_dir / "test.flac"
+        audio_file.write_bytes(b"audio")  # real file so lazy generation proceeds
 
         # Write CSV
         with open(csv_file, "w", newline="") as f:
@@ -437,9 +435,8 @@ class TestDatasetConfigIntegration:
             csv_file=str(csv_file), specs_dir=str(specs_dir), extractor=extractor
         )
 
-        with patch("pathlib.Path.exists", return_value=True):
-            # Generate spec
-            _ = dataset[0]
+        # Generate spec (nothing mocked, so caching really runs and creates the nested dir).
+        _ = dataset[0]
 
-            # Verify subdirectories were created
-            assert specs_dir.exists()
+        # Verify the nested specs directory was created on the real filesystem.
+        assert specs_dir.exists()

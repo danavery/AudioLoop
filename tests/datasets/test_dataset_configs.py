@@ -378,51 +378,36 @@ class TestAudioSetConfig:
         # But filename should be the same
         assert parsed_bal["filename"] == parsed_unbal["filename"] == parsed_eval["filename"]
 
-    def test_audioset_load_metadata_passes_split_to_parser(self):
+    def test_audioset_load_metadata_passes_split_to_parser(self, tmp_path):
         """Test that load_metadata passes correct split to parse_metadata_row."""
         config = AudiosetConfig()
-
-        # Create minimal CSV content
-        csv_content = '# YTID,start_seconds,end_seconds,positive_labels\nYT123,0.0,10.0,"/m/test"\n'
 
         # Mock ontology
         config._mid_to_name = {"/m/test": "Test"}
         config._name_to_mid = {"Test": 0}  # Integer ID mapping
 
-        # Mock the CSV file reading for different splits
-        with patch("builtins.open", create=True) as mock_open:
-            from io import StringIO
+        # A single real CSV stands in for each split's metadata file; _load_metadata_for_split
+        # reads via Path.open, so a real file (not a patched builtins.open) is what's exercised.
+        csv_path = tmp_path / "audioset.csv"
+        csv_path.write_text('# YTID,start_seconds,end_seconds,positive_labels\nYT123,0.0,10.0,"/m/test"\n')
+        config.balanced_csv = csv_path
+        config.unbalanced_csv = csv_path
+        config.eval_csv = csv_path
 
-            mock_open.return_value.__enter__.return_value = StringIO(csv_content)
+        # Load from different splits
+        bal_metadata = config.load_metadata(split="bal_train")
+        unbal_metadata = config.load_metadata(split="unbal_train")
+        eval_metadata = config.load_metadata(split="eval")
 
-            # Temporarily override CSV paths
-            import tempfile
+        # Verify split is in metadata
+        assert bal_metadata[0]["split"] == "bal_train"
+        assert unbal_metadata[0]["split"] == "unbal_train"
+        assert eval_metadata[0]["split"] == "eval"
 
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as tmp:
-                tmp.write(csv_content)
-                tmp_path = Path(tmp.name)
-
-            try:
-                config.balanced_csv = tmp_path
-                config.unbalanced_csv = tmp_path
-                config.eval_csv = tmp_path
-
-                # Load from different splits
-                bal_metadata = config.load_metadata(split="bal_train")
-                unbal_metadata = config.load_metadata(split="unbal_train")
-                eval_metadata = config.load_metadata(split="eval")
-
-                # Verify split is in metadata
-                assert bal_metadata[0]["split"] == "bal_train"
-                assert unbal_metadata[0]["split"] == "unbal_train"
-                assert eval_metadata[0]["split"] == "eval"
-
-                # Verify audio paths use correct split
-                assert "bal_train" in str(bal_metadata[0]["audio_path"])
-                assert "unbal_train" in str(unbal_metadata[0]["audio_path"])
-                assert "eval" in str(eval_metadata[0]["audio_path"])
-            finally:
-                tmp_path.unlink()
+        # Verify audio paths use correct split
+        assert "bal_train" in str(bal_metadata[0]["audio_path"])
+        assert "unbal_train" in str(unbal_metadata[0]["audio_path"])
+        assert "eval" in str(eval_metadata[0]["audio_path"])
 
     def test_audioset_supports_custom_csv(self):
         """Test that AudioSet supports custom CSV files."""

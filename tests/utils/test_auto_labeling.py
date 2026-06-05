@@ -6,67 +6,49 @@ Tests the ground truth auto-labeling functionality used in evaluation workflows.
 """
 
 import csv
-import tempfile
-from pathlib import Path
 
 import pytest
 
 from audioloop.utils.auto_labeling import auto_label_from_ground_truth, parse_target_class
 
+_FIELDNAMES_WITH_GT = [
+    "filename",
+    "predicted_is_positive",
+    "confidence",
+    "needs_human_label",
+    "prediction",
+    "entropy",
+    "prob_negative",
+    "prob_positive",
+    "target_class",
+    "ground_truth",
+    "correct",
+    "original_class",
+    "fold",
+    "filepath",
+]
+
+# Production mode - no ground truth columns
+_FIELDNAMES_NO_GT = [
+    "filename",
+    "predicted_is_positive",
+    "confidence",
+    "needs_human_label",
+    "prediction",
+    "entropy",
+    "prob_negative",
+    "prob_positive",
+    "target_class",
+    "original_class",
+    "fold",
+    "filepath",
+]
+
 
 class TestAutoLabelingUtility:
     """Test cases for the auto-labeling utility function."""
 
-    def create_test_candidates_csv(self, candidates_data, include_ground_truth=True):
-        """Create a temporary candidates CSV file for testing."""
-        # Standard fieldnames for candidates CSV
-        if include_ground_truth:
-            fieldnames = [
-                "filename",
-                "predicted_is_positive",
-                "confidence",
-                "needs_human_label",
-                "prediction",
-                "entropy",
-                "prob_negative",
-                "prob_positive",
-                "target_class",
-                "ground_truth",
-                "correct",
-                "original_class",
-                "fold",
-                "filepath",
-            ]
-        else:
-            # Production mode - no ground truth columns
-            fieldnames = [
-                "filename",
-                "predicted_is_positive",
-                "confidence",
-                "needs_human_label",
-                "prediction",
-                "entropy",
-                "prob_negative",
-                "prob_positive",
-                "target_class",
-                "original_class",
-                "fold",
-                "filepath",
-            ]
-
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as temp_file:
-            writer = csv.DictWriter(temp_file, fieldnames=fieldnames)
-            writer.writeheader()
-
-            for data in candidates_data:
-                # Fill in defaults for missing fields
-                row = dict.fromkeys(fieldnames, "")
-                row.update(data)
-                writer.writerow(row)
-
-            return temp_file.name
-
-    def test_auto_label_basic_functionality(self):
+    def test_auto_label_basic_functionality(self, candidates_csv):
         """Test basic auto-labeling with ground truth data."""
         candidates_data = [
             {
@@ -89,61 +71,49 @@ class TestAutoLabelingUtility:
             },
         ]
 
-        csv_file = self.create_test_candidates_csv(candidates_data)
+        csv_file = candidates_csv(candidates_data, _FIELDNAMES_WITH_GT)
+        results = auto_label_from_ground_truth(str(csv_file))
 
-        try:
-            results = auto_label_from_ground_truth(csv_file)
+        # Check return values
+        assert results["positive_count"] == 2
+        assert results["negative_count"] == 1
+        assert results["total"] == 3
 
-            # Check return values
-            assert results["positive_count"] == 2
-            assert results["negative_count"] == 1
-            assert results["total"] == 3
+        # Verify file was updated in place
+        with csv_file.open() as f:
+            rows = list(csv.DictReader(f))
 
-            # Verify file was updated
-            with open(csv_file) as f:
-                reader = csv.DictReader(f)
-                rows = list(reader)
+        assert len(rows) == 3
+        assert rows[0]["needs_human_label"] == "1"  # True -> 1
+        assert rows[1]["needs_human_label"] == "0"  # False -> 0
+        assert rows[2]["needs_human_label"] == "1"  # True -> 1
 
-            assert len(rows) == 3
-            assert rows[0]["needs_human_label"] == "1"  # True -> 1
-            assert rows[1]["needs_human_label"] == "0"  # False -> 0
-            assert rows[2]["needs_human_label"] == "1"  # True -> 1
-
-        finally:
-            Path(csv_file).unlink()
-
-    def test_auto_label_no_ground_truth(self):
+    def test_auto_label_no_ground_truth(self, candidates_csv):
         """Test error handling when no ground truth data is available."""
         candidates_data = [
             {"filename": "test1.wav", "predicted_is_positive": "False", "confidence": "0.7"}
         ]
 
-        # Create CSV without ground truth columns
-        csv_file = self.create_test_candidates_csv(candidates_data, include_ground_truth=False)
+        # CSV without ground truth columns
+        csv_file = candidates_csv(candidates_data, _FIELDNAMES_NO_GT)
 
-        try:
-            with pytest.raises(ValueError, match="No ground truth data found"):
-                auto_label_from_ground_truth(csv_file)
-        finally:
-            Path(csv_file).unlink()
+        with pytest.raises(ValueError, match="No ground truth data found"):
+            auto_label_from_ground_truth(str(csv_file))
 
     def test_auto_label_file_not_found(self):
         """Test error handling for non-existent files."""
         with pytest.raises(FileNotFoundError):
             auto_label_from_ground_truth("/nonexistent/file.csv")
 
-    def test_auto_label_empty_file(self):
+    def test_auto_label_empty_file(self, tmp_path):
         """Test error handling for empty CSV files."""
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".csv", delete=False) as temp_file:
-            temp_file_name = temp_file.name
+        empty_file = tmp_path / "empty.csv"
+        empty_file.write_text("")  # truly empty: no header, no rows
 
-        try:
-            with pytest.raises(ValueError, match="No candidates found"):
-                auto_label_from_ground_truth(temp_file_name)
-        finally:
-            Path(temp_file_name).unlink()
+        with pytest.raises(ValueError, match="No candidates found"):
+            auto_label_from_ground_truth(str(empty_file))
 
-    def test_auto_label_mixed_boolean_formats(self):
+    def test_auto_label_mixed_boolean_formats(self, candidates_csv):
         """Test handling of different boolean string formats."""
         candidates_data = [
             {"filename": "test1.wav", "ground_truth": "true"},  # lowercase
@@ -153,27 +123,21 @@ class TestAutoLabelingUtility:
             {"filename": "test5.wav", "ground_truth": ""},  # empty string
         ]
 
-        csv_file = self.create_test_candidates_csv(candidates_data)
+        csv_file = candidates_csv(candidates_data, _FIELDNAMES_WITH_GT)
+        results = auto_label_from_ground_truth(str(csv_file))
 
-        try:
-            results = auto_label_from_ground_truth(csv_file)
+        assert results["positive_count"] == 3  # All 'true' variants
+        assert results["negative_count"] == 2  # 'false' and empty
 
-            assert results["positive_count"] == 3  # All 'true' variants
-            assert results["negative_count"] == 2  # 'false' and empty
+        # Verify labels
+        with csv_file.open() as f:
+            rows = list(csv.DictReader(f))
 
-            # Verify labels
-            with open(csv_file) as f:
-                reader = csv.DictReader(f)
-                rows = list(reader)
-
-            assert rows[0]["needs_human_label"] == "1"  # true
-            assert rows[1]["needs_human_label"] == "1"  # TRUE
-            assert rows[2]["needs_human_label"] == "1"  # True
-            assert rows[3]["needs_human_label"] == "0"  # false
-            assert rows[4]["needs_human_label"] == "0"  # empty
-
-        finally:
-            Path(csv_file).unlink()
+        assert rows[0]["needs_human_label"] == "1"  # true
+        assert rows[1]["needs_human_label"] == "1"  # TRUE
+        assert rows[2]["needs_human_label"] == "1"  # True
+        assert rows[3]["needs_human_label"] == "0"  # false
+        assert rows[4]["needs_human_label"] == "0"  # empty
 
     def test_parse_target_class(self):
         """Test target class parsing utility function."""

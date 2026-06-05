@@ -205,12 +205,13 @@ class TestRealUsagePatterns:
                     assert config.output_dir != other_config.output_dir
 
     def test_configuration_persistence(self):
-        """Test that configuration behaves consistently across multiple calls."""
+        """Test that configuration behaves consistently across instances and calls."""
         config = AudioLoopConfig(experiment_name="persistent")
+        other = AudioLoopConfig(experiment_name="persistent")
 
-        # Multiple calls should return identical results
-        assert config.output_dir == config.output_dir
-        assert config.get_model_path(1) == config.get_model_path(1)
+        # Same inputs -> identical results, across independent instances (not self-comparison).
+        assert config.output_dir == other.output_dir
+        assert config.get_model_path(1) == other.get_model_path(1)
 
         # Dataset config should be retrievable multiple times
         dataset_config1 = config.get_dataset_config()

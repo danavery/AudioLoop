@@ -98,12 +98,14 @@ class TestConfigPaths:
         assert path.name == expected_file
 
     def test_path_consistency(self):
-        """Test that paths are consistent across calls."""
-        config = AudioLoopConfig(experiment_name="test")
+        """Test that paths are deterministic: two configs for the same experiment agree."""
+        config_a = AudioLoopConfig(experiment_name="test")
+        config_b = AudioLoopConfig(experiment_name="test")
 
-        # Multiple calls should return same paths
-        assert config.output_dir == config.output_dir
-        assert config.get_model_path(1) == config.get_model_path(1)
+        # Same inputs -> same paths, across independent instances (not self-comparison).
+        assert config_a.output_dir == config_b.output_dir
+        assert config_a.get_model_path(1) == config_b.get_model_path(1)
+        assert config_a.get_model_path(1).name == "model_v1.pt"
 
 
 class TestConfigConstructor:

@@ -517,8 +517,6 @@ def test_basic_transition_empty_metrics():
     strategy = BasicTransitionStrategy()
 
     assert not strategy._should_transition({})
-    # Test with empty dictionary instead of None
-    assert not strategy._should_transition({})
 
 
 def test_basic_transition_strategy_delegation(sample_predictions):
@@ -652,9 +650,6 @@ def test_basic_transition_print_analysis_no_crash(capsys):
     strategy._print_transition_analysis(metrics, True)
 
     # Test with empty metrics
-    strategy._print_transition_analysis({}, False)
-
-    # Test with None metrics
     strategy._print_transition_analysis({}, False)
 
     # Capture output to verify it produces some output
