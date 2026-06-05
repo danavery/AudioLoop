@@ -131,7 +131,6 @@ This system allows for domain-specific optimizations (e.g., whale calls with few
 ### Data Pipeline
 - **`utils/spectrogram_dataset.py`**: Unified dataset loader for multiple CSV formats
 - **`utils/data_utils.py`**: Core utilities (device selection, collate functions, entropy)
-- **`utils/labeled_dataset.py`**: Legacy dataset implementation
 - **`utils/log_normalize.py`**: Spectrogram normalization transform
 
 ### Dataset Configuration
