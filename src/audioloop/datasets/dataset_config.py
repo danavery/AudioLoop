@@ -174,25 +174,6 @@ class DatasetConfig(ABC):
         """
         pass
 
-    # === Feature Extraction ===
-    @property
-    def feature_extractor(self):
-        """Lazily build and cache this dataset's feature extractor.
-
-        The extractor owns audio->tensor production (load -> transform -> fix) AND the
-        audio-processing parameters (sample_rate, n_fft, ... — feature concerns, not
-        dataset identity). The dataset config is passed in only for file-level knowledge
-        the build step needs (get_spectrogram_path, get_bad_files, min_audio_file_size).
-        """
-        fx = getattr(self, "_feature_extractor", None)
-        if fx is None:
-            # Local import avoids a module-level datasets <-> feature_extractor cycle.
-            from audioloop.feature_extractor import SpectrogramExtractor
-
-            fx = SpectrogramExtractor(self)
-            self._feature_extractor = fx
-        return fx
-
     # === Binary Classification ===
     @abstractmethod
     def is_positive_class(self, class_name: str, positive_class: str | int) -> bool:

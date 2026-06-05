@@ -18,19 +18,11 @@ from audioloop.feature_extractor import SpectrogramExtractor
 ALL_CONFIGS = [FSD50KConfig, UrbanSound8KConfig, AudiosetConfig]
 
 
-def test_feature_extractor_property_caches():
-    """DatasetConfig.feature_extractor builds once and returns the same instance."""
-    config = FSD50KConfig()
-    fx = config.feature_extractor
-    assert isinstance(fx, SpectrogramExtractor)
-    assert config.feature_extractor is fx
-
-
 @pytest.mark.parametrize("config_class", ALL_CONFIGS)
 def test_get_output_shape(config_class):
     """Output shape is (n_mels, -1): correct freq dim and variable-time sentinel."""
     config = config_class()
-    fx = config.feature_extractor
+    fx = SpectrogramExtractor(config)
     shape = fx.get_output_shape()
 
     assert isinstance(shape, tuple)
@@ -44,7 +36,7 @@ def test_get_output_shape(config_class):
 def test_fix_length_crops_outliers_and_preserves_short(config_class):
     """_fix_length center-crops above max_spectrogram_length, never pads short clips."""
     config = config_class()
-    fx = config.feature_extractor
+    fx = SpectrogramExtractor(config)
     max_length = fx.max_spectrogram_length
 
     # Short: preserved, no padding.
@@ -62,7 +54,7 @@ def test_fix_length_crops_outliers_and_preserves_short(config_class):
 def test_extract_one_composes_load_transform_fix(monkeypatch):
     """extract_one runs load -> transform -> fix, in that order."""
     config = FSD50KConfig()
-    fx = config.feature_extractor
+    fx = SpectrogramExtractor(config)
     max_length = fx.max_spectrogram_length
 
     seen = {}
@@ -91,7 +83,7 @@ def test_extract_one_composes_load_transform_fix(monkeypatch):
 def test_process_one_builds_and_saves(tmp_path, monkeypatch):
     """process_one extracts and caches the spec under get_spectrogram_path, returns length."""
     config = FSD50KConfig()
-    fx = config.feature_extractor
+    fx = SpectrogramExtractor(config)
 
     audio = tmp_path / "clip.wav"
     audio.write_bytes(b"ignored")  # must exist; content irrelevant (extract_one is stubbed)
@@ -110,7 +102,7 @@ def test_process_one_builds_and_saves(tmp_path, monkeypatch):
 def test_process_one_skips_already_built(tmp_path, monkeypatch):
     """Resumable: an existing spec is skipped (True, None) without invoking the extractor."""
     config = FSD50KConfig()
-    fx = config.feature_extractor
+    fx = SpectrogramExtractor(config)
 
     audio = tmp_path / "clip.wav"
     audio.write_bytes(b"ignored")
@@ -132,7 +124,7 @@ def test_process_one_skips_already_built(tmp_path, monkeypatch):
 def test_process_one_missing_audio_is_failure(tmp_path):
     """A missing audio file is a quiet failure (False, None)."""
     config = FSD50KConfig()
-    fx = config.feature_extractor
+    fx = SpectrogramExtractor(config)
     out_dir = tmp_path / "specs"
     out_dir.mkdir()
 

@@ -96,15 +96,10 @@ class TestDatasetConfigInterface:
         assert hasattr(config, "get_available_splits")
         assert hasattr(config, "get_default_split")
         assert hasattr(config, "get_audio_path")
-        # Audio->tensor production + the offline build step now live on the feature
-        # extractor, not the config.
-        assert hasattr(config, "feature_extractor")
         assert callable(config.load_metadata)
         assert callable(config.get_available_splits)
         assert callable(config.get_default_split)
         assert callable(config.get_audio_path)
-        assert callable(config.feature_extractor.get_output_shape)
-        assert callable(config.feature_extractor.process_one)
 
 
 class TestDatasetSplitInterface:
