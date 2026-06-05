@@ -15,7 +15,6 @@ keeps your code out of the installed package. See docs/custom_datasets.md.
 This template provides a complete DatasetConfig implementation with:
 - Audio file loading from directory structures
 - CSV metadata parsing with flexible column names
-- Audio processing parameters (consumed by the feature extractor)
 - Binary classification support
 - Automatic file extension detection
 - Dataset split interface (single "all" split for simple datasets)
@@ -39,7 +38,7 @@ Copy and customize example:
     cp src/audioloop/datasets/templates/simple_audio_template.py \\
        datasets/my_dataset_config.py
 
-Then edit: class name, paths, vocabulary, and audio parameters.
+Then edit: class name, paths, and vocabulary.
 """
 
 import csv
@@ -59,7 +58,7 @@ class TemplateAudioConfig(DatasetConfig):
     (The class can be named anything — AudioLoop finds the DatasetConfig
     subclass automatically — but a descriptive name is good practice.)
 
-    Then customize the paths, vocabulary, and audio parameters below.
+    Then customize the paths and vocabulary below.
     This template provides all required DatasetConfig methods for full AudioLoop compatibility.
     """
 
@@ -90,11 +89,9 @@ class TemplateAudioConfig(DatasetConfig):
         2: "class_three",
     }
 
-    # Audio processing parameters (sample_rate, n_fft, hop_length, n_mels, top_db,
-    # max_spectrogram_length) are NOT set here — they are owned by the feature extractor
-    # (audioloop/feature_extractor.py: SpectrogramExtractor), which currently uses sensible
-    # defaults (44.1kHz log-mel). Per-experiment override of these is coming via
-    # AudioLoopConfig; until then, edit the extractor defaults if you need different values.
+    # Audio/spectrogram parameters (sample_rate, n_fft, hop_length, n_mels, top_db,
+    # max_spectrogram_length) live on the feature extractor, not here. Override them
+    # per-experiment via `feature_extractor_kwargs` in audioloop.yaml.
 
     # =============================================================================
     # INTERFACE IMPLEMENTATION (usually no need to modify below this line)
@@ -280,4 +277,4 @@ class TemplateAudioConfig(DatasetConfig):
     # Note: offline spectrogram building (load -> transform -> fix -> save, with skip/guard
     # policy) is handled by the feature extractor's process_one(); the config only supplies
     # file-level knowledge it reads (get_bad_files, min_audio_file_size). The cached-feature
-    # path (.pt naming) lives on the extractor. No process_single_file needed.
+    # path (.pt naming) lives on the extractor.

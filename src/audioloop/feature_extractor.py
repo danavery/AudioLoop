@@ -5,9 +5,9 @@
 on `DatasetConfig`. It is the unification point for the offline build path (`create_specs`)
 and the lazy path (`SpectrogramDataset`).
 
-Params are currently constructor defaults; experiment-level overrides (sourced from
-`AudioLoopConfig`) arrive in A3, when a FeatureSet built from config flows the configured
-extractor into both build paths consistently.
+Params are constructor defaults; experiment-level overrides come from
+`AudioLoopConfig.feature_extractor_kwargs` (see `config.get_feature_extractor`), which
+constructs the extractor once and flows it into both build paths consistently.
 """
 
 import logging
@@ -34,8 +34,8 @@ class SpectrogramExtractor:
     The `dataset_config` reference is retained for file-level dataset knowledge used by the
     build step (get_bad_files, min_audio_file_size), not for params.
 
-    Experiment-level overrides of these defaults arrive in A3 (FeatureSet, built from
-    AudioLoopConfig, flows the configured extractor into both build paths consistently).
+    Experiment-level overrides of these defaults come from
+    `AudioLoopConfig.feature_extractor_kwargs` (see `config.get_feature_extractor`).
     """
 
     def __init__(

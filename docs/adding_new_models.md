@@ -78,7 +78,7 @@ class MyCustomModel(AudioLoopModel):
 
 - `forward()` uses the standard PyTorch signature. Input spectrograms are `(batch, n_mels, time)`.
 - `get_model_info()` returns metadata that gets saved alongside the model weights when training completes. Include anything needed to reconstruct the model — this is not automatic.
-- `can_handle_shape()` is called before training starts to verify the model is compatible with the dataset. The shape tuple excludes the batch dimension. A `-1` indicates a variable dimension — all built-in datasets return `(n_mels, -1)` since spectrogram length varies. Models with adaptive pooling can just check `len(shape) == 2`; models that need a fixed input size would need to reject shapes containing `-1`.
+- `can_handle_shape()` is called before training starts to verify the model is compatible with the dataset. The shape tuple excludes the batch dimension. A `-1` indicates a variable dimension — the spectrogram extractor returns `(n_mels, -1)` since spectrogram length varies. Models with adaptive pooling can just check `len(shape) == 2`; models that need a fixed input size would need to reject shapes containing `-1`.
 
 ## Using Your Model
 

@@ -1,29 +1,26 @@
 # Shape Compatibility and Variable-Length Spectrograms
 
-AudioLoop validates dataset/model compatibility at startup and supports variable-length spectrograms. Datasets declare output shapes, models declare what shapes they accept, and the training pipeline checks compatibility before training begins.
+AudioLoop validates feature/model compatibility at startup and supports variable-length spectrograms. The feature extractor declares the output shape it produces, models declare what shapes they accept, and the training pipeline checks compatibility before training begins.
 
-## Dataset Side: `get_output_shape()`
+## Feature Side: `get_output_shape()`
 
-Each dataset config returns its tensor shape (excluding batch dimension). The sentinel value `-1` marks a variable dimension (typically time):
+The feature extractor returns its tensor shape (excluding batch dimension). The sentinel value `-1` marks a variable dimension (typically time):
 
 ```python
 def get_output_shape(self) -> tuple[int, ...]:
     return (self.n_mels, -1)  # e.g. (128, -1) — 128 mel bins, variable time
 ```
 
-## Crop-Not-Pad Behavior: `fix_spectrogram_length()`
+## Crop-Not-Pad Behavior: `_fix_length()`
 
 Spectrograms shorter than the configured maximum are kept at their natural length (no zero-padding). Only outliers exceeding the max are center-cropped:
 
 ```python
-def fix_spectrogram_length(self, spec: torch.Tensor) -> torch.Tensor:
-    current_length = spec.shape[-1]
-    max_length = self._max_spectrogram_length
-
-    if current_length > max_length:
-        start_idx = (current_length - max_length) // 2
-        spec = spec[..., start_idx : start_idx + max_length]
-
+def _fix_length(self, spec: torch.Tensor) -> torch.Tensor:
+    current_length = spec.shape[-1]  # Time dimension is last
+    if current_length > self.max_spectrogram_length:
+        start_idx = (current_length - self.max_spectrogram_length) // 2
+        spec = spec[..., start_idx : start_idx + self.max_spectrogram_length]
     return spec  # Short spectrograms returned as-is
 ```
 

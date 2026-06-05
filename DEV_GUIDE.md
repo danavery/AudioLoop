@@ -91,22 +91,22 @@ AudioLoop uses a pluggable model architecture where all models implement the `Au
 AudioLoop supports variable length spectrograms and automatic dataset/model compatibility checking. This enables domain-specific feature extraction while preventing runtime failures.
 
 **Key Features:**
-- **Shape Compatibility System**: Datasets declare output shapes (`get_output_shape`), models declare input requirements (`can_handle_shape`), and the training pipeline automatically validates compatibility.
+- **Shape Compatibility System**: The feature extractor declares its output shape (`get_output_shape`), models declare input requirements (`can_handle_shape`), and the training pipeline automatically validates compatibility.
 - **Variable Length Spectrograms**: Natural audio durations are preserved, with outlier cropping and dynamic batch padding.
 - **Implicit Temporal Augmentation**: Training on natural length variations improves model generalization.
 
-**Dataset Configuration:**
-Datasets now return `(num_mels, -1)` for their shape, indicating a variable time dimension. The `fixed_length` parameter is used as a maximum for outlier cropping, not for forced padding.
+**Feature Extraction:**
+The feature extractor returns `(num_mels, -1)` for its shape, indicating a variable time dimension. The `max_spectrogram_length` parameter is used as a maximum for outlier cropping, not for forced padding.
 
 ```python
-class FSD50KConfig(DatasetConfig):
-    fixed_length = 2048  # Used as max length
+class SpectrogramExtractor:
+    max_spectrogram_length = 2048  # ctor default; used as max length
 
     def get_output_shape(self) -> tuple[int, ...]:
         return (self.n_mels, -1)  # Variable time dimension
 
-    def fix_spectrogram_length(self, spec: torch.Tensor) -> torch.Tensor:
-        # Crops outliers > 2048, but preserves natural lengths of shorter clips
+    def _fix_length(self, spec: torch.Tensor) -> torch.Tensor:
+        # Crops outliers > max_spectrogram_length, preserves natural lengths of shorter clips
         ...
 ```
 

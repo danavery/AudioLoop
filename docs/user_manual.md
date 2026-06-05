@@ -27,7 +27,7 @@ AudioLoop has two running modes: **production mode** (the default) for real-worl
 
 Per-dataset handling is configured in specific instances of `DatasetConfig` in the `datasets` project directory (apart from pre-supplied dataset configs for Audioset, FSD50K, and UrbanSound8K). 
 
-Dataset configuration tells AudioLoop where the clip files are, where the metadata is, what splits are available, a list of classes, and any custom spectrogram parameters.
+Dataset configuration tells AudioLoop where the clip files are, where the metadata is, what splits are available, and a list of classes.
 
 Examples of dataset configuration are available in the current project directory's `datasets/templates`. Copy that template to `datasets` and alter as needed. Examples of complete pre-supplied configurations are in the AudioLoop source directory `src/audioloop/datasets`
 
@@ -79,15 +79,19 @@ The newly-created spectrograms live in the `specs_dir_path` directory (default: 
 
 ### Options
 
-Note that none of these values have built-in defaults, and they all need to be specified in the dataset configuration. Examples can be found in the built-in dataset configs:
+Where the audio files live is part of the dataset configuration (examples in the built-in dataset configs):
 
 * _audio_root: The directory where your audio files live
 * _audio_extension: The file extension for your audio files (.wav, .flac, etc.)
-* _max_spectrogram_length: Maximum length for the created spectrograms. Useful if you have some particularly large outliers. (`create_specs` will give you a histogram of created lengths when it's done)
-* _sample_rate (Hz)
-* _n_fft
-* _hop_length
-* _n_mels
+
+How those files are turned into spectrograms is controlled by `feature_extractor_kwargs` in `audioloop.yaml`. Each parameter has a built-in default, so you only set the ones you want to change:
+
+* max_spectrogram_length (default 2048): Maximum length for the created spectrograms. Useful if you have some particularly large outliers. (`create_specs` will give you a histogram of created lengths when it's done)
+* sample_rate (default 44100, Hz)
+* n_fft (default 1024)
+* hop_length (default 256)
+* n_mels (default 128)
+* top_db (default 80)
 
 ## Training
 
@@ -297,7 +301,7 @@ This is normal for large datasets on the first run if the spectrograms haven't b
 Check that PyTorch is using your GPU: `python -c "import torch; print(torch.cuda.is_available())"`. If you have a GPU but CUDA isn't available, you may need to reinstall PyTorch with CUDA support.
 
 **"Out of memory" during training**
-Reduce `batch_size` in `audioloop.yaml` (default is 32). If you're on CPU, also check that spectrograms aren't unusually large — review `_max_spectrogram_length` in your dataset config.
+Reduce `batch_size` in `audioloop.yaml` (default is 32). If you're on CPU, also check that spectrograms aren't unusually large — review `max_spectrogram_length` in `feature_extractor_kwargs` (audioloop.yaml).
 
 **Automated workflow stops and asks me to label**
 This is expected. The workflow pauses after each candidate selection so you can label in a separate terminal (web UI or CLI). It can be resumed once labeling is saved and merged.

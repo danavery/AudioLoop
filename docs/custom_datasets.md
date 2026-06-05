@@ -76,13 +76,6 @@ class MyDatasetConfig(DatasetConfig):   # Was TemplateAudioConfig
         1: "music",
         2: "noise",
     }
-
-    # Audio processing (adjust if needed)
-    _sample_rate = 22050
-    _n_fft = 1024
-    _hop_length = 512
-    _n_mels = 128
-    _max_spectrogram_length = 993
 ```
 
 Everything below the customization section implements the `DatasetConfig` interface and typically doesn't need changes.
@@ -112,16 +105,14 @@ The template implements every required method from `DatasetConfig`. For most cus
 
 **File paths** (where things live):
 - `get_audio_path(filename, split, fold)` — resolve audio file location
-- `get_spectrogram_path(filename, specs_dir)` — resolve spectrogram file location
 
 **Classification** (how labels are interpreted):
 - `is_positive_class(class_name, positive_class)` — determine if a class matches the positive class
 - `get_binary_label(item, positive_class_id, positive_class_name)` — get 0/1 label for an item
 
-**Audio processing** (spectrogram generation):
-- `create_spectrogram_transform()` — PyTorch transform pipeline
-- `fix_spectrogram_length(spec)` — handle length outliers
-- `process_single_file(file_info, output_dir)` — full processing pipeline for one file
+Spectrogram generation (the transform pipeline, length handling, and `.pt` caching) is
+owned by the feature extractor, not `DatasetConfig` — its parameters are configured via
+`feature_extractor_kwargs` in `audioloop.yaml`. Custom datasets don't implement it.
 
 For split/fold customization, see [Splits and Folds](#splits-and-folds) below. See the built-in configs (`fsd50k_config.py`, `urbansound8k_config.py`, `audioset_config.py`) for examples of varying complexity.
 
