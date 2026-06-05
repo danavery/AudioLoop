@@ -17,18 +17,16 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
 dependencies = [
-    "basedpyright>=1.31.7",
     "flask>=3.0.0",
     "matplotlib>=3.7.0",
     "numpy>=2.3.0",
-    "pytest>=8.4.1",
     "pyyaml>=6.0",
-    "ruff",
     "torch>=2.10.0",
     "torchaudio>=2.10.0",
     "torchcodec>=0.10.0",
@@ -37,9 +35,11 @@ dependencies = [
 
 [project.optional-dependencies]
 test = [
-    "pytest>=7.0",
+    "basedpyright>=1.31.7",
+    "pytest>=8.4.1",
     "pytest-cov>=4.0",
     "pytest-mock>=3.10",
+    "ruff",
 ]
 
 
@@ -72,7 +72,7 @@ extend-select = ["I", "B", "SIM", "RET", "UP", "C4", "F", "RUF", "TID", "E"]
 ignore = ["RET504", "E501"]
 
 [tool.ruff.lint.per-file-ignores]
-"audioloop/label_audio.py" = ["RET508"]
+"src/audioloop/label_audio.py" = ["RET508"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
