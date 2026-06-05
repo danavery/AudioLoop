@@ -50,7 +50,6 @@ line-length = 100
 include = ["src", "tests"]
 exclude = [
     "**/.venv",
-    "**/webui",
     "**/data",
     "**/outputs",
     "**/subsets",

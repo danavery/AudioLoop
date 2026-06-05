@@ -13,7 +13,6 @@ and auto-populate available candidate files for labeling.
 
 import argparse
 import os
-import sys
 from pathlib import Path
 
 DEFAULT_HOST = "127.0.0.1"
@@ -84,30 +83,16 @@ def main():
         os.environ["AUDIOLOOP_WEBUI_PORT"] = str(port)
         os.environ.setdefault("AUDIOLOOP_OUTPUT_ROOT", str(project_root))
 
-    # Import and run the Flask app
-    webui_dir = Path(__file__).parent.parent.parent / "webui"
+    # Import and run the Flask app. The app lives inside this package and uses
+    # explicit template/static folders, so no cwd or sys.path manipulation is needed.
+    from audioloop.webui.app import app
 
-    if not webui_dir.exists():
-        print(f"Error: webui directory not found at {webui_dir}")
-        sys.exit(1)
+    if not is_reloader_restart:
+        print(f"Starting web UI at http://{host}:{port}")
+        print(f"Project root: {project_root}")
+        print()
 
-    # Change to webui dir so Flask can find templates/static
-    original_cwd = os.getcwd()
-    os.chdir(webui_dir)
-
-    sys.path.insert(0, str(webui_dir))
-
-    try:
-        from app import app  # type: ignore[import-not-found]
-
-        if not is_reloader_restart:
-            print(f"Starting web UI at http://{host}:{port}")
-            print(f"Project root: {project_root}")
-            print()
-
-        app.run(debug=True, host=host, port=port)
-    finally:
-        os.chdir(original_cwd)
+    app.run(debug=True, host=host, port=port)
 
 
 if __name__ == "__main__":

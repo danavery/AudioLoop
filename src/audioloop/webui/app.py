@@ -7,25 +7,20 @@ logic but presents it through a modern web interface instead of terminal command
 """
 
 import os
-import sys
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request, send_file
 
-# Add the parent directory to Python path so we can import audioloop
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-sys.path.insert(0, str(Path(__file__).parent.parent))
+from audioloop.label_audio import SimpleAudioLabeler
 
 # Determine project root:
 # 1. From AUDIOLOOP_PROJECT_ROOT (set by python -m audioloop.webui)
-# 2. Fall back to webui's parent (legacy: running directly from webui/)
-PROJECT_ROOT = Path(os.environ.get("AUDIOLOOP_PROJECT_ROOT", Path(__file__).parent.parent))
+# 2. Fall back to the current working directory (running app.py directly)
+PROJECT_ROOT = Path(os.environ.get("AUDIOLOOP_PROJECT_ROOT", Path.cwd()))
 
 # Set default output root to project root
 if "AUDIOLOOP_OUTPUT_ROOT" not in os.environ:
     os.environ["AUDIOLOOP_OUTPUT_ROOT"] = str(PROJECT_ROOT)
-
-from audioloop.label_audio import SimpleAudioLabeler  # noqa: E402
 
 # Use explicit paths for templates/static so Flask works from any directory
 WEBUI_DIR = Path(__file__).parent

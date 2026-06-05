@@ -22,7 +22,7 @@ If you have existing candidates files, you can test immediately:
 
 ```bash
 # 1. Start the web server (in one terminal)
-cd webui && python app.py
+python -m audioloop.webui
 
 # 2. Open browser to http://127.0.0.1:5000
 
@@ -46,9 +46,11 @@ cd webui && python app.py
 ## Architecture
 
 ```
-webui/
+src/audioloop/webui/
+├── __main__.py         # `python -m audioloop.webui` entry point
+├── launcher.py         # Project detection + Flask launch
 ├── app.py              # Flask server
-├── templates/          # HTML templates  
+├── templates/          # HTML templates
 │   └── labeling.html   # Main labeling interface
 └── static/             # CSS/JS files
     ├── style.css       # Bootstrap + custom styling

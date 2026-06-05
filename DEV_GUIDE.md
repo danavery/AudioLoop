@@ -443,4 +443,4 @@ All modules use seed `42` by default. The `set_seed()` function controls Python 
 - **[docs/stopping_criteria_guide.md](docs/stopping_criteria_guide.md)**: Training stopping criteria
 - **[docs/cycle_stopping_criteria.md](docs/cycle_stopping_criteria.md)**: Cross-cycle stopping criteria
 - **[docs/shape_compatibility_and_variable_lengths.md](docs/shape_compatibility_and_variable_lengths.md)**: Variable-length spectrogram support
-- **[webui/README.md](webui/README.md)**: Web-based labeling interface
+- **[src/audioloop/webui/README.md](src/audioloop/webui/README.md)**: Web-based labeling interface
