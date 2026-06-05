@@ -68,7 +68,7 @@ class TestDatasetConfigInterface:
             def list_classes(self):
                 print("test class")
 
-            def get_audio_path(self, filename, fold=None):
+            def get_audio_path(self, filename, split=None, fold=None):
                 return Path(filename)
 
             def is_positive_class(self, class_name, positive_class):
@@ -477,7 +477,7 @@ class TestCreateSubsetInterface:
             def list_classes(self):
                 print("test")
 
-            def get_audio_path(self, filename, fold=None):
+            def get_audio_path(self, filename, split=None, fold=None):
                 return Path(filename)
 
             def is_positive_class(self, class_name, positive_class):

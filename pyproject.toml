@@ -46,8 +46,25 @@ test = [
 [tool.ruff]
 line-length = 100
 
-[tool.basedpyright]
+[tool.pyright]
+include = ["src", "tests"]
+exclude = [
+    "**/.venv",
+    "**/webui",
+    "**/data",
+    "**/outputs",
+    "**/subsets",
+    "**/training_sets",
+    "**/__pycache__",
+    "**/.pytest_cache",
+    "**/.mypy_cache",
+    "**/.ruff_cache",
+    "**/dist",
+    "**/build",
+]
 typeCheckingMode = "standard"
+venvPath = "."
+venv = ".venv"
 
 [tool.ruff.lint]
 # extend-select = ["I", "B", "SIM", "RET"]
