@@ -77,7 +77,10 @@ def test_extract_one_composes_load_transform_fix(monkeypatch):
 
     assert seen["loaded"] == Path("clip.wav")  # load ran first, on the given path
     assert seen["transformed"] == (1, 16000)  # transform ran on the loaded waveform
-    assert out.shape[-1] == max_length  # fix ran on the transform output (cropped)
+    # N=1 fallback: SpectrogramExtractor never windows, so the result is a single-element list.
+    assert isinstance(out, list)
+    assert len(out) == 1
+    assert out[0].shape[-1] == max_length  # fix ran on the transform output (cropped)
 
 
 def test_process_one_builds_and_saves(tmp_path, monkeypatch):
@@ -90,7 +93,7 @@ def test_process_one_builds_and_saves(tmp_path, monkeypatch):
     out_dir = tmp_path / "specs"
     out_dir.mkdir()
 
-    monkeypatch.setattr(fx, "extract_one", lambda p: torch.zeros(128, 42))
+    monkeypatch.setattr(fx, "extract_one", lambda p: [torch.zeros(128, 42)])
 
     ok, length = fx.process_one({"audio_path": audio, "filename": "clip.wav"}, out_dir)
 
@@ -112,13 +115,36 @@ def test_process_one_skips_already_built(tmp_path, monkeypatch):
     torch.save(torch.zeros(128, 10), fx.get_cached_feature_path("clip.wav", out_dir))
 
     calls = []
-    monkeypatch.setattr(fx, "extract_one", lambda p: calls.append(p) or torch.zeros(128, 10))
+    monkeypatch.setattr(fx, "extract_one", lambda p: calls.append(p) or [torch.zeros(128, 10)])
 
     ok, length = fx.process_one({"audio_path": audio, "filename": "clip.wav"}, out_dir)
 
     assert ok is True
     assert length is None  # skipped: no length recorded
     assert calls == []  # extractor never ran
+
+
+def test_process_one_refuses_multi_segment(tmp_path, monkeypatch):
+    """N=1 guard: a multi-segment extractor is a failure, not a silent drop of windows.
+
+    Multi-segment caching ({stem}__seg{i}.pt) is wired in Arc B2; until then process_one
+    must not save only the first window. Surfaces as a quiet (False, None) with no artifact.
+    """
+    config = FSD50KConfig()
+    fx = SpectrogramExtractor(config)
+
+    audio = tmp_path / "clip.wav"
+    audio.write_bytes(b"ignored")
+    out_dir = tmp_path / "specs"
+    out_dir.mkdir()
+
+    monkeypatch.setattr(fx, "extract_one", lambda p: [torch.zeros(128, 42), torch.zeros(128, 42)])
+
+    ok, length = fx.process_one({"audio_path": audio, "filename": "clip.wav"}, out_dir)
+
+    assert ok is False
+    assert length is None
+    assert not fx.get_cached_feature_path("clip.wav", out_dir).exists()  # nothing written
 
 
 def test_process_one_missing_audio_is_failure(tmp_path):

@@ -57,15 +57,23 @@ class SpectrogramExtractor:
         self.top_db = top_db
         self.max_spectrogram_length = max_spectrogram_length
 
-    def extract_one(self, audio_path: Path) -> torch.Tensor:
-        """Produce the feature tensor for one audio file: load -> transform -> fix.
+    def extract_one(self, audio_path: Path) -> list[torch.Tensor]:
+        """Produce the feature tensor(s) for one audio file: load -> transform -> fix.
+
+        Returns a *list* of feature tensors, one per segment. SpectrogramExtractor does not
+        window *today*, so it returns a single-element list (the N=1 case); a windowed
+        extractor (e.g. Perch's fixed 5s input, or a future spectrogram-windowing mode that
+        tiles long clips instead of center-cropping them in _fix_length) returns one tensor
+        per window. The list is the contract that lets each extractor own its own windowing
+        without the rest of the pipeline knowing the cardinality up front — including, later,
+        this same class once it grows a window_length/hop knob.
 
         This is the pure audio->tensor core; callers retain their own surrounding policy
         (existence/corruption guards, caching, stats, filename derivation).
         """
         waveform = self._load_audio(audio_path)
         spec = self._create_transform()(waveform)
-        return self._fix_length(spec)
+        return [self._fix_length(spec)]
 
     def get_cached_feature_path(self, filename: str, output_dir: Path) -> Path:
         """Resolve the on-disk cache path for one file's feature tensor.
@@ -107,7 +115,19 @@ class SpectrogramExtractor:
             if min_size is not None and audio_path.stat().st_size < min_size:
                 return False, None
 
-            spec = self.extract_one(audio_path)
+            specs = self.extract_one(audio_path)
+            # N=1 fallback: a single segment is cached under the plain {stem}.pt path,
+            # byte-identical to the pre-Arc-B behavior. A windowing extractor (N>1) needs
+            # multi-segment caching ({stem}__seg{i}.pt), which lands with segment
+            # enumeration (extractor.num_segments, from audio metadata) in the
+            # windowing/Perch arc. Until then the offline build is single-segment; refuse
+            # rather than silently dropping windows.
+            if len(specs) != 1:
+                raise NotImplementedError(
+                    f"Offline build caches one segment per file; this extractor produced "
+                    f"{len(specs)}. Multi-segment (windowed) extractors aren't supported yet."
+                )
+            spec = specs[0]
             torch.save(spec, output_path)
             return True, spec.shape[-1]
 

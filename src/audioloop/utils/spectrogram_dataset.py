@@ -133,12 +133,23 @@ class SpectrogramDataset(torch.utils.data.Dataset):
                     f"Likely corrupt (e.g., FLAC header with no data)."
                 )
 
-        # Produce the feature tensor (load -> transform -> fix)
+        # Produce the feature tensor (load -> transform -> fix). extract_one returns a list
+        # of segments. Lazy generation produces exactly one row per file, so it is
+        # single-segment by construction. A windowing extractor (N>1) must instead be
+        # pre-generated offline (create_specs): its segments are enumerated from audio
+        # metadata (extractor.num_segments) and loaded from the cache, never generated on
+        # the fly. Refuse N>1 rather than silently dropping windows.
         try:
-            return self.extractor.extract_one(audio_path)
+            specs = self.extractor.extract_one(audio_path)
         except Exception as e:
             # Corrupt or unsupported audio file
             raise RuntimeError(f"Failed to extract features from {audio_path}: {e}") from e
+        if len(specs) != 1:
+            raise NotImplementedError(
+                f"Lazy generation is single-segment; this extractor produced {len(specs)}. "
+                "Pre-generate windowed features offline (create_specs) instead."
+            )
+        return specs[0]
 
     def __len__(self):
         return len(self.samples)

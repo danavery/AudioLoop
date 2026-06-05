@@ -17,8 +17,9 @@ def _make_mock_extractor():
     SpectrogramDataset uses the extractor for lazy generation (extract_one) and cached-feature
     path resolution (get_cached_feature_path), and reaches its dataset_config only for the
     corruption guard (min_audio_file_size). Tests stub the seam:
-    extractor.extract_one.return_value = <spec tensor>. (The audio->tensor composition
-    itself is covered by tests/test_feature_extractor.py.)
+    extractor.extract_one.return_value = [<spec tensor>] (a list of segments; the lazy
+    path is single-segment). The audio->tensor composition itself is covered by
+    tests/test_feature_extractor.py.
     """
     mock_config = Mock()
     mock_config.min_audio_file_size = None
@@ -180,7 +181,7 @@ class TestLazySpectrogramGeneration:
 
         # Mock dataset config: the extractor produces the spec.
         extractor = _make_mock_extractor()
-        extractor.extract_one.return_value = torch.randn(1, 128, 100)
+        extractor.extract_one.return_value = [torch.randn(1, 128, 100)]
 
         dataset = SpectrogramDataset(
             csv_file=str(csv_file), specs_dir=str(specs_dir), extractor=extractor
@@ -212,7 +213,7 @@ class TestLazySpectrogramGeneration:
         # Mock dataset config: the extractor produces the spec.
         extractor = _make_mock_extractor()
         spec_data = torch.randn(1, 128, 100)
-        extractor.extract_one.return_value = spec_data
+        extractor.extract_one.return_value = [spec_data]
 
         dataset = SpectrogramDataset(
             csv_file=str(csv_file), specs_dir=str(specs_dir), extractor=extractor
@@ -430,7 +431,7 @@ class TestDatasetConfigIntegration:
         # Mock dataset config: the extractor produces the spec.
         extractor = _make_mock_extractor()
         spec_data = torch.randn(1, 128, 100)
-        extractor.extract_one.return_value = spec_data
+        extractor.extract_one.return_value = [spec_data]
 
         dataset = SpectrogramDataset(
             csv_file=str(csv_file), specs_dir=str(specs_dir), extractor=extractor
