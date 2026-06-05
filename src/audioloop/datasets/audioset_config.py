@@ -300,11 +300,6 @@ class AudiosetConfig(DatasetConfig):
 
         return self.audio_root / split / first_two / filename
 
-    def get_spectrogram_path(self, filename: str, specs_dir: Path) -> Path:
-        """Get path where spectrogram should be stored."""
-        spec_filename = filename.replace(".flac", "") + ".pt"
-        return specs_dir / spec_filename
-
     # === Dataset Subsetting ===
     def create_subset(
         self,

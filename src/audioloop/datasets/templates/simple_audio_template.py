@@ -251,12 +251,6 @@ class TemplateAudioConfig(DatasetConfig):
             )
         return False
 
-    def get_spectrogram_path(self, filename: str, specs_dir: Path) -> Path:
-        """Get path where spectrogram should be stored."""
-        # Remove extension and add .pt
-        base_filename = filename.split(".")[0]
-        return specs_dir / f"{base_filename}.pt"
-
     def parse_metadata_row(self, row: dict[str, str], split: str | None = None) -> dict[str, Any]:
         """Parse a single CSV row into standardized metadata format."""
         filename = row[self._filename_column].strip()
@@ -285,5 +279,5 @@ class TemplateAudioConfig(DatasetConfig):
 
     # Note: offline spectrogram building (load -> transform -> fix -> save, with skip/guard
     # policy) is handled by the feature extractor's process_one(); the config only supplies
-    # file-level knowledge it reads (get_spectrogram_path, get_bad_files, min_audio_file_size).
-    # No process_single_file needed.
+    # file-level knowledge it reads (get_bad_files, min_audio_file_size). The cached-feature
+    # path (.pt naming) lives on the extractor. No process_single_file needed.

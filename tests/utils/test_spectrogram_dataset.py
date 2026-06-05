@@ -14,9 +14,9 @@ from audioloop.utils.spectrogram_dataset import SpectrogramDataset
 def _make_mock_extractor():
     """Create a mock SpectrogramExtractor wrapping a mock dataset config.
 
-    SpectrogramDataset uses the extractor for lazy generation (extract_one) and reaches its
-    dataset_config for spectrogram-path resolution (get_spectrogram_path) + corruption
-    guards (min_audio_file_size). Tests stub the seam:
+    SpectrogramDataset uses the extractor for lazy generation (extract_one) and cached-feature
+    path resolution (get_cached_feature_path), and reaches its dataset_config only for the
+    corruption guard (min_audio_file_size). Tests stub the seam:
     extractor.extract_one.return_value = <spec tensor>. (The audio->tensor composition
     itself is covered by tests/test_feature_extractor.py.)
     """
@@ -30,10 +30,9 @@ def _make_mock_extractor():
             spec_name = spec_name.replace(ext, ".pt")
         return Path(specs_dir) / spec_name
 
-    mock_config.get_spectrogram_path = _get_spec_path
-
     extractor = Mock()
     extractor.dataset_config = mock_config
+    extractor.get_cached_feature_path = _get_spec_path
     return extractor
 
 
@@ -97,8 +96,8 @@ class TestSpectrogramDatasetCSVParsing:
 
         assert dataset.samples[0]["original_class"] == 5
 
-    def test_spec_path_uses_dataset_config(self, tmp_path):
-        """Test that spec path is resolved via dataset_config.get_spectrogram_path."""
+    def test_spec_path_uses_extractor(self, tmp_path):
+        """Test that spec path is resolved via extractor.get_cached_feature_path."""
         csv_file = tmp_path / "test.csv"
         specs_dir = tmp_path / "specs"
         specs_dir.mkdir()

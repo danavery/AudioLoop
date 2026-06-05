@@ -32,7 +32,7 @@ class SpectrogramExtractor:
     (the decode/STFT/mel target), owned by the extractor — not dataset identity.
 
     The `dataset_config` reference is retained for file-level dataset knowledge used by the
-    build step (get_spectrogram_path, get_bad_files, min_audio_file_size), not for params.
+    build step (get_bad_files, min_audio_file_size), not for params.
 
     Experiment-level overrides of these defaults arrive in A3 (FeatureSet, built from
     AudioLoopConfig, flows the configured extractor into both build paths consistently).
@@ -67,12 +67,23 @@ class SpectrogramExtractor:
         spec = self._create_transform()(waveform)
         return self._fix_length(spec)
 
+    def get_cached_feature_path(self, filename: str, output_dir: Path) -> Path:
+        """Resolve the on-disk cache path for one file's feature tensor.
+
+        The cached artifact is the audio file's stem with a .pt suffix (clip.flac ->
+        clip.pt), placed directly under output_dir. This is a *feature* concern — the
+        cache artifact the extractor produces — which is why it lives here rather than on
+        DatasetConfig (dataset identity). The previous per-dataset overrides only differed
+        in which extension they stripped; Path.stem subsumes them all.
+        """
+        return Path(output_dir) / (Path(filename).stem + ".pt")
+
     def process_one(self, file_info: dict, output_dir: Path) -> tuple[bool, int | None]:
         """Build and cache one file's feature tensor: the offline (create_specs) build step.
 
         Applies all guards uniformly before extraction — resumable skip, audio existence,
         the dataset's known-bad files, and minimum file size — then runs extract_one and
-        caches the result under get_spectrogram_path. Returns (success, feature_length):
+        caches the result under get_cached_feature_path. Returns (success, feature_length):
         length is None for files skipped because they were already built. Per-file
         skips/failures are counted by the caller, not logged here, to keep the progress
         bar readable; only unexpected exceptions are logged.
@@ -81,7 +92,7 @@ class SpectrogramExtractor:
         try:
             audio_path = file_info["audio_path"]
             filename = file_info["filename"]
-            output_path = config.get_spectrogram_path(filename, output_dir)
+            output_path = self.get_cached_feature_path(filename, output_dir)
 
             # Resumable: skip files already built (forced rebuild via create_specs clear_output).
             if output_path.exists():

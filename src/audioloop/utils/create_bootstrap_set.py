@@ -29,6 +29,8 @@ def get_matching_samples(
     if config is None:
         config = AudioLoopConfig.from_project(dataset=dataset_name)
     dataset_config = config.get_dataset_config()
+    # Extractor resolves the cached-feature (.pt) path for each sampled file.
+    extractor = config.get_feature_extractor(dataset_config)
 
     # Get split parameter or use dataset's default
     split = kwargs.get("split")
@@ -86,7 +88,7 @@ def get_matching_samples(
                     item["filename"], split=item.get("split"), fold=item.get("fold")
                 )
                 if audio_path.exists():
-                    spec_path = dataset_config.get_spectrogram_path(
+                    spec_path = extractor.get_cached_feature_path(
                         item["filename"], config.specs_dir
                     )
                     matching_samples.append(
@@ -107,8 +109,8 @@ def get_matching_samples(
             item["filename"], split=item.get("split"), fold=item.get("fold")
         )
         if audio_path.exists():
-            # Use config's method to get spectrogram path
-            spec_path = dataset_config.get_spectrogram_path(item["filename"], config.specs_dir)
+            # Resolve the cached-feature path via the extractor
+            spec_path = extractor.get_cached_feature_path(item["filename"], config.specs_dir)
             matching_samples.append(
                 {
                     "spec_filename": spec_path.name,

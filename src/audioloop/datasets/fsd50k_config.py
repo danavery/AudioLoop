@@ -267,11 +267,6 @@ class FSD50KConfig(DatasetConfig):
             return audio_dir / filename
         return audio_dir / f"{filename}.wav"
 
-    def get_spectrogram_path(self, filename: str, specs_dir: Path) -> Path:
-        """Get path where spectrogram should be stored."""
-        spec_filename = filename.replace(".wav", "") + ".pt"
-        return specs_dir / spec_filename
-
     # === Binary Classification ===
     def is_positive_class(self, class_name: str, positive_class: str | int) -> bool:
         """Determine if a class matches the positive class for binary classification."""

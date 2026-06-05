@@ -81,7 +81,7 @@ def test_extract_one_composes_load_transform_fix(monkeypatch):
 
 
 def test_process_one_builds_and_saves(tmp_path, monkeypatch):
-    """process_one extracts and caches the spec under get_spectrogram_path, returns length."""
+    """process_one extracts and caches the spec under get_cached_feature_path, returns length."""
     config = FSD50KConfig()
     fx = SpectrogramExtractor(config)
 
@@ -96,7 +96,7 @@ def test_process_one_builds_and_saves(tmp_path, monkeypatch):
 
     assert ok is True
     assert length == 42
-    assert config.get_spectrogram_path("clip.wav", out_dir).exists()
+    assert fx.get_cached_feature_path("clip.wav", out_dir).exists()
 
 
 def test_process_one_skips_already_built(tmp_path, monkeypatch):
@@ -109,7 +109,7 @@ def test_process_one_skips_already_built(tmp_path, monkeypatch):
     out_dir = tmp_path / "specs"
     out_dir.mkdir()
     # Pre-build the cached spec.
-    torch.save(torch.zeros(128, 10), config.get_spectrogram_path("clip.wav", out_dir))
+    torch.save(torch.zeros(128, 10), fx.get_cached_feature_path("clip.wav", out_dir))
 
     calls = []
     monkeypatch.setattr(fx, "extract_one", lambda p: calls.append(p) or torch.zeros(128, 10))

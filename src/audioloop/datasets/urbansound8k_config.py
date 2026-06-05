@@ -203,11 +203,6 @@ class UrbanSound8KConfig(DatasetConfig):
         # Return most likely path if not found
         return self.audio_root / "fold1" / filename
 
-    def get_spectrogram_path(self, filename: str, specs_dir: Path) -> Path:
-        """Get path where spectrogram should be stored."""
-        spec_filename = filename.replace(".wav", ".pt")
-        return specs_dir / spec_filename
-
     # === Binary Classification ===
     def is_positive_class(self, class_name: str, positive_class: str | int) -> bool:
         """Determine if a class matches the positive class for binary classification."""

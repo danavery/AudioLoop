@@ -28,9 +28,9 @@ class SpectrogramDataset(torch.utils.data.Dataset):
         Args:
             csv_file: Path to CSV file containing labels with headers
             extractor: SpectrogramExtractor used to generate spectrograms on-the-fly when a
-                       cached .pt is missing (lazy generation). Its dataset_config supplies
-                       spectrogram path resolution (get_spectrogram_path) and corruption
-                       guards (min_audio_file_size).
+                       cached .pt is missing (lazy generation) and to resolve the cached .pt
+                       path (get_cached_feature_path). Its dataset_config supplies the
+                       corruption guard (min_audio_file_size).
             specs_dir: Directory containing precomputed .pt spectrogram files
         """
         if extractor is None:
@@ -96,8 +96,8 @@ class SpectrogramDataset(torch.utils.data.Dataset):
 
         audio_path = row.get("audio_path", None)
 
-        # Build spectrogram path using dataset config (same method used by create_specs)
-        spec_filepath = str(self.dataset_config.get_spectrogram_path(filename, Path(self.specs_dir)))
+        # Build spectrogram path via the extractor (same method used by create_specs)
+        spec_filepath = str(self.extractor.get_cached_feature_path(filename, Path(self.specs_dir)))
 
         return {
             "filename": filename,

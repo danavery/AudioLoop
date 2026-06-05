@@ -161,19 +161,6 @@ class DatasetConfig(ABC):
         """
         pass
 
-    @abstractmethod
-    def get_spectrogram_path(self, filename: str, specs_dir: Path) -> Path:
-        """Get path where spectrogram should be stored.
-
-        Args:
-            filename: Original audio filename
-            specs_dir: Root directory for spectrograms
-
-        Returns:
-            Full path to spectrogram file
-        """
-        pass
-
     # === Binary Classification ===
     @abstractmethod
     def is_positive_class(self, class_name: str, positive_class: str | int) -> bool:

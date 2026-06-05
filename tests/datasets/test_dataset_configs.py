@@ -74,9 +74,6 @@ class TestDatasetConfigInterface:
             def is_positive_class(self, class_name, positive_class):
                 return class_name == positive_class
 
-            def get_spectrogram_path(self, filename, specs_dir):
-                return specs_dir / f"{filename}.pt"
-
             def parse_metadata_row(self, row, split=None):
                 return row
 
@@ -485,9 +482,6 @@ class TestCreateSubsetInterface:
 
             def is_positive_class(self, class_name, positive_class):
                 return False
-
-            def get_spectrogram_path(self, filename, specs_dir):
-                return specs_dir / f"{filename}.pt"
 
             def parse_metadata_row(self, row, split=None):
                 return row

@@ -102,6 +102,8 @@ def run_binary_inference(
 
     # Get dataset config from unified config
     dataset_config = config.get_dataset_config()
+    # Extractor resolves the cached-feature (.pt) path for each candidate.
+    extractor = config.get_feature_extractor(dataset_config)
 
     # Load all available metadata and create binary labels inline
     metadata = dataset_config.load_metadata()
@@ -136,8 +138,8 @@ def run_binary_inference(
                     filtered_count += 1
                     continue
 
-                # Use dataset config's path conversion method
-                spec_path = dataset_config.get_spectrogram_path(item["filename"], config.specs_dir)
+                # Resolve the cached-feature path via the extractor
+                spec_path = extractor.get_cached_feature_path(item["filename"], config.specs_dir)
                 spec_filename = spec_path.name
 
                 # Skip if already in training set
