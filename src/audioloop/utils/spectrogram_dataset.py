@@ -198,8 +198,6 @@ class SpectrogramDataset(torch.utils.data.Dataset):
         except Exception as e:
             # File missing, corrupted, or failed to decode - skip this sample
             # Log at info level (only visible with --verbose)
-            import logging
-
-            logging.info(f"Skipping file {sample['filename']}: {e}")
+            logger.info(f"Skipping file {sample['filename']}: {e}")
             # Return None to signal skip (collate_fn will filter these out)
             return None
