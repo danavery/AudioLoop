@@ -434,6 +434,20 @@ AudioLoop uses pluggable Strategy patterns for both training stopping (within a 
 ### Reproducibility and Seed Management
 All modules use seed `42` by default. The `set_seed()` function controls Python `random`, NumPy, PyTorch, CUDA, and CUDNN deterministic mode. All CLI scripts accept `--seed` and seeds propagate through automated workflows.
 
+## Testing
+
+```bash
+uv run --extra test pytest          # full suite (~5s), no coverage
+uv run --extra test pytest --cov    # with coverage report (fully covered files are hidden)
+```
+
+Coverage is configured in `pyproject.toml` (`[tool.coverage.*]`) and deliberately **not** in pytest's `addopts`, so single-test iteration stays fast — run `--cov` before committing new modules. Interactive surfaces (`webui/`, `label_audio.py`) are omitted from the percentage; batch CLI entry points are counted so their missing tests stay visible. There is no enforced threshold: the report exists to make new untested code visible, not to gate merges.
+
+Test conventions worth keeping:
+- Tests run hermetically under a temp project root (`setup_project_root` autouse fixture in `conftest.py`) — no real audio, datasets, or network.
+- Prefer "stub the edge, run the core": fake only the I/O boundary (`_load_audio`, `train_epoch`, `load_metadata`) and exercise the real production path (see `test_feature_extractor.py`, `test_training_core.py`, `test_active_learning_core.py`).
+- When a suite mocks an *internal* module, add one unmocked integration test alongside (see `TestBasicTransitionIntegration` in `test_adaptive_thresholds.py`).
+
 ## Related Documentation
 
 - **[docs/custom_datasets.md](docs/custom_datasets.md)**: Adding your own audio data

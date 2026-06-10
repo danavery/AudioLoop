@@ -80,5 +80,20 @@ filterwarnings = [
     "ignore:.*At least one mel filterbank has all zero values.*:UserWarning:torchaudio.functional.functional"
 ]
 
+# Coverage is opt-in (`pytest --cov`), not in addopts, so single-test iteration stays fast.
+[tool.coverage.run]
+source = ["src/audioloop"]
+omit = [
+    # Interactive surfaces only — batch CLI entry points (train.py, create_specs.py, ...)
+    # stay counted so their missing tests remain visible in the report.
+    "src/audioloop/webui/*",
+    "src/audioloop/label_audio.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+precision = 1
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/audioloop"]
