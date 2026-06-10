@@ -1,17 +1,25 @@
 """
 Tests for training core functionality.
 
-This module tests class weighting and other training-related features.
+This module tests class weighting, the real training loop (execute_training_loop with
+scripted epoch results), and run_training end to end on tiny synthetic spectrograms.
 """
 
+import csv
+import logging
 from typing import cast
 
 import pytest
 import torch
+from torch.utils.data import DataLoader
 
+from audioloop import training_core
+from audioloop.active_learning_core import load_model
 from audioloop.config import AudioLoopConfig
-from audioloop.training_core import setup_loss_criterion
+from audioloop.models.simplecnn import SimpleCnn
+from audioloop.training_core import execute_training_loop, run_training, setup_loss_criterion
 from audioloop.utils.spectrogram_dataset import SpectrogramDataset
+from audioloop.utils.stopping_criteria import AccuracyCriterion, PlateauCriterion
 
 
 class _FakeTrainDataset:
@@ -132,3 +140,183 @@ class TestClassWeightingCalculation:
 
         assert torch.isfinite(loss)
         assert loss.item() >= 0
+
+
+def _run_scripted_loop(monkeypatch, epoch_results, stopping_criterion, max_epochs):
+    """Run the REAL execute_training_loop with train_epoch replaced by a scripted sequence.
+
+    Only the gradient work (train_epoch) is stubbed; the model, optimizer, criterion under
+    test, and all loop bookkeeping (best-model updates, break vs for-else completion) are
+    the production code. This is the loop-side counterpart of the criterion-only suites in
+    test_stopping_criteria.py: those prove the criteria, these prove the loop honors them.
+
+    The script is an iterator on purpose: if the loop runs more epochs than scripted, the
+    stub raises StopIteration and the test fails loudly instead of looping on stale values.
+    """
+    results = iter(epoch_results)
+
+    def scripted_train_epoch(*args: object, **kwargs: object):
+        del args, kwargs  # train_epoch's signature, but the script ignores it
+        return next(results)
+
+    monkeypatch.setattr(training_core, "train_epoch", scripted_train_epoch)
+
+    model = SimpleCnn(num_classes=2)
+    stopping_criterion.reset()
+
+    return model, execute_training_loop(
+        model=model,
+        train_loader=cast(DataLoader, None),  # only consumed by the stubbed train_epoch
+        optimizer=torch.optim.Adam(model.parameters()),
+        criterion=torch.nn.CrossEntropyLoss(),
+        device=_CPU,
+        stopping_criterion=stopping_criterion,
+        scheduler=None,
+        config=AudioLoopConfig(max_epochs=max_epochs),
+        train_dataset=cast(SpectrogramDataset, None),  # floor is explicit, so never read
+    )
+
+
+class TestExecuteTrainingLoop:
+    """Test the real training loop's integration with stopping criteria.
+
+    Criteria are built with an explicit accuracy_floor: the loop always forwards
+    train_dataset to should_stop, and a None floor would trigger auto-calculation from
+    label balance, coupling stop timing to fixture data instead of the scripted losses.
+    """
+
+    def test_plateau_early_stop_breaks_loop_and_tracks_best(self, monkeypatch):
+        """The loop stops when plateau patience runs out, keeping the best-epoch snapshot."""
+        # (avg_loss, accuracy) per epoch: improves for 3 epochs, then degrades.
+        script = [(1.0, 0.5), (0.8, 0.6), (0.7, 0.7), (0.75, 0.7), (0.8, 0.7)]
+        criterion = PlateauCriterion(patience=2, min_delta=0.01, accuracy_floor=0.0)
+
+        model, (final_accuracy, best_accuracy, num_epochs) = _run_scripted_loop(
+            monkeypatch, script, criterion, max_epochs=10
+        )
+
+        assert num_epochs == 5  # stopped early: patience (2) exhausted at epoch 5 of 10
+        assert final_accuracy == 0.7
+        assert best_accuracy == 0.7  # accuracy at the last loss improvement (epoch 3)
+
+        # The loop must have pushed a real state-dict snapshot into the criterion.
+        best_state = criterion.get_best_model_state()
+        assert best_state is not None
+        assert best_state.keys() == model.state_dict().keys()
+
+    def test_natural_completion_runs_all_epochs(self, monkeypatch):
+        """With loss improving every epoch the loop completes max_epochs (for-else path)."""
+        script = [(1.0, 0.5), (0.9, 0.6), (0.8, 0.7)]
+        criterion = PlateauCriterion(patience=50, accuracy_floor=0.0)
+
+        _, (final_accuracy, best_accuracy, num_epochs) = _run_scripted_loop(
+            monkeypatch, script, criterion, max_epochs=3
+        )
+
+        assert num_epochs == 3
+        assert final_accuracy == 0.7
+        assert best_accuracy == 0.7  # best updated every epoch; last improvement wins
+
+    def test_no_best_model_when_criterion_never_saves(self, monkeypatch):
+        """AccuracyCriterion without perfect accuracy yields best_accuracy=None.
+
+        This pins the fallback contract save_trained_model relies on: when no best state
+        was tracked, callers get the final-epoch accuracy and the final model state.
+        """
+        script = [(1.0, 0.5), (0.9, 0.6), (0.8, 0.7)]
+        criterion = AccuracyCriterion(max_epochs=3)
+
+        _, (final_accuracy, best_accuracy, num_epochs) = _run_scripted_loop(
+            monkeypatch, script, criterion, max_epochs=3
+        )
+
+        assert num_epochs == 3
+        assert final_accuracy == 0.7
+        assert best_accuracy is None
+        assert criterion.get_best_model_state() is None
+
+
+def _build_training_set(config, n_files=8, time_frames=40):
+    """Materialize a tiny pre-built training set in the fake project root.
+
+    Writes random (1, n_mels, T) tensors at the exact cache paths the extractor resolves
+    (so SpectrogramDataset takes the cached-load path, no audio decoding) plus the labels
+    CSV. Alternating labels guarantee both classes are present for num_classes detection.
+    """
+    extractor = config.get_feature_extractor()
+    rows = []
+    for i in range(n_files):
+        filename = f"clip{i}.wav"
+        spec = torch.randn(1, extractor.n_mels, time_frames)
+        torch.save(spec, extractor.get_cached_feature_path(filename, config.specs_dir))
+        rows.append({"filename": filename, "label": i % 2})
+
+    csv_path = config.specs_dir.parent / "training_set.csv"
+    with csv_path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=["filename", "label"])
+        writer.writeheader()
+        writer.writerows(rows)
+    return csv_path
+
+
+class TestRunTrainingEndToEnd:
+    """Smoke tests through the real run_training: dataset -> loop -> checkpoint -> reload.
+
+    get_device is pinned to CPU so the test is deterministic and identical on CUDA/MPS
+    hosts; everything else (DataLoader, collate, model, criterion factory, stopping
+    criterion, checkpoint save) is the production path.
+    """
+
+    @pytest.fixture(autouse=True)
+    def cpu_device(self, monkeypatch):
+        monkeypatch.setattr(training_core, "get_device", lambda: _CPU)
+
+    def _smoke_config(self, **overrides):
+        defaults = {
+            "experiment_name": "smoke",
+            "model_type": "simplecnn",
+            "max_epochs": 3,
+            "batch_size": 4,
+            "num_workers": 0,  # no worker processes in tests
+            "use_lr_scheduler": False,
+        }
+        return AudioLoopConfig(**{**defaults, **overrides})
+
+    def test_trains_saves_and_reloads_checkpoint(self):
+        """run_training completes, saves a checkpoint at the config path, and the
+        checkpoint round-trips through load_model into a usable classifier."""
+        config = self._smoke_config()
+        csv_path = _build_training_set(config)
+
+        accuracy, num_epochs = run_training(
+            config, str(csv_path), version=1, log_level=logging.WARNING
+        )
+
+        assert 0.0 <= accuracy <= 1.0
+        assert 1 <= num_epochs <= config.max_epochs
+
+        model_path = config.get_model_path(1)
+        assert model_path.exists()
+
+        loaded = load_model(model_path, _CPU)
+        assert isinstance(loaded, SimpleCnn)
+        assert loaded.get_model_info()["num_classes"] == 2
+
+        logits = loaded(torch.randn(2, 1, 128, 40))
+        assert logits.shape == (2, 2)
+        assert torch.isfinite(logits).all()
+
+    def test_custom_model_path_overrides_config_path(self, tmp_path):
+        """An explicit model_path wins over config.get_model_path(version)."""
+        config = self._smoke_config(max_epochs=1)
+        csv_path = _build_training_set(config, n_files=4)
+        custom_path = tmp_path / "outputs" / "smoke" / "custom_model.pt"
+        custom_path.parent.mkdir(parents=True, exist_ok=True)
+
+        run_training(
+            config, str(csv_path), version=1, model_path=str(custom_path), log_level=logging.WARNING
+        )
+
+        assert custom_path.exists()
+        assert not config.get_model_path(1).exists()
+        assert isinstance(load_model(custom_path, _CPU), SimpleCnn)
