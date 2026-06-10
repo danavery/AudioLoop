@@ -60,6 +60,10 @@ def merge_training_sets(
     """
     Merge original training set with newly labeled samples.
 
+    Samples are keyed by filename: a newly labeled candidate that already exists in the
+    original training set replaces it (keeping its position), so re-labeling a file or
+    re-running a merge never duplicates rows.
+
     Args:
         original_csv: Path to existing training set (e.g., training_set_v1.csv)
         new_labels_csv: Path to newly labeled samples (candidates CSV with human labels)
@@ -84,7 +88,11 @@ def merge_training_sets(
         version = (current_version or 1) + 1
         output_csv = str(config.get_training_set_path(version))
 
-    all_data = []
+    # Merged samples keyed by filename: a newly labeled candidate REPLACES an existing
+    # entry (the human's latest label is the freshest truth), and duplicates within
+    # either input collapse to the last occurrence. Insertion order is preserved, so
+    # replaced entries keep their original position.
+    merged: dict[str, int] = {}
 
     # Read original training set (requires headers)
     if os.path.exists(original_csv):
@@ -119,13 +127,8 @@ def merge_training_sets(
                 # Handle both filename and full filepath
                 filename = os.path.basename(filepath) if filepath.startswith("/") else filepath
 
-                all_data.append(
-                    {
-                        "filename": filename,
-                        "label": int(row["label"]),
-                    }
-                )
-        logger.info(f"Loaded {len(all_data)} samples from {original_csv}")
+                merged[filename] = int(row["label"])
+        logger.info(f"Loaded {len(merged)} samples from {original_csv}")
     else:
         logger.warning(f"Warning: {original_csv} not found, starting fresh")
 
@@ -133,6 +136,7 @@ def merge_training_sets(
     new_count = 0
     new_positive = 0
     new_negative = 0
+    replaced_count = 0
     with open(new_labels_csv) as f:
         reader = csv.DictReader(f)
 
@@ -157,12 +161,15 @@ def merge_training_sets(
                     logger.warning(f"Warning: Invalid label '{label}' for {filename}, skipping")
                     continue
 
-                all_data.append({"filename": filename, "label": label_int})
-                new_count += 1
-                if label_int == 1:
-                    new_positive += 1
+                if filename in merged:
+                    replaced_count += 1
                 else:
-                    new_negative += 1
+                    new_count += 1
+                    if label_int == 1:
+                        new_positive += 1
+                    else:
+                        new_negative += 1
+                merged[filename] = label_int
             except ValueError:
                 logger.warning(f"Warning: Invalid label '{label}' for {filename}, skipping")
                 continue
@@ -170,6 +177,8 @@ def merge_training_sets(
     logger.info(
         f"Added {new_count} new labeled samples ({new_positive} positive, {new_negative} negative)"
     )
+    if replaced_count:
+        logger.info(f"Updated {replaced_count} existing samples with new human labels")
 
     # Compute and save candidate metrics
     compute_and_log_candidate_metrics(new_labels_csv, config, log_level)
@@ -182,17 +191,17 @@ def merge_training_sets(
         fieldnames = ["filename", "label"]
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
-        writer.writerows(all_data)
+        writer.writerows({"filename": filename, "label": label} for filename, label in merged.items())
 
     logger.info(f"Created merged training set: {output_csv}")
     logger.info(
-        f"Total samples: {len(all_data)} (original: {len(all_data) - new_count}, new: {new_count})"
+        f"Total samples: {len(merged)} (original: {len(merged) - new_count}, new: {new_count})"
     )
 
     # Show label distribution
     label_counts = {0: 0, 1: 0}
-    for item in all_data:
-        label_counts[item["label"]] += 1
+    for label in merged.values():
+        label_counts[label] += 1
 
     logger.info(
         f"Label distribution: {label_counts[0]} negative class, {label_counts[1]} positive class"
@@ -200,7 +209,7 @@ def merge_training_sets(
 
     # Display final training set composition (always visible, not just at INFO level)
     print(
-        f"New training set: {len(all_data)} total ({label_counts[1]} positive, {label_counts[0]} negative)"
+        f"New training set: {len(merged)} total ({label_counts[1]} positive, {label_counts[0]} negative)"
     )
 
     return output_csv
