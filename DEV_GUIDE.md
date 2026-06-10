@@ -445,8 +445,18 @@ Coverage is configured in `pyproject.toml` (`[tool.coverage.*]`) and deliberatel
 
 Test conventions worth keeping:
 - Tests run hermetically under a temp project root (`setup_project_root` autouse fixture in `conftest.py`) — no real audio, datasets, or network.
-- Prefer "stub the edge, run the core": fake only the I/O boundary (`_load_audio`, `train_epoch`, `load_metadata`) and exercise the real production path (see `test_feature_extractor.py`, `test_training_core.py`, `test_active_learning_core.py`).
+- Prefer "stub the edge, run the core": fake only the I/O boundary (`_load_audio`, `train_epoch`, `load_metadata`) and exercise the real production path (see `test_feature_extractor.py`, `test_training_core.py`, `test_active_learning_core.py`). Each stubbed component then needs its own direct test (see `test_log_normalize.py`).
 - When a suite mocks an *internal* module, add one unmocked integration test alongside (see `TestBasicTransitionIntegration` in `test_adaptive_thresholds.py`).
+
+Style rules:
+- One behavior per test; the name states the behavior (`test_quota_never_exceeds_num_candidates`, not `test_edge_cases`). Variations of one behavior go in `@pytest.mark.parametrize`, not a loop inside the test.
+- Docstrings only when they add the *why* or a non-obvious contract; delete docstrings that restate the test name.
+- Assert hand-computed values with a derivation comment (`# 100/(2*90)`), never by re-deriving the production formula in the test.
+- Flat test functions by default; a test class only when it carries shared fixtures or helpers.
+- Stub via `monkeypatch.setattr(module_object, "name", ...)` on an imported handle, not `patch("string.path")` — the former fails loudly when code moves.
+- Assert log/print text only when text is the product (reporting modules); logic modules are asserted on return values and side effects.
+- Test files mirror source modules 1:1.
+- Don't test the framework (PyTorch mode flags, device moves, Python ABC mechanics) — only this project's behavior.
 
 ## Related Documentation
 

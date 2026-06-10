@@ -172,30 +172,6 @@ class TestCNN5Layer:
 
         assert params_with_bn > params_without_bn
 
-    def test_model_training_mode_switching(self):
-        """Test that model can switch between train and eval modes."""
-        model = CNN5Layer(num_classes=2, dataset_size=150)
-
-        # Test train mode
-        model.train()
-        assert model.training is True
-
-        # Test eval mode
-        model.eval()
-        assert model.training is False
-
-    def test_model_device_movement(self):
-        """Test moving model between devices."""
-        model = CNN5Layer(num_classes=2, dataset_size=150)
-
-        # Move to CPU (should work regardless of CUDA availability)
-        model.to(torch.device("cpu"))
-
-        # Test forward pass still works
-        x = torch.randn(1, 1, 128, 128)
-        output = model(x)
-        assert output.shape == (1, 2)
-
     def test_can_handle_shape(self):
         """Test can_handle_shape method."""
         model = CNN5Layer(num_classes=2, dataset_size=150)
@@ -384,15 +360,3 @@ class TestSimpleCnn:
         sound_params = sound_model.get_model_info()["num_parameters"]
 
         assert simple_params < sound_params
-
-    def test_model_training_mode_switching(self):
-        """Test that SimpleCnn can switch between train and eval modes."""
-        model = SimpleCnn(num_classes=2)
-
-        # Test train mode
-        model.train()
-        assert model.training is True
-
-        # Test eval mode
-        model.eval()
-        assert model.training is False
