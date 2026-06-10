@@ -242,6 +242,47 @@ class TestCNN5Layer:
         assert not torch.equal(output1[:, :2], output2[:, :2])  # Should be different
 
 
+class TestCNN7Layer:
+    """Forward-pass tests for CNN7Layer.
+
+    The checkpoint round-trip below covers its constructor and state dict, but until these
+    tests nothing ever pushed a tensor through the 7-layer forward — the only registered
+    model whose forward was untested.
+    """
+
+    def test_forward_pass_with_batchnorm(self):
+        model = CNN7Layer(num_classes=2, dataset_size=150)
+
+        output = model(torch.randn(1, 1, 128, 128))
+
+        assert output.shape == (1, 2)
+        assert not torch.isnan(output).any()
+
+    def test_forward_pass_without_batchnorm_uses_dropout_path(self):
+        model = CNN7Layer(num_classes=3, dataset_size=50)
+        assert model.use_batchnorm is False
+
+        output = model(torch.randn(2, 1, 128, 128))
+
+        assert output.shape == (2, 3)
+        assert not torch.isnan(output).any()
+
+    def test_forward_adds_channel_dim_for_3d_input(self):
+        model = CNN7Layer(num_classes=2, dataset_size=150)
+
+        output = model(torch.randn(1, 128, 128))  # no channel dim
+
+        assert output.shape == (1, 2)
+
+    def test_can_handle_shape(self):
+        model = CNN7Layer(num_classes=2, dataset_size=150)
+
+        assert model.can_handle_shape((128, 993)) is True
+        assert model.can_handle_shape((128, -1)) is True  # variable time dim
+        assert model.can_handle_shape((128,)) is False
+        assert model.can_handle_shape((128, 993, 3)) is False
+
+
 class TestModelCheckpointMetadata:
     """Test model checkpoint metadata round-trips through inference loading."""
 
