@@ -452,3 +452,28 @@ class TestActiveLearningParameters:
         # Invalid: wrong type
         with pytest.raises(ValueError, match="precision_floor must be 'auto' or a float"):
             AudioLoopConfig(precision_floor=None)  # type: ignore[arg-type]
+
+
+class TestFeatureExtractorSelection:
+    """The feature_extractor_type knob and its dispatch in get_feature_extractor."""
+
+    def test_default_type_is_spectrogram(self):
+        """Default selection reproduces pre-knob behavior (a SpectrogramExtractor)."""
+        from audioloop.feature_extractor import SpectrogramExtractor
+
+        config = AudioLoopConfig(dataset="urbansound8k")
+        assert config.feature_extractor_type == "spectrogram"
+        assert isinstance(config.get_feature_extractor(), SpectrogramExtractor)
+
+    def test_kwargs_flow_to_selected_extractor(self):
+        """feature_extractor_kwargs are passed to the selected extractor's constructor."""
+        config = AudioLoopConfig(
+            dataset="urbansound8k", feature_extractor_kwargs={"n_mels": 64}
+        )
+        assert config.get_feature_extractor().n_mels == 64
+
+    def test_unknown_type_raises_at_dispatch(self):
+        """An unrecognized type fails loudly at get_feature_extractor, listing valid options."""
+        config = AudioLoopConfig(dataset="urbansound8k", feature_extractor_type="bogus")
+        with pytest.raises(ValueError, match=r"Unknown feature_extractor_type 'bogus'"):
+            config.get_feature_extractor()

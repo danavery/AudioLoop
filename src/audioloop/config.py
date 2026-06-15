@@ -95,8 +95,12 @@ class AudioLoopConfig:
     model_type: str = "cnn5layer"
     model_kwargs: dict[str, Any] = field(default_factory=dict)
 
-    # Feature extractor parameters (audio->tensor production), e.g. sample_rate, n_fft,
-    # n_mels, max_spectrogram_length. Empty = SpectrogramExtractor defaults (44.1kHz log-mel).
+    # Feature extractor selection + parameters (audio->tensor production). Mirrors
+    # model_type/model_kwargs: feature_extractor_type picks the extractor class (see
+    # get_feature_extractor), feature_extractor_kwargs are its constructor params and are
+    # therefore type-dependent (e.g. sample_rate/n_fft/n_mels for "spectrogram"). Empty
+    # kwargs = that extractor's defaults (spectrogram = 44.1kHz log-mel).
+    feature_extractor_type: str = "spectrogram"
     feature_extractor_kwargs: dict[str, Any] = field(default_factory=dict)
     class_weighting: str | float | None = (
         0.70  # "adaptive", float (target positive ratio 0.0-1.0), or None
@@ -424,16 +428,32 @@ class AudioLoopConfig:
     def get_feature_extractor(self, dataset_config: DatasetConfig | None = None):
         """Build the feature extractor for this experiment, with params from config.
 
-        This is the config-scoped construction point: feature_extractor_kwargs (sample_rate,
-        n_fft, n_mels, ...) come from the experiment config, so offline (create_specs) and
-        lazy (SpectrogramDataset) builds share identical params. Pass an existing
-        dataset_config to reuse it; otherwise one is built from this config.
+        This is the config-scoped construction point: feature_extractor_type selects the
+        extractor class and feature_extractor_kwargs (sample_rate, n_fft, n_mels, ...) come
+        from the experiment config, so offline (create_specs) and lazy (SpectrogramDataset)
+        builds share identical params. Pass an existing dataset_config to reuse it;
+        otherwise one is built from this config.
+
+        Selection is a small explicit dict rather than file-discovery (as models use): the
+        set of extractors is tiny and the boring dict is the correct minimum. An unknown
+        type fails here, the dispatch point, mirroring model_type/stopping_criterion_type.
         """
         from .feature_extractor import SpectrogramExtractor
 
+        extractor_classes = {
+            "spectrogram": SpectrogramExtractor,
+        }
+        try:
+            extractor_class = extractor_classes[self.feature_extractor_type]
+        except KeyError:
+            raise ValueError(
+                f"Unknown feature_extractor_type {self.feature_extractor_type!r}; "
+                f"expected one of {sorted(extractor_classes)}"
+            ) from None
+
         if dataset_config is None:
             dataset_config = self.get_dataset_config()
-        return SpectrogramExtractor(dataset_config, **self.feature_extractor_kwargs)
+        return extractor_class(dataset_config, **self.feature_extractor_kwargs)
 
     def create_directories(self) -> None:
         """Create all necessary directories for this configuration."""

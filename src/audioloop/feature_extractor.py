@@ -1,8 +1,13 @@
-"""Feature extraction: audio file -> feature tensor.
+"""Feature extraction: audio file -> feature tensor(s).
 
-`SpectrogramExtractor` owns the audio->spectrogram production pipeline (load -> transform
--> fix) AND the audio-processing parameters (sample_rate, n_fft, ...) that previously lived
-on `DatasetConfig`. It is the unification point for the offline build path (`create_specs`)
+`FeatureExtractor` is the shared base owning the build orchestration that is identical
+across extractors: the offline `process_one` build step and its guards, audio loading
+(`_load_audio`), and cache-path resolution (`get_cached_feature_path`). Concrete extractors
+override only `extract_one` (the audio->tensor core) and `get_output_shape`.
+
+`SpectrogramExtractor` is the log-mel spectrogram concrete (load -> transform -> fix) and
+owns the audio-processing parameters (sample_rate, n_fft, ...) that previously lived on
+`DatasetConfig`. It is the unification point for the offline build path (`create_specs`)
 and the lazy path (`SpectrogramDataset`).
 
 Params are constructor defaults; experiment-level overrides come from
@@ -23,57 +28,38 @@ from audioloop.utils.log_normalize import LogNormalize
 logger = logging.getLogger(__name__)
 
 
-class SpectrogramExtractor:
-    """Produce log-mel spectrogram tensors from audio files.
+class FeatureExtractor:
+    """Shared base: the build orchestration common to every extractor.
 
-    The load -> transform -> fix behavior is identical across all datasets; only the
-    parameter *values* differ, so this is a single concrete class parameterized by its
-    constructor arguments rather than a per-dataset subclass. These are *feature* params
-    (the decode/STFT/mel target), owned by the extractor — not dataset identity.
+    Owns `process_one` (the offline create_specs build step) and its guards, `_load_audio`
+    (decode/resample/mono to `self.sample_rate`), and `get_cached_feature_path` (the .pt
+    cache artifact path) — all verified extractor-generic: they touch only dataset_config
+    knowledge, the target sample rate, and `extract_one`. Concrete extractors override
+    `extract_one` and `get_output_shape`; everything else is inherited.
 
-    The `dataset_config` reference is retained for file-level dataset knowledge used by the
-    build step (get_bad_files, min_audio_file_size), not for params.
-
-    Experiment-level overrides of these defaults come from
-    `AudioLoopConfig.feature_extractor_kwargs` (see `config.get_feature_extractor`).
+    This is a plain base, not an ABC — the value is sharing the orchestrator, not enforcing
+    a parallel-impl contract, so there are no abstract hooks beyond the two override points.
     """
 
-    def __init__(
-        self,
-        dataset_config,
-        *,
-        sample_rate: int = 44100,
-        n_fft: int = 1024,
-        hop_length: int = 256,
-        n_mels: int = 128,
-        top_db: int = 80,
-        max_spectrogram_length: int = 2048,
-    ):
+    def __init__(self, dataset_config, *, sample_rate: int):
         self.dataset_config = dataset_config
         self.sample_rate = sample_rate
-        self.n_fft = n_fft
-        self.hop_length = hop_length
-        self.n_mels = n_mels
-        self.top_db = top_db
-        self.max_spectrogram_length = max_spectrogram_length
 
     def extract_one(self, audio_path: Path) -> list[torch.Tensor]:
-        """Produce the feature tensor(s) for one audio file: load -> transform -> fix.
+        """Produce the feature tensor(s) for one audio file. **Override point.**
 
-        Returns a *list* of feature tensors, one per segment. SpectrogramExtractor does not
-        window *today*, so it returns a single-element list (the N=1 case); a windowed
-        extractor (e.g. Perch's fixed 5s input, or a future spectrogram-windowing mode that
-        tiles long clips instead of center-cropping them in _fix_length) returns one tensor
+        Returns a *list* of feature tensors, one per segment. Non-windowing extractors
+        return a single-element list (the N=1 case); a windowed extractor returns one tensor
         per window. The list is the contract that lets each extractor own its own windowing
-        without the rest of the pipeline knowing the cardinality up front — including, later,
-        this same class once it grows a window_length/hop knob.
-
-        This is the pure audio->tensor core; callers retain their own surrounding policy
-        (existence/corruption guards, caching, stats, filename derivation).
+        without the rest of the pipeline knowing the cardinality up front. See
+        SpectrogramExtractor for the concrete spectrogram rationale.
         """
-        waveform = self._load_audio(audio_path)
-        spec = self._create_transform()(waveform)
-        return [self._fix_length(spec)]
+        del audio_path  # override point; signature documents the contract
+        raise NotImplementedError
+
+    def get_output_shape(self) -> tuple[int, ...]:
+        """Shape of tensors this extractor produces (excluding batch dim). **Override point.**"""
+        raise NotImplementedError
 
     def get_cached_feature_path(self, filename: str, output_dir: Path) -> Path:
         """Resolve the on-disk cache path for one file's feature tensor.
@@ -95,6 +81,9 @@ class SpectrogramExtractor:
         length is None for files skipped because they were already built. Per-file
         skips/failures are counted by the caller, not logged here, to keep the progress
         bar readable; only unexpected exceptions are logged.
+
+        This orchestration is extractor-generic: the only extractor-specific step is the
+        `extract_one` call, dispatched polymorphically to the concrete subclass.
         """
         config = self.dataset_config
         try:
@@ -139,6 +128,58 @@ class SpectrogramExtractor:
         """Load audio with torchcodec, resampling to the target rate and converting to mono."""
         decoder = AudioDecoder(str(audio_path), sample_rate=self.sample_rate, num_channels=1)
         return decoder.get_all_samples().data
+
+
+class SpectrogramExtractor(FeatureExtractor):
+    """Produce log-mel spectrogram tensors from audio files.
+
+    The load -> transform -> fix behavior is identical across all datasets; only the
+    parameter *values* differ, so this is a single concrete class parameterized by its
+    constructor arguments rather than a per-dataset subclass. These are *feature* params
+    (the decode/STFT/mel target), owned by the extractor — not dataset identity.
+
+    The `dataset_config` reference is retained for file-level dataset knowledge used by the
+    build step (get_bad_files, min_audio_file_size), not for params.
+
+    Experiment-level overrides of these defaults come from
+    `AudioLoopConfig.feature_extractor_kwargs` (see `config.get_feature_extractor`).
+    """
+
+    def __init__(
+        self,
+        dataset_config,
+        *,
+        sample_rate: int = 44100,
+        n_fft: int = 1024,
+        hop_length: int = 256,
+        n_mels: int = 128,
+        top_db: int = 80,
+        max_spectrogram_length: int = 2048,
+    ):
+        super().__init__(dataset_config, sample_rate=sample_rate)
+        self.n_fft = n_fft
+        self.hop_length = hop_length
+        self.n_mels = n_mels
+        self.top_db = top_db
+        self.max_spectrogram_length = max_spectrogram_length
+
+    def extract_one(self, audio_path: Path) -> list[torch.Tensor]:
+        """Produce the feature tensor(s) for one audio file: load -> transform -> fix.
+
+        Returns a *list* of feature tensors, one per segment. SpectrogramExtractor does not
+        window *today*, so it returns a single-element list (the N=1 case); a windowed
+        extractor (e.g. Perch's fixed 5s input, or a future spectrogram-windowing mode that
+        tiles long clips instead of center-cropping them in _fix_length) returns one tensor
+        per window. The list is the contract that lets each extractor own its own windowing
+        without the rest of the pipeline knowing the cardinality up front — including, later,
+        this same class once it grows a window_length/hop knob.
+
+        This is the pure audio->tensor core; callers retain their own surrounding policy
+        (existence/corruption guards, caching, stats, filename derivation).
+        """
+        waveform = self._load_audio(audio_path)
+        spec = self._create_transform()(waveform)
+        return [self._fix_length(spec)]
 
     def _create_transform(self) -> nn.Sequential:
         """Build the mel-spectrogram + log-normalize transform pipeline."""
