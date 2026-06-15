@@ -438,10 +438,11 @@ class AudioLoopConfig:
         set of extractors is tiny and the boring dict is the correct minimum. An unknown
         type fails here, the dispatch point, mirroring model_type/stopping_criterion_type.
         """
-        from .feature_extractor import SpectrogramExtractor
+        from .feature_extractor import EmbeddingExtractor, SpectrogramExtractor
 
         extractor_classes = {
             "spectrogram": SpectrogramExtractor,
+            "embedding": EmbeddingExtractor,
         }
         try:
             extractor_class = extractor_classes[self.feature_extractor_type]

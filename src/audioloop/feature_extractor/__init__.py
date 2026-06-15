@@ -8,6 +8,7 @@ so the concretes are re-exported by name (not just the base).
 """
 
 from .base import FeatureExtractor
+from .embedding import EmbeddingExtractor
 from .spectrogram import SpectrogramExtractor
 
-__all__ = ["FeatureExtractor", "SpectrogramExtractor"]
+__all__ = ["EmbeddingExtractor", "FeatureExtractor", "SpectrogramExtractor"]

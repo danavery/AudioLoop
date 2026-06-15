@@ -477,3 +477,10 @@ class TestFeatureExtractorSelection:
         config = AudioLoopConfig(dataset="urbansound8k", feature_extractor_type="bogus")
         with pytest.raises(ValueError, match=r"Unknown feature_extractor_type 'bogus'"):
             config.get_feature_extractor()
+
+    def test_embedding_type_selects_embedding_extractor(self):
+        """feature_extractor_type='embedding' dispatches to EmbeddingExtractor (no backbone load)."""
+        from audioloop.feature_extractor import EmbeddingExtractor
+
+        config = AudioLoopConfig(dataset="urbansound8k", feature_extractor_type="embedding")
+        assert isinstance(config.get_feature_extractor(), EmbeddingExtractor)
