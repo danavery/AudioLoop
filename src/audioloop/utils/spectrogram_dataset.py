@@ -43,6 +43,10 @@ class SpectrogramDataset(torch.utils.data.Dataset):
         self.dataset_config = extractor.dataset_config
         self.samples = []
 
+        # Create-or-verify the extractor's cache subdir + manifest on the read side too: catches
+        # param drift against a pre-built cache, and ensures the subdir exists for lazy generation.
+        self.extractor.ensure_cache_dir(Path(specs_dir))
+
         # Load from CSV file
         self._load_from_csv(csv_file)
 

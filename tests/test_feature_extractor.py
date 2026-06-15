@@ -111,7 +111,8 @@ def test_process_one_skips_already_built(tmp_path, monkeypatch):
     audio.write_bytes(b"ignored")
     out_dir = tmp_path / "specs"
     out_dir.mkdir()
-    # Pre-build the cached spec.
+    # Pre-build the cached spec (ensure_cache_dir creates the extractor's subdir first).
+    fx.ensure_cache_dir(out_dir)
     torch.save(torch.zeros(128, 10), fx.get_cached_feature_path("clip.wav", out_dir))
 
     calls = []
@@ -160,3 +161,38 @@ def test_process_one_missing_audio_is_failure(tmp_path):
 
     assert ok is False
     assert length is None
+
+
+class TestCacheDir:
+    """The per-extractor cache subdir + extractor.json validity manifest."""
+
+    def test_cached_feature_path_includes_subdir(self, tmp_path):
+        """get_cached_feature_path namespaces the .pt under the extractor's cache_subdir."""
+        fx = SpectrogramExtractor(FSD50KConfig())
+        path = fx.get_cached_feature_path("clip.flac", tmp_path)
+        assert path == tmp_path / "spectrogram" / "clip.pt"
+
+    def test_ensure_cache_dir_creates_subdir_and_manifest(self, tmp_path):
+        """A fresh cache root gets the subdir + an extractor.json of class + cache_params."""
+        import json
+
+        fx = SpectrogramExtractor(FSD50KConfig())
+        subdir = fx.ensure_cache_dir(tmp_path)
+
+        assert subdir == tmp_path / "spectrogram"
+        manifest = json.loads((subdir / "extractor.json").read_text())
+        assert manifest["class"] == "SpectrogramExtractor"
+        assert manifest["params"] == fx.cache_params()
+
+    def test_ensure_cache_dir_passes_on_matching_params(self, tmp_path):
+        """Re-running with identical params is a no-op, not an error (resumable builds)."""
+        SpectrogramExtractor(FSD50KConfig()).ensure_cache_dir(tmp_path)
+        # Second call with an equivalent extractor must not raise.
+        SpectrogramExtractor(FSD50KConfig()).ensure_cache_dir(tmp_path)
+
+    def test_ensure_cache_dir_raises_on_param_mismatch(self, tmp_path):
+        """A changed param vs the stored manifest is a loud error (no silent stale reuse)."""
+        SpectrogramExtractor(FSD50KConfig(), n_mels=128).ensure_cache_dir(tmp_path)
+
+        with pytest.raises(ValueError, match="different feature-extractor settings"):
+            SpectrogramExtractor(FSD50KConfig(), n_mels=64).ensure_cache_dir(tmp_path)

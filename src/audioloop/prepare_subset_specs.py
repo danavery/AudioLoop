@@ -30,16 +30,25 @@ def prepare_subset_specs(
     subset_csv: Path,
     output_dir: Path,
     source_specs_dir: Path,
+    cache_subdir: str,
     use_copy: bool = False,
     verbose: bool = True,
 ) -> dict:
     """
     Prepare a subset-specific spectrogram directory.
 
+    Cached features live under a per-extractor subdir (`cache_subdir`) of the cache root, so
+    both the source and the destination are namespaced by it: files are read from
+    `source_specs_dir/<cache_subdir>/` and written to `output_dir/<cache_subdir>/`. This keeps
+    the destination a valid cache root — after syncing `output_dir/` to the remote's specs_dir,
+    the remote dataset finds features at `specs_dir/<cache_subdir>/`. The extractor.json manifest
+    is copied alongside so the remote's `ensure_cache_dir` validation passes.
+
     Args:
         subset_csv: Path to subset CSV file (with 'filename' column)
-        output_dir: Directory to create subset specs in
-        source_specs_dir: Source directory containing all spectrograms (e.g., all_specs)
+        output_dir: Cache root to create subset specs in (the per-extractor subdir is created under it)
+        source_specs_dir: Source cache root containing per-extractor subdirs (e.g., all_specs)
+        cache_subdir: The extractor's cache subdir name (e.g. "spectrogram", "embed_wav2vec2")
         use_copy: If True, copy files instead of hard linking
         verbose: Print progress information
 
@@ -55,8 +64,15 @@ def prepare_subset_specs(
         "skipped_existing": 0,
     }
 
-    # Create output directory
-    output_dir.mkdir(parents=True, exist_ok=True)
+    # Namespace both source and destination by the extractor's cache subdir.
+    source_root = source_specs_dir / cache_subdir
+    dest_root = output_dir / cache_subdir
+    dest_root.mkdir(parents=True, exist_ok=True)
+
+    # Copy the manifest so the remote's ensure_cache_dir validation passes.
+    source_manifest = source_root / "extractor.json"
+    if source_manifest.exists():
+        shutil.copy2(source_manifest, dest_root / "extractor.json")
 
     # Read subset CSV to get filenames
     filenames = []
@@ -73,15 +89,15 @@ def prepare_subset_specs(
 
     if verbose:
         print(f"Preparing subset specs for {len(filenames)} files...")
-        print(f"Source: {source_specs_dir}")
-        print(f"Output: {output_dir}")
+        print(f"Source: {source_root}")
+        print(f"Output: {dest_root}")
         print(f"Method: {'copy' if use_copy else 'hard link'}")
         print()
 
     # Process each file
     for i, filename in enumerate(filenames, 1):
-        source_path = source_specs_dir / filename
-        dest_path = output_dir / filename
+        source_path = source_root / filename
+        dest_path = dest_root / filename
 
         # Skip if destination already exists
         if dest_path.exists():
@@ -189,12 +205,14 @@ Note: --no-o --no-g prevents chown permission errors on remote systems
     if not args.subset_csv.exists():
         parser.error(f"Subset CSV not found: {args.subset_csv}")
 
-    # Get source specs directory (from config if not specified)
-    if args.specs_dir:
-        source_specs_dir = args.specs_dir
-    else:
-        config = AudioLoopConfig()
-        source_specs_dir = config.specs_dir
+    # Config is needed both for the default source dir and for the extractor's cache subdir.
+    config = AudioLoopConfig()
+
+    # Get source specs directory / cache root (from config if not specified)
+    source_specs_dir = args.specs_dir or config.specs_dir
+
+    # The extractor owns the cache subdir name; source/dest are namespaced by it.
+    cache_subdir = config.get_feature_extractor().cache_subdir
 
     # Validate source directory exists
     if not source_specs_dir.exists():
@@ -213,6 +231,7 @@ Note: --no-o --no-g prevents chown permission errors on remote systems
         subset_csv=args.subset_csv,
         output_dir=output_dir,
         source_specs_dir=source_specs_dir,
+        cache_subdir=cache_subdir,
         use_copy=args.use_copy,
         verbose=not args.quiet,
     )

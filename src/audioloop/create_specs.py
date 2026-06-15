@@ -157,12 +157,17 @@ def create_specs(config, dataset_config, clear_output=False, limit=None) -> tupl
     if not dataset_config.audio_root.exists():
         raise FileNotFoundError(f"Audio root directory not found: {dataset_config.audio_root}")
 
-    # Clear and create output directory
-    if clear_output and config.specs_dir.exists():
-        logger.info(f"Clearing existing spectrograms in {config.specs_dir}")
-        shutil.rmtree(config.specs_dir)
+    # Build the extractor first: it owns the cache subdir, so clear/ensure operate on it.
+    extractor = config.get_feature_extractor(dataset_config)
+    cache_dir = config.specs_dir / extractor.cache_subdir
 
-    config.specs_dir.mkdir(parents=True, exist_ok=True)
+    # Clear only THIS extractor's cache subdir (siblings' caches are left intact), then
+    # create-or-verify it (writes/checks extractor.json).
+    if clear_output and cache_dir.exists():
+        logger.info(f"Clearing existing cached features in {cache_dir}")
+        shutil.rmtree(cache_dir)
+
+    extractor.ensure_cache_dir(config.specs_dir)
 
     # Load metadata
     logger.info(f"Loading {dataset_config.__class__.__name__} metadata...")
@@ -177,7 +182,6 @@ def create_specs(config, dataset_config, clear_output=False, limit=None) -> tupl
 
     # Process files
     stats = ProcessingStats()
-    extractor = config.get_feature_extractor(dataset_config)
 
     with tqdm(audio_files, desc="Creating spectrograms") as pbar:
         for file_info in pbar:

@@ -96,6 +96,7 @@ def _write_specs(config, filenames):
     variable-length collate padding on the eval path (not just training).
     """
     extractor = config.get_feature_extractor()
+    extractor.ensure_cache_dir(config.specs_dir)  # create the extractor's cache subdir
     for i, filename in enumerate(filenames):
         spec = torch.randn(1, extractor.n_mels, 30 + 5 * i)
         torch.save(spec, extractor.get_cached_feature_path(filename, config.specs_dir))

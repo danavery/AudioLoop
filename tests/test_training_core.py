@@ -244,6 +244,7 @@ def _build_training_set(config, n_files=8, time_frames=40):
     CSV. Alternating labels guarantee both classes are present for num_classes detection.
     """
     extractor = config.get_feature_extractor()
+    extractor.ensure_cache_dir(config.specs_dir)  # create the extractor's cache subdir
     rows = []
     for i in range(n_files):
         filename = f"clip{i}.wav"
