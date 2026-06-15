@@ -441,7 +441,7 @@ uv run --extra test pytest          # full suite (~5s), no coverage
 uv run --extra test pytest --cov    # with coverage report (fully covered files are hidden)
 ```
 
-Coverage is configured in `pyproject.toml` (`[tool.coverage.*]`) and deliberately **not** in pytest's `addopts`, so single-test iteration stays fast — run `--cov` before committing new modules. Interactive surfaces (`webui/`, `label_audio.py`) are omitted from the percentage; batch CLI entry points are counted so their missing tests stay visible. There is no enforced threshold: the report exists to make new untested code visible, not to gate merges.
+Coverage is configured in `pyproject.toml` (`[tool.coverage.*]`) and deliberately **not** in pytest's `addopts`, so single-test iteration stays fast — run `--cov` before committing new modules. Interactive surfaces (`src/audioloop/webui/`, `src/audioloop/label_audio.py`) are omitted from the percentage; batch CLI entry points are counted so their missing tests stay visible. There is no enforced threshold: the report exists to make new untested code visible, not to gate merges.
 
 Test conventions worth keeping:
 - Tests run hermetically under a temp project root (`setup_project_root` autouse fixture in `conftest.py`) — no real audio, datasets, or network.
