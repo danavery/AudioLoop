@@ -84,7 +84,7 @@ filterwarnings = [
 [tool.coverage.run]
 source = ["src/audioloop"]
 omit = [
-    # Interactive surfaces only — batch CLI entry points (train.py, create_specs.py, ...)
+    # Interactive surfaces only — batch CLI entry points (train.py, build_features.py, ...)
     # stay counted so their missing tests remain visible in the report.
     "src/audioloop/webui/*",
     "src/audioloop/label_audio.py",

@@ -23,7 +23,7 @@ class ProcessingStats:
         self.successful = 0
         self.failed = 0
         self.processing_times = []
-        self.spectrogram_lengths = []
+        self.feature_lengths = []
         self.start_time = time.time()
 
     def record_success(self, processing_time: float | None = None, spec_length: int | None = None):
@@ -32,7 +32,7 @@ class ProcessingStats:
         if processing_time:
             self.processing_times.append(processing_time)
         if spec_length:
-            self.spectrogram_lengths.append(spec_length)
+            self.feature_lengths.append(spec_length)
 
     def record_failure(self):
         """Record a failed processing."""
@@ -54,15 +54,15 @@ class ProcessingStats:
         if self.processing_times:
             summary.append(f"Average processing time: {avg_time:.3f}s per file")
 
-        if self.spectrogram_lengths:
+        if self.feature_lengths:
             summary.append("")
-            summary.append("Spectrogram length statistics:")
-            summary.append(f"  Count: {len(self.spectrogram_lengths)}")
-            summary.append(f"  Min: {min(self.spectrogram_lengths)}")
-            summary.append(f"  Max: {max(self.spectrogram_lengths)}")
-            summary.append(f"  Mean: {statistics.mean(self.spectrogram_lengths):.1f}")
-            summary.append(f"  Median: {statistics.median(self.spectrogram_lengths):.1f}")
-            summary.append(f"  Std Dev: {statistics.stdev(self.spectrogram_lengths):.1f}")
+            summary.append("Feature length statistics:")
+            summary.append(f"  Count: {len(self.feature_lengths)}")
+            summary.append(f"  Min: {min(self.feature_lengths)}")
+            summary.append(f"  Max: {max(self.feature_lengths)}")
+            summary.append(f"  Mean: {statistics.mean(self.feature_lengths):.1f}")
+            summary.append(f"  Median: {statistics.median(self.feature_lengths):.1f}")
+            summary.append(f"  Std Dev: {statistics.stdev(self.feature_lengths):.1f}")
 
             # Add histogram
             summary.extend(self._create_length_histogram())
@@ -70,11 +70,11 @@ class ProcessingStats:
         return "\n".join(summary)
 
     def _create_length_histogram(self) -> list[str]:
-        """Create a text-based histogram of spectrogram lengths."""
-        if not self.spectrogram_lengths:
+        """Create a text-based histogram of feature lengths."""
+        if not self.feature_lengths:
             return []
 
-        lengths = sorted(self.spectrogram_lengths)
+        lengths = sorted(self.feature_lengths)
         min_len = min(lengths)
         max_len = max(lengths)
 
@@ -93,7 +93,7 @@ class ProcessingStats:
 
         # Handle edge case where all lengths are the same
         if bin_width == 0:
-            return ["", f"All spectrograms have the same length: {min_len}"]
+            return ["", f"All features have the same length: {min_len}"]
         bins = [0] * num_bins
 
         # Count items in each bin
@@ -136,14 +136,14 @@ class ProcessingStats:
         return histogram
 
 
-def create_specs(config, dataset_config, clear_output=False, limit=None) -> tuple[int, int]:
+def build_features(config, dataset_config, clear_output=False, limit=None) -> tuple[int, int]:
     """
-    Create spectrograms for any dataset using the provided configurations.
+    Build cached features for any dataset using the provided configurations.
 
     Args:
-        config: Central AudioLoopConfig for output directory (specs_dir)
+        config: Central AudioLoopConfig for output directory (feature_cache_dir)
         dataset_config: Dataset configuration that handles dataset-specific operations
-        clear_output: Whether to clear existing spectrograms before processing (default: False to cache specs)
+        clear_output: Whether to clear existing cached features before processing (default: False to keep the cache)
         limit: Optional limit on number of files to process (for testing)
 
     Returns:
@@ -159,7 +159,7 @@ def create_specs(config, dataset_config, clear_output=False, limit=None) -> tupl
 
     # Build the extractor first: it owns the cache subdir, so clear/ensure operate on it.
     extractor = config.get_feature_extractor(dataset_config)
-    cache_dir = config.specs_dir / extractor.cache_subdir
+    cache_dir = config.feature_cache_dir / extractor.cache_subdir
 
     # Clear only THIS extractor's cache subdir (siblings' caches are left intact), then
     # create-or-verify it (writes/checks extractor.json).
@@ -167,7 +167,7 @@ def create_specs(config, dataset_config, clear_output=False, limit=None) -> tupl
         logger.info(f"Clearing existing cached features in {cache_dir}")
         shutil.rmtree(cache_dir)
 
-    extractor.ensure_cache_dir(config.specs_dir)
+    extractor.ensure_cache_dir(config.feature_cache_dir)
 
     # Load metadata
     logger.info(f"Loading {dataset_config.__class__.__name__} metadata...")
@@ -183,11 +183,11 @@ def create_specs(config, dataset_config, clear_output=False, limit=None) -> tupl
     # Process files
     stats = ProcessingStats()
 
-    with tqdm(audio_files, desc="Creating spectrograms") as pbar:
+    with tqdm(audio_files, desc="Building features") as pbar:
         for file_info in pbar:
             start_time = time.time()
 
-            success, spec_length = extractor.process_one(file_info, config.specs_dir)
+            success, spec_length = extractor.process_one(file_info, config.feature_cache_dir)
 
             processing_time = time.time() - start_time
 
@@ -206,7 +206,7 @@ def create_specs(config, dataset_config, clear_output=False, limit=None) -> tupl
 
     # Print summary
     logger.info("\n" + stats.summary())
-    logger.info(f"Output directory: {config.specs_dir}")
+    logger.info(f"Output directory: {config.feature_cache_dir}")
 
     return stats.successful, stats.failed
 
@@ -219,7 +219,7 @@ def create_inference_csv(config, dataset_config, limit=None) -> Path:
     Args:
         config: Central AudioLoopConfig for output path
         dataset_config: Dataset configuration that handles dataset-specific operations
-        limit: Optional limit on number of files to include (should match create_specs limit)
+        limit: Optional limit on number of files to include (should match build_features limit)
 
     Returns:
         Path to created inference CSV
@@ -227,7 +227,7 @@ def create_inference_csv(config, dataset_config, limit=None) -> Path:
     # Load metadata
     audio_files = dataset_config.load_metadata()
 
-    # Apply limit if specified (should match what was used in create_specs)
+    # Apply limit if specified (should match what was used in build_features)
     if limit is not None:
         audio_files = audio_files[:limit]
 
@@ -257,21 +257,21 @@ def create_inference_csv(config, dataset_config, limit=None) -> Path:
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Create spectrograms for audio datasets",
+        description="Build cached features for audio datasets",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Process FSD50K dataset (keeps existing specs as cache)
-  python -m audioloop.create_specs
+  # Process FSD50K dataset (keeps existing cache)
+  python -m audioloop.build_features
 
   # Process UrbanSound8K dataset
-  python -m audioloop.create_specs --dataset urbansound8k
+  python -m audioloop.build_features --dataset urbansound8k
 
-  # Clear existing spectrograms before processing
-  python -m audioloop.create_specs --clear
+  # Clear existing cached features before processing
+  python -m audioloop.build_features --clear
 
   # Process only first 100 files (for testing)
-  python -m audioloop.create_specs --limit 100
+  python -m audioloop.build_features --limit 100
         """,
     )
 
@@ -290,7 +290,7 @@ Examples:
     parser.add_argument(
         "--clear",
         action="store_true",
-        help="Clear existing spectrograms before processing (default: keep as cache)",
+        help="Clear existing cached features before processing (default: keep as cache)",
     )
 
     parser.add_argument(
@@ -328,8 +328,8 @@ Examples:
 
     logger.info(f"Processing {dataset_name} dataset")
 
-    # Create spectrograms
-    successful, _ = create_specs(
+    # Build features
+    successful, _ = build_features(
         config, dataset_config, clear_output=args.clear, limit=args.limit
     )
 
@@ -339,7 +339,7 @@ Examples:
         logger.info(f"Ready for inference! Use: {inference_csv}")
         return 0
 
-    logger.error("No spectrograms were created successfully")
+    logger.error("No features were created successfully")
     return 1
 
 

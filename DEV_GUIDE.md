@@ -67,9 +67,9 @@ AudioLoop uses a pluggable strategy pattern for candidate selection:
 - **`training_core.py`**: Core training logic with automatic versioning and pluggable stopping criteria
 - **`label_audio.py`**: Terminal-based audio labeling interface with multi-dataset support
 - **`merge_labels.py`**: Combines human labels with training sets
-- **`create_specs.py`**: Preprocesses audio into spectrograms (optional with lazy generation)
+- **`build_features.py`**: Preprocesses audio into spectrograms (optional with lazy generation)
 - **`create_subset.py`**: CLI tool for creating training-ready dataset subsets with binary classification labels
-- **`prepare_subset_specs.py`**: Creates subset-specific spectrogram directories for efficient remote deployment (hard links or copies)
+- **`prepare_subset_features.py`**: Creates subset-specific spectrogram directories for efficient remote deployment (hard links or copies)
 - **`track_metrics.py`**: Comprehensive metrics tracking and visualization (accuracy, F1, precision, recall, confidence, entropy) across active learning cycles
 - **`config.py`**: Unified configuration system coordinating paths, datasets, and experiments
 - **`utils/create_bootstrap_set.py`**: Bootstrap training set creation from ground truth (evaluation mode only)
@@ -129,7 +129,7 @@ The `variable_length_collate_fn` handles different lengths by padding to the lon
 This system allows for domain-specific optimizations (e.g., whale calls with fewer frequency bins and longer time windows) while maintaining a robust and flexible training pipeline.
 
 ### Data Pipeline
-- **`utils/spectrogram_dataset.py`**: Unified dataset loader for multiple CSV formats
+- **`utils/cached_feature_dataset.py`**: Unified dataset loader for multiple CSV formats
 - **`utils/data_utils.py`**: Core utilities (device selection, collate functions, entropy)
 - **`utils/log_normalize.py`**: Spectrogram normalization transform
 
@@ -166,7 +166,7 @@ config = AudioLoopConfig(experiment_name="my_exp", dataset="urbansound8k")
 # Access all path locations
 config.output_dir          # outputs/my_exp/
 config.training_sets_dir   # training_sets/my_exp/
-config.specs_dir          # data/all_specs/
+config.feature_cache_dir          # data/feature_cache/
 
 # Generate versioned file paths
 config.get_model_path(1)        # outputs/my_exp/model_v1.pt
@@ -208,7 +208,7 @@ Customize paths and behavior via environment variables:
 - `AUDIOLOOP_DATASET`: Default dataset (`fsd50k` or `urbansound8k`)
 - `AUDIOLOOP_DATA_ROOT`: Root directory for data files (default: `data`)
 - `AUDIOLOOP_OUTPUT_ROOT`: Root directory for outputs (default: `.`)
-- `AUDIOLOOP_SPECS_DIR`: Spectrograms subdirectory (default: `all_specs`). Env var fallback; prefer `specs_dir_path` in yaml.
+- `AUDIOLOOP_SPECS_DIR`: Spectrograms subdirectory (default: `feature_cache`). Env var fallback; prefer `feature_cache_dir_path` in yaml.
 
 ### Sound Classification
 - **`datasets/fsd50k.py`**: FSD50K class mappings (200 classes with semantic groupings)
@@ -219,7 +219,7 @@ Customize paths and behavior via environment variables:
 
 ### Production Mode (Default)
 1. **Subset Creation** (optional, for large datasets): Create manageable subsets via `create_subset.py`
-2. **Preprocessing** (optional): Raw audio → spectrograms via `create_specs.py`, or use lazy generation
+2. **Preprocessing** (optional): Raw audio → spectrograms via `build_features.py`, or use lazy generation
 3. **Initial Training Set**: User-provided labeled dataset
 4. **Model Training**: Small labeled set → CNN model via `train.py` (with lazy spec generation if audio_path provided)
 5. **Active Learning**: Model predictions on ALL files → candidate selection via `active_learning.py`
@@ -230,7 +230,7 @@ Customize paths and behavior via environment variables:
 
 ### Evaluation Mode (Research/Testing)
 1. **Subset Creation** (optional, for large datasets): Create manageable subsets via `create_subset.py`
-2. **Preprocessing** (optional): Raw audio → spectrograms via `create_specs.py`, or use lazy generation
+2. **Preprocessing** (optional): Raw audio → spectrograms via `build_features.py`, or use lazy generation
 3. **Bootstrap Training Set**: Sample from ground truth via `utils/create_bootstrap_set.py`
 4. **Model Training**: Small labeled set → CNN model via `train.py` (with lazy spec generation if audio_path provided)
 5. **Active Learning**: Model predictions with ground truth → candidate selection via `active_learning.py --with-ground-truth`
@@ -259,7 +259,7 @@ clip_001.pt,1,/path/to/audio/clip_001.wav
 Merged (from `merge_labels`):
 ```csv
 filename,label
-data/all_specs/100032-3-0-0.pt,1
+data/feature_cache/100032-3-0-0.pt,1
 ```
 
 ### Predictions CSV (Generated)
@@ -422,7 +422,7 @@ AudioLoop supports creating training-ready subsets from large datasets, lazy spe
 See **[docs/custom_datasets.md](docs/custom_datasets.md)** for subsetting, lazy generation, and remote deployment workflows.
 
 ### Spectrogram Preprocessing
-Audio is converted to variable-length mel-spectrograms with log normalization, stored as PyTorch tensors for efficient loading. Spectrograms can be pre-generated via `create_specs.py` or generated on-demand during training via lazy generation.
+Audio is converted to variable-length mel-spectrograms with log normalization, stored as PyTorch tensors for efficient loading. Spectrograms can be pre-generated via `build_features.py` or generated on-demand during training via lazy generation.
 
 ### Stopping Criteria
 AudioLoop uses pluggable Strategy patterns for both training stopping (within a cycle) and cycle stopping (across cycles):

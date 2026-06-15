@@ -1,8 +1,8 @@
 """`SpectrogramExtractor`: the log-mel spectrogram concrete (load -> transform -> fix).
 
 Owns the audio-processing parameters (sample_rate, n_fft, ...) that previously lived on
-`DatasetConfig`, and is the unification point for the offline build path (`create_specs`)
-and the lazy path (`SpectrogramDataset`). Params are constructor defaults; experiment-level
+`DatasetConfig`, and is the unification point for the offline build path (`build_features`)
+and the lazy path (`CachedFeatureDataset`). Params are constructor defaults; experiment-level
 overrides come from `AudioLoopConfig.feature_extractor_kwargs` (see
 `config.get_feature_extractor`), which constructs the extractor once and flows it into both
 build paths consistently.

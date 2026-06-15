@@ -21,7 +21,7 @@ Basic Usage:
     # Access organized paths
     config.output_dir          # outputs/test/
     config.training_sets_dir   # training_sets/test/
-    config.specs_dir          # data/all_specs/
+    config.feature_cache_dir          # data/feature_cache/
 
     # Generate versioned paths
     config.get_model_path(1)        # outputs/test/model_v1.pt
@@ -47,7 +47,7 @@ Environment Variables:
     AUDIOLOOP_DATASET: Default dataset ('fsd50k' or 'urbansound8k')
     AUDIOLOOP_DATA_ROOT: Root directory for data files (default: 'data')
     AUDIOLOOP_OUTPUT_ROOT: Root directory for outputs (default: '.')
-    AUDIOLOOP_SPECS_DIR: Spectrograms subdirectory (default: 'all_specs')
+    AUDIOLOOP_SPECS_DIR: Spectrograms subdirectory (default: 'feature_cache')
 """
 
 import os
@@ -58,9 +58,9 @@ from typing import Any
 from .datasets.dataset_config import DatasetConfig
 from .utils.paths import (
     create_output_directories,
+    get_feature_cache_dir,
     get_output_dir,
     get_project_root,
-    get_specs_dir,
     get_training_sets_dir,
 )
 
@@ -76,7 +76,7 @@ class AudioLoopConfig:
     # Dataset configuration (environment variable support)
     dataset: str = field(default_factory=lambda: os.getenv("AUDIOLOOP_DATASET", "fsd50k"))
     subset_csv: Path | None = None  # Optional subset CSV to restrict dataset files
-    specs_dir_path: str | None = None  # Spectrogram dir (relative to project root, or absolute)
+    feature_cache_dir_path: str | None = None  # Feature-cache dir (relative to project root, or absolute)
 
     # Training parameters (experiment configuration)
     max_epochs: int = 1000
@@ -385,12 +385,12 @@ class AudioLoopConfig:
         return get_training_sets_dir(self.experiment_name)
 
     @property
-    def specs_dir(self) -> Path:
-        """Get the spectrograms directory."""
-        if self.specs_dir_path is not None:
-            p = Path(self.specs_dir_path)
+    def feature_cache_dir(self) -> Path:
+        """Get the feature-cache directory (holds each extractor's per-subdir .pt cache)."""
+        if self.feature_cache_dir_path is not None:
+            p = Path(self.feature_cache_dir_path)
             return p if p.is_absolute() else get_project_root() / p
-        return get_specs_dir()
+        return get_feature_cache_dir()
 
     def get_model_path(self, version: int) -> Path:
         """Get path for a model file."""
@@ -430,7 +430,7 @@ class AudioLoopConfig:
 
         This is the config-scoped construction point: feature_extractor_type selects the
         extractor class and feature_extractor_kwargs (sample_rate, n_fft, n_mels, ...) come
-        from the experiment config, so offline (create_specs) and lazy (SpectrogramDataset)
+        from the experiment config, so offline (build_features) and lazy (CachedFeatureDataset)
         builds share identical params. Pass an existing dataset_config to reuse it;
         otherwise one is built from this config.
 

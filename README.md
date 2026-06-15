@@ -65,7 +65,7 @@ mv UrbanSound8K/metadata/UrbanSound8K.csv ${PROJECT_DIR}/data/urbansound8k
 ### 5. Generate spectrograms
 
 ```bash
-python -m audioloop.create_specs
+python -m audioloop.build_features
 ```
 
 ### 6. Create a seed training set 
@@ -118,9 +118,9 @@ All actions are run as `python -m audioloop.<action>`. Use `--help` on any actio
 | `webui` | Web-based labeling interface (recommended) |
 | `merge_labels` | Merge human labels back into a training set |
 | `auto_label_candidates` | Auto-label candidates from ground truth (evaluation mode) |
-| `create_specs` | Pre-generate spectrograms from audio files |
+| `build_features` | Pre-generate spectrograms from audio files |
 | `create_subset` | Create a training-ready subset from a large dataset |
-| `prepare_subset_specs` | Create a subset-specific spectrogram directory for remote deployment |
+| `prepare_subset_features` | Create a subset-specific spectrogram directory for remote deployment |
 | `track_metrics` | View and plot learning curves across cycles |
 | `init_project` | Initialize a new project directory |
 | `utils.create_bootstrap_set` | Create an initial seed training set |

@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class FeatureExtractor:
     """Shared base: the build orchestration common to every extractor.
 
-    Owns `process_one` (the offline create_specs build step) and its guards, `_load_audio`
+    Owns `process_one` (the offline build_features build step) and its guards, `_load_audio`
     (decode/resample/mono to `self.sample_rate`), `get_cached_feature_path` (the .pt cache
     artifact path), and `ensure_cache_dir` (the per-extractor cache subdir + `extractor.json`
     validity stamp) — all verified extractor-generic: they touch only dataset_config
@@ -94,9 +94,9 @@ class FeatureExtractor:
         writes a manifest of {class name, cache_params()}. On an existing subdir, STRICT-compares
         the stored manifest against the current one and raises ValueError on any difference —
         turning a silent train-on-stale-features bug (e.g. a changed n_mels reusing old .pt files)
-        into a loud error. The escape hatch is rebuilding with `create_specs --clear`.
+        into a loud error. The escape hatch is rebuilding with `build_features --clear`.
 
-        Called ONCE per build/load by the orchestrators (create_specs, SpectrogramDataset), not
+        Called ONCE per build/load by the orchestrators (build_features, CachedFeatureDataset), not
         per file — per-file directory creation is handled cheaply by process_one / the lazy path.
         """
         subdir = Path(output_dir) / self.cache_subdir
@@ -115,7 +115,7 @@ class FeatureExtractor:
                     f"Cache at {subdir} was built with different feature-extractor settings.\n"
                     f"  stored:  {stored}\n"
                     f"  current: {current}\n"
-                    f"Rebuild with `create_specs --clear` to regenerate this extractor's cache."
+                    f"Rebuild with `build_features --clear` to regenerate this extractor's cache."
                 )
         else:
             # Subdir exists without a manifest (e.g. a pre-manifest cache): stamp one now.
@@ -123,7 +123,7 @@ class FeatureExtractor:
         return subdir
 
     def process_one(self, file_info: dict, output_dir: Path) -> tuple[bool, int | None]:
-        """Build and cache one file's feature tensor: the offline (create_specs) build step.
+        """Build and cache one file's feature tensor: the offline (build_features) build step.
 
         Applies all guards uniformly before extraction — resumable skip, audio existence,
         the dataset's known-bad files, and minimum file size — then runs extract_one and
@@ -141,7 +141,7 @@ class FeatureExtractor:
             filename = file_info["filename"]
             output_path = self.get_cached_feature_path(filename, output_dir)
 
-            # Resumable: skip files already built (forced rebuild via create_specs clear_output).
+            # Resumable: skip files already built (forced rebuild via build_features clear_output).
             if output_path.exists():
                 return True, None
 

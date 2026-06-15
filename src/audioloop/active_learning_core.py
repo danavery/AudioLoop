@@ -11,13 +11,13 @@ from torch.utils.data import DataLoader
 from tqdm import tqdm
 
 from .models.model_registry import get_model_class, list_available_models
+from .utils.cached_feature_dataset import CachedFeatureDataset
 from .utils.candidate_selection import (
     load_predictions,
     print_selection_statistics,
     save_candidates,
 )
 from .utils.data_utils import entropy, get_device, variable_length_collate_fn
-from .utils.spectrogram_dataset import SpectrogramDataset
 
 # Set up logger for this module
 logger = logging.getLogger(__name__)
@@ -139,7 +139,7 @@ def run_binary_inference(
                     continue
 
                 # Resolve the cached-feature path via the extractor
-                spec_path = extractor.get_cached_feature_path(item["filename"], config.specs_dir)
+                spec_path = extractor.get_cached_feature_path(item["filename"], config.feature_cache_dir)
                 spec_filename = spec_path.name
 
                 # Skip if already in training set
@@ -180,8 +180,8 @@ def run_binary_inference(
 
         # Load dataset from temporary CSV with lazy generation support
         extractor = config.get_feature_extractor(dataset_config)
-        dataset = SpectrogramDataset(
-            csv_file=str(temp_csv), extractor=extractor, specs_dir=str(config.specs_dir)
+        dataset = CachedFeatureDataset(
+            csv_file=str(temp_csv), extractor=extractor, feature_cache_dir=str(config.feature_cache_dir)
         )
 
         # Binary classification

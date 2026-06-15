@@ -18,12 +18,12 @@ from audioloop.active_learning_core import load_model
 from audioloop.config import AudioLoopConfig
 from audioloop.models.simplecnn import SimpleCnn
 from audioloop.training_core import execute_training_loop, run_training, setup_loss_criterion
-from audioloop.utils.spectrogram_dataset import SpectrogramDataset
+from audioloop.utils.cached_feature_dataset import CachedFeatureDataset
 from audioloop.utils.stopping_criteria import AccuracyCriterion, PlateauCriterion
 
 
 class _FakeTrainDataset:
-    """Minimal stand-in for SpectrogramDataset.
+    """Minimal stand-in for CachedFeatureDataset.
 
     setup_loss_criterion only reads `.samples` (for the per-sample labels) and `len(...)`
     (for the total), so a list of {"label": ...} dicts is a faithful substitute that keeps
@@ -43,11 +43,11 @@ _CPU = torch.device("cpu")
 def _criterion_for(config: AudioLoopConfig, labels: list[int]) -> torch.nn.CrossEntropyLoss:
     """Build the loss criterion for a config + label distribution via the real factory.
 
-    Casts the lightweight fake to SpectrogramDataset (setup_loss_criterion only touches the
+    Casts the lightweight fake to CachedFeatureDataset (setup_loss_criterion only touches the
     duck-typed surface) and narrows the nn.Module return to CrossEntropyLoss so callers can
     read `.weight` directly — and so the test pins the factory's return contract.
     """
-    dataset = cast(SpectrogramDataset, _FakeTrainDataset(labels))
+    dataset = cast(CachedFeatureDataset, _FakeTrainDataset(labels))
     criterion = setup_loss_criterion(config, dataset, _CPU)
     assert isinstance(criterion, torch.nn.CrossEntropyLoss)
     return criterion
@@ -173,7 +173,7 @@ def _run_scripted_loop(monkeypatch, epoch_results, stopping_criterion, max_epoch
         stopping_criterion=stopping_criterion,
         scheduler=None,
         config=AudioLoopConfig(max_epochs=max_epochs),
-        train_dataset=cast(SpectrogramDataset, None),  # floor is explicit, so never read
+        train_dataset=cast(CachedFeatureDataset, None),  # floor is explicit, so never read
     )
 
 
@@ -240,19 +240,19 @@ def _build_training_set(config, n_files=8, time_frames=40):
     """Materialize a tiny pre-built training set in the fake project root.
 
     Writes random (1, n_mels, T) tensors at the exact cache paths the extractor resolves
-    (so SpectrogramDataset takes the cached-load path, no audio decoding) plus the labels
+    (so CachedFeatureDataset takes the cached-load path, no audio decoding) plus the labels
     CSV. Alternating labels guarantee both classes are present for num_classes detection.
     """
     extractor = config.get_feature_extractor()
-    extractor.ensure_cache_dir(config.specs_dir)  # create the extractor's cache subdir
+    extractor.ensure_cache_dir(config.feature_cache_dir)  # create the extractor's cache subdir
     rows = []
     for i in range(n_files):
         filename = f"clip{i}.wav"
         spec = torch.randn(1, extractor.n_mels, time_frames)
-        torch.save(spec, extractor.get_cached_feature_path(filename, config.specs_dir))
+        torch.save(spec, extractor.get_cached_feature_path(filename, config.feature_cache_dir))
         rows.append({"filename": filename, "label": i % 2})
 
-    csv_path = config.specs_dir.parent / "training_set.csv"
+    csv_path = config.feature_cache_dir.parent / "training_set.csv"
     with csv_path.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=["filename", "label"])
         writer.writeheader()

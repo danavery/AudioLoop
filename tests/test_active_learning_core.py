@@ -2,7 +2,7 @@
 
 The seam is the dataset config's enumeration surface (load_metadata / get_bad_files), stubbed
 on a real FSD50KConfig instance. Everything else is the production path: extractor cache-path
-resolution, the temp-CSV filter step, SpectrogramDataset, variable-length collate, the real
+resolution, the temp-CSV filter step, CachedFeatureDataset, variable-length collate, the real
 model forward pass, and the CSV writer whose schema the candidate-selection suite consumes.
 """
 
@@ -96,10 +96,10 @@ def _write_specs(config, filenames):
     variable-length collate padding on the eval path (not just training).
     """
     extractor = config.get_feature_extractor()
-    extractor.ensure_cache_dir(config.specs_dir)  # create the extractor's cache subdir
+    extractor.ensure_cache_dir(config.feature_cache_dir)  # create the extractor's cache subdir
     for i, filename in enumerate(filenames):
         spec = torch.randn(1, extractor.n_mels, 30 + 5 * i)
-        torch.save(spec, extractor.get_cached_feature_path(filename, config.specs_dir))
+        torch.save(spec, extractor.get_cached_feature_path(filename, config.feature_cache_dir))
 
 
 def _metadata_rows(n_files):

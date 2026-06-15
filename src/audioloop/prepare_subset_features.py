@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
-Prepare subset-specific spectrogram directories for efficient remote deployment.
+Prepare subset-specific feature-cache directories for efficient remote deployment.
 
-Creates a directory containing only the spectrograms needed for a specific subset,
+Creates a directory containing only the cached features needed for a specific subset,
 using hard links (zero storage overhead) or copies as fallback. This enables
-efficient syncing to remote training environments without transferring all_specs.
+efficient syncing to remote training environments without transferring feature_cache.
 
 Workflow:
-    1. Local: Create subset directory with hard links from all_specs
+    1. Local: Create subset directory with hard links from feature_cache
     2. Sync: rsync subset directory to remote pod
-    3. Remote: Train using subset directory as specs_dir
+    3. Remote: Train using subset directory as feature_cache_dir
 
 Usage:
-    python -m audioloop.prepare_subset_specs subsets/audioset_dog_100k.csv
-    python -m audioloop.prepare_subset_specs subsets/audioset_dog_100k.csv --output-dir data/subset_specs/dog_100k
-    python -m audioloop.prepare_subset_specs subsets/audioset_dog_100k.csv --use-copy
+    python -m audioloop.prepare_subset_features subsets/audioset_dog_100k.csv
+    python -m audioloop.prepare_subset_features subsets/audioset_dog_100k.csv --output-dir data/subset_features/dog_100k
+    python -m audioloop.prepare_subset_features subsets/audioset_dog_100k.csv --use-copy
 """
 
 import argparse
@@ -26,28 +26,28 @@ from pathlib import Path
 from .config import AudioLoopConfig
 
 
-def prepare_subset_specs(
+def prepare_subset_features(
     subset_csv: Path,
     output_dir: Path,
-    source_specs_dir: Path,
+    source_feature_cache_dir: Path,
     cache_subdir: str,
     use_copy: bool = False,
     verbose: bool = True,
 ) -> dict:
     """
-    Prepare a subset-specific spectrogram directory.
+    Prepare a subset-specific feature-cache directory.
 
     Cached features live under a per-extractor subdir (`cache_subdir`) of the cache root, so
     both the source and the destination are namespaced by it: files are read from
-    `source_specs_dir/<cache_subdir>/` and written to `output_dir/<cache_subdir>/`. This keeps
-    the destination a valid cache root — after syncing `output_dir/` to the remote's specs_dir,
-    the remote dataset finds features at `specs_dir/<cache_subdir>/`. The extractor.json manifest
+    `source_feature_cache_dir/<cache_subdir>/` and written to `output_dir/<cache_subdir>/`. This keeps
+    the destination a valid cache root — after syncing `output_dir/` to the remote's feature_cache_dir,
+    the remote dataset finds features at `feature_cache_dir/<cache_subdir>/`. The extractor.json manifest
     is copied alongside so the remote's `ensure_cache_dir` validation passes.
 
     Args:
         subset_csv: Path to subset CSV file (with 'filename' column)
         output_dir: Cache root to create subset specs in (the per-extractor subdir is created under it)
-        source_specs_dir: Source cache root containing per-extractor subdirs (e.g., all_specs)
+        source_feature_cache_dir: Source cache root containing per-extractor subdirs (e.g., feature_cache)
         cache_subdir: The extractor's cache subdir name (e.g. "spectrogram", "embed_wav2vec2")
         use_copy: If True, copy files instead of hard linking
         verbose: Print progress information
@@ -65,7 +65,7 @@ def prepare_subset_specs(
     }
 
     # Namespace both source and destination by the extractor's cache subdir.
-    source_root = source_specs_dir / cache_subdir
+    source_root = source_feature_cache_dir / cache_subdir
     dest_root = output_dir / cache_subdir
     dest_root.mkdir(parents=True, exist_ok=True)
 
@@ -144,28 +144,28 @@ def prepare_subset_specs(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Prepare subset-specific spectrogram directory for efficient remote deployment",
+        description="Prepare subset-specific feature-cache directory for efficient remote deployment",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   # Create subset specs directory with hard links (zero storage overhead)
-  python -m audioloop.prepare_subset_specs subsets/audioset_dog_100k.csv
+  python -m audioloop.prepare_subset_features subsets/audioset_dog_100k.csv
 
   # Custom output directory
-  python -m audioloop.prepare_subset_specs subsets/audioset_dog_100k.csv \\
-      --output-dir data/subset_specs/dog_100k
+  python -m audioloop.prepare_subset_features subsets/audioset_dog_100k.csv \\
+      --output-dir data/subset_features/dog_100k
 
   # Use copying instead of hard links (for different filesystems)
-  python -m audioloop.prepare_subset_specs subsets/audioset_dog_100k.csv --use-copy
+  python -m audioloop.prepare_subset_features subsets/audioset_dog_100k.csv --use-copy
 
   # Specify custom source specs directory
-  python -m audioloop.prepare_subset_specs subsets/audioset_dog_100k.csv \\
-      --specs-dir /path/to/all_specs
+  python -m audioloop.prepare_subset_features subsets/audioset_dog_100k.csv \\
+      --feature-cache-dir /path/to/feature_cache
 
 Deployment Workflow:
   1. Create subset-specific specs directory (this tool)
-  2. Sync to remote: rsync -avz --no-o --no-g data/subset_specs/dog_100k/ pod:/workspace/data/specs/
-  3. Train on remote: python -m audioloop.train subset.csv --specs-dir /workspace/data/specs
+  2. Sync to remote: rsync -avz --no-o --no-g data/subset_features/dog_100k/ pod:/workspace/data/feature_cache/
+  3. Train on remote: python -m audioloop.train subset.csv --feature-cache-dir /workspace/data/feature_cache
 
 Note: --no-o --no-g prevents chown permission errors on remote systems
         """,
@@ -180,13 +180,13 @@ Note: --no-o --no-g prevents chown permission errors on remote systems
         "--output-dir",
         type=Path,
         default=None,
-        help="Output directory for subset specs (default: data/subset_specs/SUBSET_NAME)",
+        help="Output directory for subset specs (default: data/subset_features/SUBSET_NAME)",
     )
     parser.add_argument(
-        "--specs-dir",
+        "--feature-cache-dir",
         type=Path,
         default=None,
-        help="Source specs directory (default: from AudioLoopConfig, usually data/all_specs)",
+        help="Source specs directory (default: from AudioLoopConfig, usually data/feature_cache)",
     )
     parser.add_argument(
         "--use-copy",
@@ -209,28 +209,28 @@ Note: --no-o --no-g prevents chown permission errors on remote systems
     config = AudioLoopConfig()
 
     # Get source specs directory / cache root (from config if not specified)
-    source_specs_dir = args.specs_dir or config.specs_dir
+    source_feature_cache_dir = args.feature_cache_dir or config.feature_cache_dir
 
     # The extractor owns the cache subdir name; source/dest are namespaced by it.
     cache_subdir = config.get_feature_extractor().cache_subdir
 
     # Validate source directory exists
-    if not source_specs_dir.exists():
-        parser.error(f"Source specs directory not found: {source_specs_dir}")
+    if not source_feature_cache_dir.exists():
+        parser.error(f"Source specs directory not found: {source_feature_cache_dir}")
 
     # Determine output directory (from subset CSV name if not specified)
     if args.output_dir:
         output_dir = args.output_dir
     else:
-        # Default: data/subset_specs/SUBSET_NAME (without .csv extension)
+        # Default: data/subset_features/SUBSET_NAME (without .csv extension)
         subset_name = args.subset_csv.stem
-        output_dir = Path("data/subset_specs") / subset_name
+        output_dir = Path("data/subset_features") / subset_name
 
     # Prepare subset specs
-    stats = prepare_subset_specs(
+    stats = prepare_subset_features(
         subset_csv=args.subset_csv,
         output_dir=output_dir,
-        source_specs_dir=source_specs_dir,
+        source_feature_cache_dir=source_feature_cache_dir,
         cache_subdir=cache_subdir,
         use_copy=args.use_copy,
         verbose=not args.quiet,

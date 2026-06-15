@@ -10,7 +10,7 @@
 # ------------------------------------------------------------------------------
 # dataset: fsd50k                  # Options: fsd50k, urbansound8k, audioset, or your custom dataset
 # subset_csv:                      # Restrict to subset CSV (created by create_subset)
-# specs_dir_path: data/all_specs   # Spectrogram directory (relative to project root, or absolute)
+# feature_cache_dir_path: data/feature_cache   # Spectrogram directory (relative to project root, or absolute)
 
 # ------------------------------------------------------------------------------
 # Training Parameters

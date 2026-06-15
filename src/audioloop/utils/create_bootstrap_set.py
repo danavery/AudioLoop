@@ -89,7 +89,7 @@ def get_matching_samples(
                 )
                 if audio_path.exists():
                     spec_path = extractor.get_cached_feature_path(
-                        item["filename"], config.specs_dir
+                        item["filename"], config.feature_cache_dir
                     )
                     matching_samples.append(
                         {
@@ -110,7 +110,7 @@ def get_matching_samples(
         )
         if audio_path.exists():
             # Resolve the cached-feature path via the extractor
-            spec_path = extractor.get_cached_feature_path(item["filename"], config.specs_dir)
+            spec_path = extractor.get_cached_feature_path(item["filename"], config.feature_cache_dir)
             matching_samples.append(
                 {
                     "spec_filename": spec_path.name,

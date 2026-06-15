@@ -10,42 +10,43 @@ import torch
 logger = logging.getLogger(__name__)
 
 
-class SpectrogramDataset(torch.utils.data.Dataset):
+class CachedFeatureDataset(torch.utils.data.Dataset):
     """
-    Unified dataset for loading precomputed spectrograms from CSV files.
+    Unified dataset for loading precomputed cached features (spectrograms or embeddings)
+    from CSV files.
 
     Requires CSV files with headers. Required columns: filename, label
     Optional columns: original_class, audio_path
 
     The filename column should contain just the audio filename (e.g., "audio_123.flac"),
-    not a full path. The actual spec file path is determined by the specs_dir parameter.
+    not a full path. The actual feature file path is determined by the feature_cache_dir parameter.
     """
 
-    def __init__(self, csv_file, extractor, specs_dir="data/specs"):
+    def __init__(self, csv_file, extractor, feature_cache_dir="data/feature_cache"):
         """
         Initialize the dataset.
 
         Args:
             csv_file: Path to CSV file containing labels with headers
-            extractor: SpectrogramExtractor used to generate spectrograms on-the-fly when a
+            extractor: FeatureExtractor used to generate features on-the-fly when a
                        cached .pt is missing (lazy generation) and to resolve the cached .pt
                        path (get_cached_feature_path). Its dataset_config supplies the
                        corruption guard (min_audio_file_size).
-            specs_dir: Directory containing precomputed .pt spectrogram files
+            feature_cache_dir: Directory containing precomputed .pt feature files
         """
         if extractor is None:
             raise ValueError(
-                "extractor is required. SpectrogramDataset uses it for lazy spectrogram "
-                "generation, and its dataset_config for spectrogram path resolution."
+                "extractor is required. CachedFeatureDataset uses it for lazy feature "
+                "generation, and its dataset_config for feature path resolution."
             )
-        self.specs_dir = specs_dir
+        self.feature_cache_dir = feature_cache_dir
         self.extractor = extractor
         self.dataset_config = extractor.dataset_config
         self.samples = []
 
         # Create-or-verify the extractor's cache subdir + manifest on the read side too: catches
         # param drift against a pre-built cache, and ensures the subdir exists for lazy generation.
-        self.extractor.ensure_cache_dir(Path(specs_dir))
+        self.extractor.ensure_cache_dir(Path(feature_cache_dir))
 
         # Load from CSV file
         self._load_from_csv(csv_file)
@@ -100,8 +101,8 @@ class SpectrogramDataset(torch.utils.data.Dataset):
 
         audio_path = row.get("audio_path", None)
 
-        # Build spectrogram path via the extractor (same method used by create_specs)
-        spec_filepath = str(self.extractor.get_cached_feature_path(filename, Path(self.specs_dir)))
+        # Build feature path via the extractor (same method used by build_features)
+        spec_filepath = str(self.extractor.get_cached_feature_path(filename, Path(self.feature_cache_dir)))
 
         return {
             "filename": filename,
@@ -111,14 +112,14 @@ class SpectrogramDataset(torch.utils.data.Dataset):
             "audio_path": audio_path,
         }
 
-    def _generate_spec_from_audio(self, audio_path):
-        """Generate spectrogram from audio file using dataset config.
+    def _generate_feature_from_audio(self, audio_path):
+        """Generate a feature tensor from audio using the extractor.
 
         Args:
             audio_path: Path to audio file (str or Path)
 
         Returns:
-            torch.Tensor: Generated spectrogram
+            torch.Tensor: Generated feature tensor
 
         Raises:
             FileNotFoundError: If audio file doesn't exist
@@ -140,7 +141,7 @@ class SpectrogramDataset(torch.utils.data.Dataset):
         # Produce the feature tensor (load -> transform -> fix). extract_one returns a list
         # of segments. Lazy generation produces exactly one row per file, so it is
         # single-segment by construction. A windowing extractor (N>1) must instead be
-        # pre-generated offline (create_specs): its segments are enumerated from audio
+        # pre-generated offline (build_features): its segments are enumerated from audio
         # metadata (extractor.num_segments) and loaded from the cache, never generated on
         # the fly. Refuse N>1 rather than silently dropping windows.
         try:
@@ -151,7 +152,7 @@ class SpectrogramDataset(torch.utils.data.Dataset):
         if len(specs) != 1:
             raise NotImplementedError(
                 f"Lazy generation is single-segment; this extractor produced {len(specs)}. "
-                "Pre-generate windowed features offline (create_specs) instead."
+                "Pre-generate windowed features offline (build_features) instead."
             )
         return specs[0]
 
@@ -168,7 +169,7 @@ class SpectrogramDataset(torch.utils.data.Dataset):
             print(f"DEBUG [{idx}] Loading: {sample['filename']}", file=sys.stderr, flush=True)
 
         try:
-            # Try to load cached spectrogram
+            # Try to load cached feature
             if os.path.exists(spec_filepath):
                 data = torch.load(spec_filepath)
             else:
@@ -181,8 +182,8 @@ class SpectrogramDataset(torch.utils.data.Dataset):
                             f"[{idx}] Generating from audio: {os.path.basename(audio_path)}"
                         )
                         sys.stderr.flush()  # Flush immediately to see which file crashes
-                    # Generate spectrogram from audio
-                    data = self._generate_spec_from_audio(audio_path)
+                    # Generate feature from audio
+                    data = self._generate_feature_from_audio(audio_path)
 
                     # Cache to disk for future use
                     os.makedirs(os.path.dirname(spec_filepath), exist_ok=True)
@@ -190,8 +191,8 @@ class SpectrogramDataset(torch.utils.data.Dataset):
                 else:
                     # No lazy generation possible - raise error
                     raise FileNotFoundError(
-                        f"Spectrogram file not found: {spec_filepath}. "
-                        f"Either pre-generate specs with create_specs, or provide "
+                        f"Feature file not found: {spec_filepath}. "
+                        f"Either pre-generate features with build_features, or provide "
                         f"audio_path column in CSV for lazy generation."
                     )
 

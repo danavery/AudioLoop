@@ -14,10 +14,10 @@ from audioloop.utils.paths import (
     clear_project_root_cache,
     create_output_directories,
     get_data_root,
+    get_feature_cache_dir,
     get_output_dir,
     get_output_root,
     get_project_root,
-    get_specs_dir,
     get_training_sets_dir,
 )
 
@@ -75,7 +75,7 @@ class TestEnvironmentVariables:
         monkeypatch.setenv("AUDIOLOOP_PROJECT_ROOT", str(tmp_path))
         assert get_output_root() == tmp_path
 
-    def test_specs_dir_environment_combinations(self, tmp_path, monkeypatch):
+    def test_feature_cache_dir_environment_combinations(self, tmp_path, monkeypatch):
         """Test specs directory with different environment combinations."""
         clear_project_root_cache()
         monkeypatch.setenv("AUDIOLOOP_PROJECT_ROOT", str(tmp_path))
@@ -83,21 +83,21 @@ class TestEnvironmentVariables:
         # Default (project-relative)
         monkeypatch.delenv("AUDIOLOOP_DATA_ROOT", raising=False)
         monkeypatch.delenv("AUDIOLOOP_SPECS_DIR", raising=False)
-        assert get_specs_dir() == tmp_path / "data" / "all_specs"
+        assert get_feature_cache_dir() == tmp_path / "data" / "feature_cache"
 
         # Custom data root only
         monkeypatch.setenv("AUDIOLOOP_DATA_ROOT", "/custom")
-        assert get_specs_dir() == Path("/custom/all_specs")
+        assert get_feature_cache_dir() == Path("/custom/feature_cache")
 
         # Custom specs subdir only
         monkeypatch.delenv("AUDIOLOOP_DATA_ROOT", raising=False)
         monkeypatch.setenv("AUDIOLOOP_SPECS_DIR", "spectrograms")
-        assert get_specs_dir() == tmp_path / "data" / "spectrograms"
+        assert get_feature_cache_dir() == tmp_path / "data" / "spectrograms"
 
         # Both custom
         monkeypatch.setenv("AUDIOLOOP_DATA_ROOT", "/custom")
         monkeypatch.setenv("AUDIOLOOP_SPECS_DIR", "spectrograms")
-        assert get_specs_dir() == Path("/custom/spectrograms")
+        assert get_feature_cache_dir() == Path("/custom/spectrograms")
 
 
 class TestDirectoryGeneration:

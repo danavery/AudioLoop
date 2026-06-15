@@ -60,22 +60,22 @@ All environment variables are optional. They serve as fallbacks when values aren
 | `AUDIOLOOP_PROJECT_ROOT` | Override project root detection | _(auto-detected)_ |
 | `AUDIOLOOP_DATA_ROOT` | Root directory for data files | `data` |
 | `AUDIOLOOP_OUTPUT_ROOT` | Root directory for outputs | `.` |
-| `AUDIOLOOP_SPECS_DIR` | Spectrogram subdirectory name | `all_specs` |
+| `AUDIOLOOP_SPECS_DIR` | Spectrogram subdirectory name | `feature_cache` |
 
-Note: The path variables (`PROJECT_ROOT`, `DATA_ROOT`, `OUTPUT_ROOT`) are not configurable via `audioloop.yaml` — they are only read from environment variables or defaults. `SPECS_DIR` can also be configured via `specs_dir_path` in `audioloop.yaml`.
+Note: The path variables (`PROJECT_ROOT`, `DATA_ROOT`, `OUTPUT_ROOT`) are not configurable via `audioloop.yaml` — they are only read from environment variables or defaults. `SPECS_DIR` can also be configured via `feature_cache_dir_path` in `audioloop.yaml`.
 
 ## Spectrogram Generation
 
 Each example audio clip needs to be provided in an individual file. Those files can be converted into spectrograms:
 
-  * Ahead of time and all at once with the `create_specs` action. (Example: `python -m audioloop.create_specs`)
+  * Ahead of time and all at once with the `build_features` action. (Example: `python -m audioloop.build_features`)
   * Lazily as needed--if a spectrogram doesn't exist, it will be created during training. This will make the first round of training and candidate selection for a dataset quite slow.
   
 For typical custom datasets with all audio files in one directory, populating `_audio_root` and `_audio_extension` should be enough, but you can create a custom `get_audio_path()` to work with more complex datasets.
 
 ### Output
 
-The newly-created spectrograms live in the `specs_dir_path` directory (default: `data/all_specs`), configurable in `audioloop.yaml` or via the `AUDIOLOOP_SPECS_DIR` env var.
+The newly-created spectrograms live in the `feature_cache_dir_path` directory (default: `data/feature_cache`), configurable in `audioloop.yaml` or via the `AUDIOLOOP_SPECS_DIR` env var.
 
 ### Options
 
@@ -86,7 +86,7 @@ Where the audio files live is part of the dataset configuration (examples in the
 
 How those files are turned into spectrograms is controlled by `feature_extractor_kwargs` in `audioloop.yaml`. Each parameter has a built-in default, so you only set the ones you want to change:
 
-* max_spectrogram_length (default 2048): Maximum length for the created spectrograms. Useful if you have some particularly large outliers. (`create_specs` will give you a histogram of created lengths when it's done)
+* max_spectrogram_length (default 2048): Maximum length for the created spectrograms. Useful if you have some particularly large outliers. (`build_features` will give you a histogram of created lengths when it's done)
 * sample_rate (default 44100, Hz)
 * n_fft (default 1024)
 * hop_length (default 256)
@@ -186,7 +186,7 @@ clip_001.pt,1,/path/to/audio/clip_001.wav
 **Merged training set:**
 ```csv
 filename,label
-data/all_specs/100032-3-0-0.pt,1
+data/feature_cache/100032-3-0-0.pt,1
 ```
 
 **Predictions CSV — production mode:**
@@ -242,7 +242,7 @@ my_project/
             training_set_v1.csv
             ...
     data/
-        all_specs/                 # shared across experiments
+        feature_cache/                 # shared across experiments
 ```
 
 You can run multiple experiments on the same dataset (different target classes, different parameters) without conflicts. You can run multiple experiments on different datasets as long as there's no overlap in audio file names, since at the moment all generated spectrograms live in the same project data directory. 
@@ -295,7 +295,7 @@ See `configs/README.md` for the full configuration reference, example configs, a
 You're running a command outside a project directory. Make sure you've created a project directory using the `init_project` action. Either `cd` to your project directory (where `audioloop.yaml` lives) or set `AUDIOLOOP_PROJECT_ROOT=/path/to/project`.
 
 **Spectrograms are very slow to generate**
-This is normal for large datasets on the first run if the spectrograms haven't been generated yet. Use `python -m audioloop.create_specs` to generate them all at once rather than lazily during training.
+This is normal for large datasets on the first run if the spectrograms haven't been generated yet. Use `python -m audioloop.build_features` to generate them all at once rather than lazily during training.
 
 **Training is very slow**
 Check that PyTorch is using your GPU: `python -c "import torch; print(torch.cuda.is_available())"`. If you have a GPU but CUDA isn't available, you may need to reinstall PyTorch with CUDA support.

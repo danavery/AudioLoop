@@ -23,7 +23,7 @@ This creates the standard directory structure and an `audioloop.yaml` template:
 my-project/
 ├── audioloop.yaml        # Project defaults (auto-loaded by all CLI commands)
 ├── data/
-│   └── all_specs/        # Spectrograms
+│   └── feature_cache/        # Spectrograms
 ├── outputs/              # Model outputs, predictions
 ├── training_sets/        # Training CSVs
 ├── subsets/              # Dataset subsets

@@ -27,7 +27,7 @@ import shutil
 from pathlib import Path
 
 DIRECTORIES = [
-    "data/all_specs",
+    "data/feature_cache",
     "datasets",
     "outputs",
     "training_sets",

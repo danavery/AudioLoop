@@ -563,7 +563,7 @@ Examples:
   python -m audioloop.automated_workflow --class-name Drill --cycles 30 --start-cycle 16 --experiment myexp --evaluation-mode --auto-label
 
 Prerequisites:
-  1. Run: python -m audioloop.create_specs  (one-time setup)
+  1. Run: python -m audioloop.build_features  (one-time setup)
   2. Run: python -m audioloop.utils.create_bootstrap_set --class-name <CLASS_NAME> --n 50
         """,
     )
@@ -887,9 +887,9 @@ Prerequisites:
         return 1
 
     # Check prerequisites
-    if not os.path.exists("data/all_specs"):
+    if not os.path.exists("data/feature_cache"):
         print("❌ Spectrograms not found!")
-        print("💡 Run this first: python -m audioloop.create_specs")
+        print("💡 Run this first: python -m audioloop.build_features")
         return 1
 
     # Validate start_cycle

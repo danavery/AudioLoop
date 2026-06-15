@@ -130,7 +130,7 @@ Examples:
         print("\nNext steps:")
         print("  1. Generate specs (optional, can be done lazily during training):")
         print(
-            f"     python -m audioloop.create_specs --dataset {args.dataset} --metadata-file {result_path}"
+            f"     python -m audioloop.build_features --dataset {args.dataset} --metadata-file {result_path}"
         )
         print("\n  2. Create initial training set:")
         print("     # For evaluation mode (with ground truth):")

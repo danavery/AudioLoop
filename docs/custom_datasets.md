@@ -34,7 +34,7 @@ cp src/audioloop/datasets/templates/simple_audio_template.py datasets/my_dataset
 python -m audioloop.utils.create_bootstrap_set --dataset my_dataset --list-classes
 
 # 5. Generate spectrograms (or let them generate lazily during training)
-python -m audioloop.create_specs --dataset my_dataset
+python -m audioloop.build_features --dataset my_dataset
 ```
 
 ### Creating Your Bootstrap Training Set
@@ -150,10 +150,10 @@ For training on cloud pods or HPC clusters, create a self-contained spectrogram 
 
 ```bash
 # Create subset-specific specs directory (uses hard links — zero extra storage)
-python -m audioloop.prepare_subset_specs subsets/my_dataset_dog_100000.csv
+python -m audioloop.prepare_subset_features subsets/my_dataset_dog_100000.csv
 
 # Sync to remote
-rsync -avz --no-o --no-g data/subset_specs/my_dataset_dog_100000/ user@pod:/workspace/data/specs/
+rsync -avz --no-o --no-g data/subset_features/my_dataset_dog_100000/ user@pod:/workspace/data/specs/
 ```
 
 ## See Also

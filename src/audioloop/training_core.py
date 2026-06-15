@@ -12,8 +12,8 @@ from torch.utils.data import DataLoader
 from .config import AudioLoopConfig
 from .models.audio_loop_model import AudioLoopModel
 from .models.model_registry import get_model_class, list_available_models
+from .utils.cached_feature_dataset import CachedFeatureDataset
 from .utils.data_utils import get_device, variable_length_collate_fn
-from .utils.spectrogram_dataset import SpectrogramDataset
 from .utils.stopping_criteria import TrainingStoppingCriterion, create_stopping_criterion
 
 # Set up logger for this module
@@ -78,7 +78,7 @@ def create_model(model_type: str, num_classes: int, dataset_size: int, **kwargs)
 
 def setup_loss_criterion(
     config: AudioLoopConfig,
-    train_dataset: SpectrogramDataset,
+    train_dataset: CachedFeatureDataset,
     device: torch.device,
 ) -> nn.Module:
     """
@@ -136,7 +136,7 @@ def execute_training_loop(
     stopping_criterion: TrainingStoppingCriterion,
     scheduler: optim.lr_scheduler.ReduceLROnPlateau | None,
     config: AudioLoopConfig,
-    train_dataset: SpectrogramDataset,
+    train_dataset: CachedFeatureDataset,
 ) -> tuple[float, float | None, int]:
     """
     Execute the training loop with stopping criterion and optional LR scheduling.
@@ -315,10 +315,10 @@ def run_training(
     extractor = config.get_feature_extractor()
 
     # Create dataset with lazy spec generation support
-    train_dataset = SpectrogramDataset(
+    train_dataset = CachedFeatureDataset(
         csv_file=labels_file,
         extractor=extractor,  # Enables lazy generation from audio_path
-        specs_dir=str(config.specs_dir),
+        feature_cache_dir=str(config.feature_cache_dir),
     )
     logger.info(f"Dataset size: {len(train_dataset)}")
 

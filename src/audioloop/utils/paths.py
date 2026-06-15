@@ -71,10 +71,10 @@ def get_output_root() -> Path:
     return get_project_root()
 
 
-def get_specs_dir() -> Path:
+def get_feature_cache_dir() -> Path:
     """Get the spectrograms directory."""
     data_root = get_data_root()
-    specs_subdir = os.getenv("AUDIOLOOP_SPECS_DIR", "all_specs")
+    specs_subdir = os.getenv("AUDIOLOOP_SPECS_DIR", "feature_cache")
     return data_root / specs_subdir
 
 
@@ -98,7 +98,7 @@ def create_output_directories(experiment_name: str | None = None) -> None:
     """Create output and training set directories if they don't exist."""
     get_output_dir(experiment_name).mkdir(parents=True, exist_ok=True)
     get_training_sets_dir(experiment_name).mkdir(parents=True, exist_ok=True)
-    get_specs_dir().mkdir(parents=True, exist_ok=True)
+    get_feature_cache_dir().mkdir(parents=True, exist_ok=True)
 
 
 def extract_version_from_filename(filepath: Path, file_type: str) -> int | None:

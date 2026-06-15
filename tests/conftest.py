@@ -48,7 +48,7 @@ def setup_project_root(tmp_path, monkeypatch):
     monkeypatch.setenv("AUDIOLOOP_PROJECT_ROOT", str(tmp_path))
 
     # Create the basic directory structure
-    (tmp_path / "data" / "all_specs").mkdir(parents=True)
+    (tmp_path / "data" / "feature_cache").mkdir(parents=True)
     (tmp_path / "outputs").mkdir()
     (tmp_path / "training_sets").mkdir()
 

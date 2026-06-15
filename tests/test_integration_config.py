@@ -74,7 +74,7 @@ class TestEnvironmentIntegration:
 
             # Paths should reflect environment variables
             assert str(config.output_dir).startswith("/custom/output")
-            assert str(config.specs_dir).startswith("/custom/data")
+            assert str(config.feature_cache_dir).startswith("/custom/data")
 
 
 class TestDatasetIntegration:
@@ -138,15 +138,15 @@ class TestVersionedWorkflow:
 
 
 class TestSpecsDirPathConfig:
-    """Test specs_dir_path YAML configuration."""
+    """Test feature_cache_dir_path YAML configuration."""
 
-    def test_specs_dir_path_relative(self):
-        """Test that specs_dir_path in yaml resolves relative to project root."""
+    def test_feature_cache_dir_path_relative(self):
+        """Test that feature_cache_dir_path in yaml resolves relative to project root."""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create audioloop.yaml so get_project_root() works
             yaml_path = Path(temp_dir) / "audioloop.yaml"
             yaml_path.write_text(
-                "config:\n  specs_dir_path: data/my_specs\n  experiment_name: test\n"
+                "config:\n  feature_cache_dir_path: data/my_specs\n  experiment_name: test\n"
             )
             with patch(
                 "audioloop.utils.paths.get_project_root", return_value=Path(temp_dir)
@@ -154,21 +154,21 @@ class TestSpecsDirPathConfig:
                 "audioloop.config.get_project_root", return_value=Path(temp_dir)
             ):
                 config = AudioLoopConfig.from_yaml(yaml_path)
-                assert config.specs_dir == Path(temp_dir) / "data" / "my_specs"
+                assert config.feature_cache_dir == Path(temp_dir) / "data" / "my_specs"
 
-    def test_specs_dir_path_absolute(self):
-        """Test that absolute specs_dir_path is used as-is."""
-        config = AudioLoopConfig(specs_dir_path="/mnt/fast/specs")
-        assert config.specs_dir == Path("/mnt/fast/specs")
+    def test_feature_cache_dir_path_absolute(self):
+        """Test that absolute feature_cache_dir_path is used as-is."""
+        config = AudioLoopConfig(feature_cache_dir_path="/mnt/fast/specs")
+        assert config.feature_cache_dir == Path("/mnt/fast/specs")
 
-    def test_specs_dir_path_none_falls_back(self):
-        """Test that None specs_dir_path falls back to get_specs_dir()."""
+    def test_feature_cache_dir_path_none_falls_back(self):
+        """Test that None feature_cache_dir_path falls back to get_feature_cache_dir()."""
         config = AudioLoopConfig()
-        assert config.specs_dir_path is None
-        # Should delegate to get_specs_dir() which uses env var / defaults
-        from audioloop.utils.paths import get_specs_dir
+        assert config.feature_cache_dir_path is None
+        # Should delegate to get_feature_cache_dir() which uses env var / defaults
+        from audioloop.utils.paths import get_feature_cache_dir
 
-        assert config.specs_dir == get_specs_dir()
+        assert config.feature_cache_dir == get_feature_cache_dir()
 
 
 class TestRealUsagePatterns:
