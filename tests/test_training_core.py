@@ -16,6 +16,8 @@ from torch.utils.data import DataLoader
 from audioloop import training_core
 from audioloop.active_learning_core import load_model
 from audioloop.config import AudioLoopConfig
+from audioloop.feature_extractor import EmbeddingExtractor
+from audioloop.models.linearprobe import LinearProbe
 from audioloop.models.simplecnn import SimpleCnn
 from audioloop.training_core import execute_training_loop, run_training, setup_loss_criterion
 from audioloop.utils.cached_feature_dataset import CachedFeatureDataset
@@ -304,6 +306,50 @@ class TestRunTrainingEndToEnd:
         assert loaded.get_model_info()["num_classes"] == 2
 
         logits = loaded(torch.randn(2, 1, 128, 40))
+        assert logits.shape == (2, 2)
+        assert torch.isfinite(logits).all()
+
+    def test_trains_linear_probe_over_embeddings(self, monkeypatch):
+        """End-to-end: embedding extractor (768,) features + linear probe, no backbone load.
+
+        Pre-cached (768,) tensors and a static get_output_shape mean extract_one (the wav2vec2
+        forward) is never invoked — so the whole embedding->probe path trains without
+        downloading the backbone. _get_model is patched to fail loudly if that assumption breaks.
+        """
+
+        def _no_backbone(self):
+            raise AssertionError("backbone must not load: cached features + static shape")
+
+        monkeypatch.setattr(EmbeddingExtractor, "_get_model", _no_backbone)
+
+        config = self._smoke_config(feature_extractor_type="embedding", model_type="linearprobe")
+        extractor = config.get_feature_extractor()
+        extractor.ensure_cache_dir(config.feature_cache_dir)
+        rows = []
+        for i in range(8):
+            filename = f"clip{i}.wav"
+            torch.save(
+                torch.randn(768),
+                extractor.get_cached_feature_path(filename, config.feature_cache_dir),
+            )
+            rows.append({"filename": filename, "label": i % 2})
+        csv_path = config.feature_cache_dir.parent / "embed_training_set.csv"
+        with csv_path.open("w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=["filename", "label"])
+            writer.writeheader()
+            writer.writerows(rows)
+
+        accuracy, num_epochs = run_training(
+            config, str(csv_path), version=1, log_level=logging.WARNING
+        )
+
+        assert 0.0 <= accuracy <= 1.0
+        assert 1 <= num_epochs <= config.max_epochs
+
+        loaded = load_model(config.get_model_path(1), _CPU)
+        assert isinstance(loaded, LinearProbe)
+        assert loaded.get_model_info()["in_features"] == 768  # rebuilt from the checkpoint
+        logits = loaded(torch.randn(2, 768))
         assert logits.shape == (2, 2)
         assert torch.isfinite(logits).all()
 

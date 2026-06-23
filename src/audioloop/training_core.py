@@ -62,8 +62,16 @@ def train_epoch(model, train_loader, optimizer, criterion, device):
     return avg_loss, accuracy
 
 
-def create_model(model_type: str, num_classes: int, dataset_size: int, **kwargs):
-    """Create a model based on the specified type."""
+def create_model(
+    model_type: str, num_classes: int, dataset_size: int, dataset_shape: tuple[int, ...], **kwargs
+):
+    """Create a model based on the specified type.
+
+    dataset_shape (the feature extractor's output shape, batch dim excluded) is passed as
+    construction context alongside dataset_size, so shape-dependent models (e.g. the linear
+    probe sizing its Linear from the embedding dim) can build layers eagerly. Models that
+    don't need it absorb it via **kwargs.
+    """
     try:
         model_class = get_model_class(model_type)
     except ValueError:
@@ -73,7 +81,12 @@ def create_model(model_type: str, num_classes: int, dataset_size: int, **kwargs)
         ) from None
 
     # Create model with flexible kwargs - let each model handle its own parameters
-    return model_class(num_classes=num_classes, dataset_size=dataset_size, **kwargs)
+    return model_class(
+        num_classes=num_classes,
+        dataset_size=dataset_size,
+        dataset_shape=dataset_shape,
+        **kwargs,
+    )
 
 
 def setup_loss_criterion(
@@ -348,17 +361,20 @@ def run_training(
         collate_fn=variable_length_collate_fn,
     )
 
+    # Feature shape is needed BEFORE model creation: shape-dependent models (e.g. the linear
+    # probe) size layers from it eagerly at construction.
+    dataset_shape = extractor.get_output_shape()
+
     # Create model based on config
     model = create_model(
         model_type=config.model_type,
         num_classes=num_classes,
         dataset_size=len(train_dataset),
+        dataset_shape=dataset_shape,
         **config.model_kwargs,
     ).to(device)
 
     # Check dataset/model compatibility
-    dataset_shape = extractor.get_output_shape()
-
     if not model.can_handle_shape(dataset_shape):
         available_models = list_available_models()
         raise ValueError(
