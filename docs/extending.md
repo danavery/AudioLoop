@@ -41,6 +41,18 @@ Constructor parameters from `get_model_info()` are automatically saved and resto
 
 For a complete walkthrough with code examples and testing guidance, see [adding_new_models.md](adding_new_models.md).
 
+## Feature Extractors
+
+Feature extractors turn audio into the tensors models train on. Two ship today — `spectrogram` (log-mel, 2D) and `embedding` (frozen pretrained vectors, 1D) — selected with `feature_extractor_type` in `audioloop.yaml`. See [Feature Extraction](user_manual.md#feature-extraction) for usage.
+
+Unlike models and datasets, extractors are **not** file-discovered. The set is a small explicit dict in `config.py` (`get_feature_extractor`), so adding one means editing that mapping rather than dropping a file in a directory — a deliberate choice while the roster is tiny and each extractor implies a coordinated model (a 2D extractor is useless without a 2D model). To add one:
+
+1. Subclass `FeatureExtractor` (in `src/audioloop/feature_extractor/`). Reuse the base machinery (caching, path resolution, audio loading); implement `extract_one()`, `get_output_shape()`, `cache_subdir`, and `cache_params()`.
+2. Add it to the dispatch dict in `config.get_feature_extractor`.
+3. Add a model whose `can_handle_shape()` accepts your extractor's output rank (see [Custom Models](#custom-models)).
+
+The `cache_subdir` keeps your extractor's `.pt` files in their own namespace, and `cache_params()` feeds the `extractor.json` staleness check — see [Shape Compatibility](shape_compatibility_and_variable_lengths.md) and the User Manual's Feature Extraction section.
+
 ## Custom Selection Strategies
 
 Selection strategies determine which candidates are presented to the human labeler.
@@ -84,6 +96,7 @@ See [cycle_stopping_criteria.md](cycle_stopping_criteria.md) for details.
 ## Architecture Notes
 
 - **Models**: File-based auto-discovery — project-level `models/` takes precedence over built-in `audioloop/models/`
+- **Feature extractors**: Explicit dict registration in `config.get_feature_extractor` (not file-discovered) — small fixed roster, each paired with a compatible model
 - **Selection strategies**: Factory registration — add a class and register it in `factory.py`
 - **Stopping criteria**: Instantiated directly in training/cycle configuration code
 - **Common pattern**: Abstract base class with pluggable implementations

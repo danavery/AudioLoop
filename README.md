@@ -62,7 +62,7 @@ mv UrbanSound8K/metadata/UrbanSound8K.csv ${PROJECT_DIR}/data/urbansound8k
 # Uncomment and replace `dataset: fsd50k` in ${PROJECT_DIR}/audioloop.yaml with `dataset: urbansound8k`
 ```
 
-### 5. Generate spectrograms
+### 5. Generate features
 
 ```bash
 python -m audioloop.build_features
@@ -118,9 +118,9 @@ All actions are run as `python -m audioloop.<action>`. Use `--help` on any actio
 | `webui` | Web-based labeling interface (recommended) |
 | `merge_labels` | Merge human labels back into a training set |
 | `auto_label_candidates` | Auto-label candidates from ground truth (evaluation mode) |
-| `build_features` | Pre-generate spectrograms from audio files |
+| `build_features` | Pre-generate features (spectrograms or embeddings) from audio files |
 | `create_subset` | Create a training-ready subset from a large dataset |
-| `prepare_subset_features` | Create a subset-specific spectrogram directory for remote deployment |
+| `prepare_subset_features` | Create a subset-specific feature directory for remote deployment |
 | `track_metrics` | View and plot learning curves across cycles |
 | `init_project` | Initialize a new project directory |
 | `utils.create_bootstrap_set` | Create an initial seed training set |

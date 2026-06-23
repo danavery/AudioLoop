@@ -60,22 +60,31 @@ All environment variables are optional. They serve as fallbacks when values aren
 | `AUDIOLOOP_PROJECT_ROOT` | Override project root detection | _(auto-detected)_ |
 | `AUDIOLOOP_DATA_ROOT` | Root directory for data files | `data` |
 | `AUDIOLOOP_OUTPUT_ROOT` | Root directory for outputs | `.` |
-| `AUDIOLOOP_SPECS_DIR` | Spectrogram subdirectory name | `feature_cache` |
+| `AUDIOLOOP_SPECS_DIR` | Feature cache directory name | `feature_cache` |
 
-Note: The path variables (`PROJECT_ROOT`, `DATA_ROOT`, `OUTPUT_ROOT`) are not configurable via `audioloop.yaml` — they are only read from environment variables or defaults. `SPECS_DIR` can also be configured via `feature_cache_dir_path` in `audioloop.yaml`.
+Note: The path variables (`PROJECT_ROOT`, `DATA_ROOT`, `OUTPUT_ROOT`) are not configurable via `audioloop.yaml` — they are only read from environment variables or defaults. The feature cache directory can also be configured via `feature_cache_dir_path` in `audioloop.yaml`. (The env var keeps its historical `AUDIOLOOP_SPECS_DIR` name for back-compat even though caches now hold more than spectrograms.)
 
-## Spectrogram Generation
+## Feature Extraction
 
-Each example audio clip needs to be provided in an individual file. Those files can be converted into spectrograms:
+Each example audio clip needs to be provided in an individual file. Those files are converted into the input features your model trains on. Features can be produced:
 
   * Ahead of time and all at once with the `build_features` action. (Example: `python -m audioloop.build_features`)
-  * Lazily as needed--if a spectrogram doesn't exist, it will be created during training. This will make the first round of training and candidate selection for a dataset quite slow.
-  
+  * Lazily as needed--if a feature file doesn't exist, it will be created during training. This will make the first round of training and candidate selection for a dataset quite slow.
+
 For typical custom datasets with all audio files in one directory, populating `_audio_root` and `_audio_extension` should be enough, but you can create a custom `get_audio_path()` to work with more complex datasets.
+
+### Choosing a feature extractor
+
+`feature_extractor_type` in `audioloop.yaml` selects how audio becomes features:
+
+* `spectrogram` (default): a log-mel spectrogram — a variable-length 2D image of the clip. Pairs with the CNN models (`cnn5layer`, etc.).
+* `embedding`: a single fixed-length vector pooled from a frozen pretrained backbone (currently wav2vec2, `(768,)`). The backbone weights are not trained — they are run once and the result is cached — so this pairs with the lightweight `linearprobe` model, which trains only a single linear layer on top. This lets you ask "do frozen pretrained embeddings beat a from-scratch CNN on my data?" by changing two config lines.
+
+The extractor and the model must agree on tensor rank (2D spectrogram ↔ CNN, 1D embedding ↔ linear probe); AudioLoop validates this at startup. See [shape_compatibility_and_variable_lengths.md](shape_compatibility_and_variable_lengths.md).
 
 ### Output
 
-The newly-created spectrograms live in the `feature_cache_dir_path` directory (default: `data/feature_cache`), configurable in `audioloop.yaml` or via the `AUDIOLOOP_SPECS_DIR` env var.
+Cached feature files live in the `feature_cache_dir_path` directory (default: `data/feature_cache`), configurable in `audioloop.yaml` or via the `AUDIOLOOP_SPECS_DIR` env var. Each extractor writes into its **own subdirectory** keyed by its identity — `feature_cache/spectrogram/` and `feature_cache/embed_wav2vec2/` — so different feature types coexist without colliding, and you can flip `feature_extractor_type` back and forth without regenerating. Each subdirectory also holds an `extractor.json` manifest recording the parameters its cache was built with; if those drift from your config, `build_features` and training stop with a loud error rather than silently training on stale features. Regenerate a subdirectory with `build_features --clear` (which wipes only the active extractor's subdirectory).
 
 ### Options
 
@@ -84,7 +93,7 @@ Where the audio files live is part of the dataset configuration (examples in the
 * _audio_root: The directory where your audio files live
 * _audio_extension: The file extension for your audio files (.wav, .flac, etc.)
 
-How those files are turned into spectrograms is controlled by `feature_extractor_kwargs` in `audioloop.yaml`. Each parameter has a built-in default, so you only set the ones you want to change:
+How audio is turned into features is controlled by `feature_extractor_kwargs` in `audioloop.yaml`. Each parameter has a built-in default, so you only set the ones you want to change. The spectrogram extractor accepts:
 
 * max_spectrogram_length (default 2048): Maximum length for the created spectrograms. Useful if you have some particularly large outliers. (`build_features` will give you a histogram of created lengths when it's done)
 * sample_rate (default 44100, Hz)
@@ -92,6 +101,8 @@ How those files are turned into spectrograms is controlled by `feature_extractor
 * hop_length (default 256)
 * n_mels (default 128)
 * top_db (default 80)
+
+The embedding extractor accepts `model_name` (default `wav2vec2`) and `sample_rate` (default 16000, the rate wav2vec2 expects).
 
 ## Training
 
@@ -107,7 +118,7 @@ The new working model is saved in `outputs/{experiment_name}/model_v{N}.pt` wher
 
 Some training parameters:
 
-* model_type (default: `cnn5layer`): model architecture to use. Current options are `cnn5layer`, `cnn7layer`, and `simplecnn`. The default works reasonably well, but other models (coming soon), especially pre-trained ones, will probably work better. See also [extending.md](extending.md) for how to add your own.
+* model_type (default: `cnn5layer`): model architecture to use. CNN options (for spectrogram features) are `cnn5layer`, `cnn7layer`, and `simplecnn`. There is also `linearprobe`, a single linear layer for use with `feature_extractor_type: embedding` (frozen pretrained embeddings — see [Feature Extraction](#feature-extraction)). The model must match the feature extractor's tensor rank. See also [extending.md](extending.md) for how to add your own.
 
 * model_kwargs (default: `{}`): model-specific constructor parameters for the selected model. Configure these in YAML or through the Python API; the CLI currently supports `--model-type` but does not expose arbitrary model-specific kwargs as command-line flags.
 
@@ -245,7 +256,7 @@ my_project/
         feature_cache/                 # shared across experiments
 ```
 
-You can run multiple experiments on the same dataset (different target classes, different parameters) without conflicts. You can run multiple experiments on different datasets as long as there's no overlap in audio file names, since at the moment all generated spectrograms live in the same project data directory. 
+You can run multiple experiments on the same dataset (different target classes, different parameters) without conflicts. You can run multiple experiments on different datasets as long as there's no overlap in audio file names, since at the moment all generated feature files live in the same project data directory (under per-extractor subdirectories). 
 
 Without an experiment name, artifacts go directly into `outputs/` and `training_sets/`. This works but gets messy quickly — an experiment name is strongly recommended.
 

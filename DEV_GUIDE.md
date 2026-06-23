@@ -67,9 +67,9 @@ AudioLoop uses a pluggable strategy pattern for candidate selection:
 - **`training_core.py`**: Core training logic with automatic versioning and pluggable stopping criteria
 - **`label_audio.py`**: Terminal-based audio labeling interface with multi-dataset support
 - **`merge_labels.py`**: Combines human labels with training sets
-- **`build_features.py`**: Preprocesses audio into spectrograms (optional with lazy generation)
+- **`build_features.py`**: Preprocesses audio into cached features — spectrograms or embeddings, per `feature_extractor_type` (optional with lazy generation)
 - **`create_subset.py`**: CLI tool for creating training-ready dataset subsets with binary classification labels
-- **`prepare_subset_features.py`**: Creates subset-specific spectrogram directories for efficient remote deployment (hard links or copies)
+- **`prepare_subset_features.py`**: Creates subset-specific feature directories (the active extractor's cache subdir + its `extractor.json`) for efficient remote deployment (hard links or copies)
 - **`track_metrics.py`**: Comprehensive metrics tracking and visualization (accuracy, F1, precision, recall, confidence, entropy) across active learning cycles
 - **`config.py`**: Unified configuration system coordinating paths, datasets, and experiments
 - **`utils/create_bootstrap_set.py`**: Bootstrap training set creation from ground truth (evaluation mode only)
@@ -82,9 +82,17 @@ AudioLoop uses a pluggable strategy pattern for candidate selection:
 - **`models/cnn5layer.py`**: Primary CNN architecture with adaptive pooling
 - **`models/cnn7layer.py`**: Deeper CNN architecture with adaptive pooling
 - **`models/simplecnn.py`**: Alternative lightweight CNN model
+- **`models/linearprobe.py`**: Single `nn.Linear` over a 1D embedding (linear-probe protocol); pairs with the embedding extractor
 - **`models/model_registry.py`**: Dynamic model discovery system (scans files for `AudioLoopModel` subclasses)
 
 AudioLoop uses a pluggable model architecture where all models implement the `AudioLoopModel` abstract base class. This allows easy integration of custom PyTorch models or HuggingFace models while maintaining compatibility with the existing training and inference pipeline.
+
+### Feature Extractors
+- **`feature_extractor/base.py`**: `FeatureExtractor` base — owns the shared machinery (audio loading, cache-path resolution, per-subdir `ensure_cache_dir` + `extractor.json` staleness check, `process_one` write path)
+- **`feature_extractor/spectrogram.py`**: `SpectrogramExtractor` — log-mel spectrogram, output shape `(n_mels, -1)`, cache subdir `spectrogram/`
+- **`feature_extractor/embedding.py`**: `EmbeddingExtractor` — pooled vector from a frozen pretrained backbone (currently wav2vec2 via `torchaudio.pipelines`), output shape `(768,)`, cache subdir `embed_{model_name}/`. The backbone is **lazily loaded** so the cached path never triggers the model download.
+
+Extractor selection is the `feature_extractor_type` config knob, dispatched through an explicit dict in `config.get_feature_extractor` (`spectrogram` / `embedding`) — deliberately *not* file-discovered like models, since the roster is small and each extractor is meaningless without a rank-matched model. Each extractor caches into its **own subdirectory** keyed by identity, and writes an `extractor.json` manifest of its `cache_params()`; on reuse the params are strict-compared so config drift fails loudly instead of training on stale features.
 
 ### Shape Compatibility and Variable Lengths
 
@@ -96,7 +104,7 @@ AudioLoop supports variable length spectrograms and automatic dataset/model comp
 - **Implicit Temporal Augmentation**: Training on natural length variations improves model generalization.
 
 **Feature Extraction:**
-The feature extractor returns `(num_mels, -1)` for its shape, indicating a variable time dimension. The `max_spectrogram_length` parameter is used as a maximum for outlier cropping, not for forced padding.
+The shape depends on the active extractor. `SpectrogramExtractor` returns `(num_mels, -1)` — a variable time dimension, with `max_spectrogram_length` used as a cropping ceiling, not forced padding. `EmbeddingExtractor` returns a fixed `(D,)` with no variable axis.
 
 ```python
 class SpectrogramExtractor:
@@ -108,19 +116,23 @@ class SpectrogramExtractor:
     def _fix_length(self, spec: torch.Tensor) -> torch.Tensor:
         # Crops outliers > max_spectrogram_length, preserves natural lengths of shorter clips
         ...
+
+class EmbeddingExtractor:
+    def get_output_shape(self) -> tuple[int, ...]:
+        return (768,)  # fixed wav2vec2 hidden size; no -1
 ```
 
 **Model Configuration:**
-Models declare their input requirements, which can be flexible.
+Models declare their input requirements by tensor rank, which makes the two paths self-routing.
 
 ```python
-# CNN with adaptive pooling (can handle any 2D shape)
+# CNN with adaptive pooling (any 2D spectrogram)
 def can_handle_shape(self, shape: tuple[int, ...]) -> bool:
     return len(shape) == 2
 
-# MLP requiring exact element count
+# LinearProbe (1D embedding)
 def can_handle_shape(self, shape: tuple[int, ...]) -> bool:
-    return math.prod(shape) == self.required_elements
+    return len(shape) == 1
 ```
 
 **Batch Processing:**
@@ -208,7 +220,7 @@ Customize paths and behavior via environment variables:
 - `AUDIOLOOP_DATASET`: Default dataset (`fsd50k` or `urbansound8k`)
 - `AUDIOLOOP_DATA_ROOT`: Root directory for data files (default: `data`)
 - `AUDIOLOOP_OUTPUT_ROOT`: Root directory for outputs (default: `.`)
-- `AUDIOLOOP_SPECS_DIR`: Spectrograms subdirectory (default: `feature_cache`). Env var fallback; prefer `feature_cache_dir_path` in yaml.
+- `AUDIOLOOP_SPECS_DIR`: Feature cache directory (default: `feature_cache`; name kept for back-compat). Env var fallback; prefer `feature_cache_dir_path` in yaml.
 
 ### Sound Classification
 - **`datasets/fsd50k.py`**: FSD50K class mappings (200 classes with semantic groupings)
@@ -219,7 +231,7 @@ Customize paths and behavior via environment variables:
 
 ### Production Mode (Default)
 1. **Subset Creation** (optional, for large datasets): Create manageable subsets via `create_subset.py`
-2. **Preprocessing** (optional): Raw audio → spectrograms via `build_features.py`, or use lazy generation
+2. **Preprocessing** (optional): Raw audio → cached features (spectrograms or embeddings) via `build_features.py`, or use lazy generation
 3. **Initial Training Set**: User-provided labeled dataset
 4. **Model Training**: Small labeled set → CNN model via `train.py` (with lazy spec generation if audio_path provided)
 5. **Active Learning**: Model predictions on ALL files → candidate selection via `active_learning.py`
@@ -230,7 +242,7 @@ Customize paths and behavior via environment variables:
 
 ### Evaluation Mode (Research/Testing)
 1. **Subset Creation** (optional, for large datasets): Create manageable subsets via `create_subset.py`
-2. **Preprocessing** (optional): Raw audio → spectrograms via `build_features.py`, or use lazy generation
+2. **Preprocessing** (optional): Raw audio → cached features (spectrograms or embeddings) via `build_features.py`, or use lazy generation
 3. **Bootstrap Training Set**: Sample from ground truth via `utils/create_bootstrap_set.py`
 4. **Model Training**: Small labeled set → CNN model via `train.py` (with lazy spec generation if audio_path provided)
 5. **Active Learning**: Model predictions with ground truth → candidate selection via `active_learning.py --with-ground-truth`
@@ -281,7 +293,7 @@ filename,prediction,predicted_class,target_class,confidence,entropy,prob_negativ
 ## Key Dependencies
 
 - **PyTorch**: Neural network training and inference
-- **TorchAudio**: Audio processing and spectrogram generation
+- **TorchAudio**: Audio processing, spectrogram generation, and pretrained embedding backbones (wav2vec2 via `torchaudio.pipelines`)
 - **NumPy**: Numerical operations
 - **TQDM**: Progress bars
 - **Ruff**: Code formatting and linting
@@ -417,12 +429,12 @@ Active learning prioritizes samples with high model confidence for human review,
 - This ensures focused, maintainable code with clear responsibilities
 
 ### Dataset Subsetting and Large Dataset Workflows
-AudioLoop supports creating training-ready subsets from large datasets, lazy spectrogram generation, and efficient remote deployment with subset-specific spec directories.
+AudioLoop supports creating training-ready subsets from large datasets, lazy feature generation, and efficient remote deployment with subset-specific feature directories.
 
 See **[docs/custom_datasets.md](docs/custom_datasets.md)** for subsetting, lazy generation, and remote deployment workflows.
 
-### Spectrogram Preprocessing
-Audio is converted to variable-length mel-spectrograms with log normalization, stored as PyTorch tensors for efficient loading. Spectrograms can be pre-generated via `build_features.py` or generated on-demand during training via lazy generation.
+### Feature Preprocessing
+The active feature extractor converts audio into cached PyTorch tensors for efficient loading. The default `SpectrogramExtractor` produces variable-length log-mel spectrograms; `EmbeddingExtractor` produces fixed-length frozen-backbone embeddings. Either can be pre-generated via `build_features.py` or generated on-demand during training via lazy generation. See [docs/shape_compatibility_and_variable_lengths.md](docs/shape_compatibility_and_variable_lengths.md).
 
 ### Stopping Criteria
 AudioLoop uses pluggable Strategy patterns for both training stopping (within a cycle) and cycle stopping (across cycles):

@@ -33,7 +33,7 @@ cp src/audioloop/datasets/templates/simple_audio_template.py datasets/my_dataset
 # 4. Verify it works
 python -m audioloop.utils.create_bootstrap_set --dataset my_dataset --list-classes
 
-# 5. Generate spectrograms (or let them generate lazily during training)
+# 5. Generate features (or let them generate lazily during training)
 python -m audioloop.build_features --dataset my_dataset
 ```
 
@@ -47,7 +47,7 @@ clip_001.pt,1,/path/to/audio/clip_001.wav
 clip_002.pt,0,/path/to/audio/clip_002.wav
 ```
 
-Where `label` is `1` for positive (matches your target class) and `0` for negative. The `audio_path` column is optional but enables lazy spectrogram generation.
+Where `label` is `1` for positive (matches your target class) and `0` for negative. The `audio_path` column is optional but enables lazy feature generation.
 
 `create_bootstrap_set --class-name X --n 40` can generate this automatically, but only in evaluation mode where ground truth labels already exist. For real-world use, you'll need to create this CSV yourself from a small set of clips you've listened to and labeled.
 
@@ -140,20 +140,20 @@ For large datasets (100K+ files), you may want to create a subset rather than wo
 # Create a manageable subset
 python -m audioloop.create_subset --dataset my_dataset --class-name "Dog" --max-samples 1000
 
-# Train directly on the subset — spectrograms are generated on demand
+# Train directly on the subset — features are generated on demand
 python -m audioloop.train subsets/my_dataset_dog_1000.csv
 ```
 
-Subsets include an `audio_path` column that enables lazy spectrogram generation — no need to pre-generate specs for the entire dataset.
+Subsets include an `audio_path` column that enables lazy feature generation — no need to pre-generate features for the entire dataset.
 
-For training on cloud pods or HPC clusters, create a self-contained spectrogram directory for efficient syncing:
+For training on cloud pods or HPC clusters, create a self-contained feature directory for efficient syncing. `prepare_subset_features` copies the active extractor's cache subdirectory (and its `extractor.json` manifest), so the remote's validation passes:
 
 ```bash
-# Create subset-specific specs directory (uses hard links — zero extra storage)
+# Create subset-specific feature directory (uses hard links — zero extra storage)
 python -m audioloop.prepare_subset_features subsets/my_dataset_dog_100000.csv
 
 # Sync to remote
-rsync -avz --no-o --no-g data/subset_features/my_dataset_dog_100000/ user@pod:/workspace/data/specs/
+rsync -avz --no-o --no-g data/subset_features/my_dataset_dog_100000/ user@pod:/workspace/data/feature_cache/
 ```
 
 ## See Also

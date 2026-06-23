@@ -76,9 +76,9 @@ class MyCustomModel(AudioLoopModel):
 
 **Notes on the interface:**
 
-- `forward()` uses the standard PyTorch signature. Input spectrograms are `(batch, n_mels, time)`.
-- `get_model_info()` returns metadata that gets saved alongside the model weights when training completes. Include anything needed to reconstruct the model — this is not automatic.
-- `can_handle_shape()` is called before training starts to verify the model is compatible with the dataset. The shape tuple excludes the batch dimension. A `-1` indicates a variable dimension — the spectrogram extractor returns `(n_mels, -1)` since spectrogram length varies. Models with adaptive pooling can just check `len(shape) == 2`; models that need a fixed input size would need to reject shapes containing `-1`.
+- `forward()` uses the standard PyTorch signature. The input shape depends on the feature extractor: spectrogram features arrive as `(batch, n_mels, time)`, while embedding features (e.g. wav2vec2) arrive as `(batch, D)`.
+- `get_model_info()` returns metadata that gets saved alongside the model weights when training completes. Include anything needed to reconstruct the model — this is not automatic. In particular, **any parameter that sizes a layer must be returned here**, because inference rebuilds the model purely from this dict, with no feature extractor present. `LinearProbe`, for example, returns its `in_features` so its `nn.Linear` can be reconstructed at the right size; omitting it would make `load_state_dict` fail with a shape mismatch.
+- `can_handle_shape()` is called before training starts to verify the model is compatible with the dataset. The shape tuple excludes the batch dimension. A `-1` indicates a variable dimension — the spectrogram extractor returns `(n_mels, -1)` since spectrogram length varies, while the embedding extractor returns a fixed `(D,)`. Models with adaptive pooling can just check `len(shape) == 2`; `LinearProbe` checks `len(shape) == 1`; a model needing a fixed element count would compute `math.prod(shape)` and reject shapes containing `-1`.
 
 ## Using Your Model
 
@@ -104,4 +104,4 @@ These are passed as `**kwargs` to your model's constructor during training. If t
 ## See Also
 - [User Manual: Training](user_manual.md#training) — training options and model types
 - [Extending AudioLoop](extending.md) — general extensibility guide
-- [Shape Compatibility](shape_compatibility_and_variable_lengths.md) — how variable-length spectrograms are handled
+- [Shape Compatibility](shape_compatibility_and_variable_lengths.md) — how feature/model shape compatibility and variable lengths are handled
