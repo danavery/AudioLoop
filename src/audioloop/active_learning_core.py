@@ -396,6 +396,11 @@ def run_active_learning_cycle(
 
     logger.info(f"Using strategy: {strategy.get_active_strategy_name()}")
     predictions = load_predictions(predictions_file)
+    # Derive a per-cycle seed so that random selection re-randomizes each cycle
+    # instead of replaying the same sample pattern (a fixed seed reset every cycle
+    # collapses the 25 cycles into one repeated draw). Deterministic in (seed, cycle);
+    # None stays None to preserve nondeterministic default behavior.
+    cycle_seed = None if seed is None else seed * 1000 + run_number
     candidates = strategy.select_candidates(
         predictions=predictions,
         num_candidates=config.total_candidates,
@@ -403,7 +408,7 @@ def run_active_learning_cycle(
         negative_class_name=negative_class_name,
         positive_percentage=config.positive_percentage,
         candidate_pool_multiplier=config.candidate_pool_multiplier,
-        random_seed=seed,
+        random_seed=cycle_seed,
     )
     save_candidates(candidates, candidates_file)
     print_selection_statistics(

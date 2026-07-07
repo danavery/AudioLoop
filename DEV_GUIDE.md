@@ -440,7 +440,7 @@ The active feature extractor converts audio into cached PyTorch tensors for effi
 AudioLoop uses pluggable Strategy patterns for both training stopping (within a cycle) and cycle stopping (across cycles):
 
 - **Training stopping**: `PlateauCriterion` (default) stops when loss plateaus, with optional accuracy floor. `AccuracyCriterion` stops at 100% accuracy. See **[docs/stopping_criteria_guide.md](docs/stopping_criteria_guide.md)**.
-- **Cycle stopping**: `LabelModeStoppingCriterion` (optimizes F1) and `SearchModeStoppingCriterion` (optimizes recall with precision floor). See **[docs/cycle_stopping_criteria.md](docs/cycle_stopping_criteria.md)**.
+- **Cycle stopping**: `LabelModeStoppingCriterion` (optimizes F1) and `SearchModeStoppingCriterion` (optimizes recall with precision floor), both on candidate metrics; `ChurnStoppingCriterion` (label-free — stops when pool-prediction churn flattens, avoiding candidate-metric selection bias). See **[docs/cycle_stopping_criteria.md](docs/cycle_stopping_criteria.md)**.
 - **Custom criteria**: See **[docs/extending.md](docs/extending.md)**.
 
 ### Reproducibility and Seed Management

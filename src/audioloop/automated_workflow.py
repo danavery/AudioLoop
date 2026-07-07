@@ -39,6 +39,7 @@ from audioloop.merge_labels import merge_training_sets
 from audioloop.training_core import run_training
 from audioloop.utils.candidate_metrics import load_candidate_metrics_history
 from audioloop.utils.cycle_stopping_criteria import (
+    ChurnStoppingCriterion,
     SearchModeStoppingCriterion,
     create_cycle_stopping_criterion,
 )
@@ -440,6 +441,24 @@ def run_automated_workflow(
                 print()
                 display_confusion_matrix(current_metrics)
 
+            elif config.cycle_stopping_strategy == "churn" and isinstance(
+                stopping_criterion, ChurnStoppingCriterion
+            ):
+                # Churn mode is label-free: report pool-prediction churn, not batch metrics.
+                s = stopping_criterion.status(cycle)
+                cur = f"{s['current']:.4f}" if s["current"] is not None else "n/a"
+                roll = f"{s['rolling']:.4f}" if s["rolling"] is not None else "n/a"
+                print("   📉 Stopping (churn mode, label-free):")
+                print(f"      Pool churn (current): {cur}")
+                print(f"      Pool churn (rolling avg): {roll} (window={config.cycle_window})")
+                print(
+                    f"      Peak churn so far: {s['peak']:.4f} "
+                    f"(stop at <= {config.churn_peak_frac:.0%} of peak)"
+                )
+                print(
+                    f"      Below-threshold streak: {s['streak']}/{config.churn_patience}"
+                )
+
         # Display confusion matrix even when stopping criteria are disabled
         elif config.cycle_stopping_strategy == "none":
             metrics_history = load_candidate_metrics_history(config.output_dir)
@@ -676,8 +695,8 @@ Prerequisites:
     # Cycle stopping criteria (cross-cycle stopping based on candidate metrics)
     parser.add_argument(
         "--cycle-stopping-strategy",
-        choices=["none", "label", "search"],
-        help="Cycle stopping strategy: 'none' (default, no stopping), 'label' (optimize F1), or 'search' (optimize recall with precision floor)",
+        choices=["none", "label", "search", "churn"],
+        help="Cycle stopping strategy: 'none' (default, no stopping), 'label' (optimize F1), 'search' (optimize recall with precision floor), or 'churn' (label-free: stop when pool-prediction churn flattens)",
     )
 
     # Active learning parameters

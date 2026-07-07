@@ -4,8 +4,13 @@ Cycle-level stopping criteria for active learning loops.
 This module provides stopping logic based on candidate metrics trends across
 multiple active learning cycles, enabling automatic termination when the model
 has learned effectively from the selected samples.
+
+The 'churn' criterion is the exception: instead of candidate-batch metrics it watches
+prediction churn on the unlabeled pool, which needs no ground truth (see
+ChurnStoppingCriterion).
 """
 
+import csv
 import logging
 import statistics
 
@@ -300,6 +305,125 @@ class SearchModeStoppingCriterion(CycleStoppingCriterion):
         return rolling_std < 0.10
 
 
+class ChurnStoppingCriterion(CycleStoppingCriterion):
+    """
+    Label-free stopping criterion based on prediction churn over the unlabeled pool.
+
+    The label/search criteria track candidate-BATCH metrics, which are biased toward the
+    hardest, selection-picked clips and so make an unreliable convergence signal (they can
+    read falsely stable on a weak model, or never settle). This criterion instead measures
+    how much the model's PREDICTED labels on the remaining pool change between cycles. When
+    the model stops reorganizing the pool, it has converged. This needs no ground truth and
+    no candidate metrics - only the per-cycle predictions_v{N}.csv the loop already writes.
+
+    Rule (scale-free, online): stop once the rolling-mean churn has fallen to
+    <= churn_peak_frac of its running peak for churn_patience consecutive cycles, after
+    cycle_min_cycles. Peak-relative rather than an absolute threshold because the churn
+    floor is dataset dependent (pool size, base rate). Churn is a LEADING indicator - it
+    quiets slightly before the quality plateau - so it stops a touch conservatively, which
+    is the safe direction.
+    """
+
+    def __init__(self, config, metrics_history):
+        super().__init__(config, metrics_history)
+        # version -> {filename: predicted_positive(bool)}; loaded lazily, cached
+        self._pred_cache: dict[int, dict[str, bool]] = {}
+        # later-version -> flip fraction vs the previous version
+        self._churn: dict[int, float] = {}
+
+    def _available_versions(self, max_cycle):
+        """Prediction versions on disk, 1..max_cycle (contiguity not assumed)."""
+        return [
+            v
+            for v in range(1, max_cycle + 1)
+            if self.config.get_predictions_path(v).exists()
+        ]
+
+    def _load_predictions(self, version):
+        if version not in self._pred_cache:
+            preds = {}
+            with self.config.get_predictions_path(version).open(newline="") as f:
+                for row in csv.DictReader(f):
+                    preds[row["filename"]] = row["prediction"] == "True"
+            self._pred_cache[version] = preds
+        return self._pred_cache[version]
+
+    def _update_churn(self, versions):
+        """Fill in churn for any newly-available consecutive version pairs."""
+        for prev_v, cur_v in zip(versions[:-1], versions[1:]):
+            if cur_v in self._churn:
+                continue
+            prev = self._load_predictions(prev_v)
+            cur = self._load_predictions(cur_v)
+            shared = prev.keys() & cur.keys()
+            if shared:
+                flips = sum(1 for fn in shared if prev[fn] != cur[fn])
+                self._churn[cur_v] = flips / len(shared)
+
+    def _replay(self, versions):
+        """Online peak + below-threshold streak over the churn series.
+
+        Returns (fired_cycle | None, rolling_at_last, running_peak, streak_at_last).
+        Stateless replay so repeated calls for the same cycle are idempotent.
+        """
+        churn_versions = [v for v in versions if v in self._churn]
+        peak = 0.0
+        streak = 0
+        fired = None
+        roll = None
+        window = self.config.cycle_window
+        for i, v in enumerate(churn_versions):
+            window_vals = [
+                self._churn[churn_versions[j]] for j in range(max(0, i - window + 1), i + 1)
+            ]
+            roll = statistics.mean(window_vals)
+            peak = max(peak, roll)  # running peak, updated online
+            if v < self.config.cycle_min_cycles or peak == 0.0:
+                continue
+            streak = streak + 1 if roll <= self.config.churn_peak_frac * peak else 0
+            if fired is None and streak >= self.config.churn_patience:
+                fired = v
+        return fired, roll, peak, streak
+
+    def should_stop(self, current_cycle):
+        """Stop when pool-prediction churn has flattened (see class docstring)."""
+        if current_cycle < self.config.cycle_min_cycles:
+            return False
+        versions = self._available_versions(current_cycle)
+        if len(versions) < 2:
+            return False
+        self._update_churn(versions)
+        fired = self._replay(versions)[0]
+        if fired is not None:
+            # Ship the model from the cycle where churn first flattened.
+            self.best_cycle = fired
+            self.best_rolling_avg = self._churn.get(fired, 0.0)
+            return True
+        return False
+
+    def status(self, current_cycle):
+        """Display snapshot for the workflow: current/rolling/peak churn + streak."""
+        versions = self._available_versions(current_cycle)
+        if len(versions) >= 2:
+            self._update_churn(versions)
+        _, roll, peak, streak = self._replay(versions)
+        return {
+            "current": self._churn.get(current_cycle),
+            "rolling": roll,
+            "peak": peak,
+            "streak": streak,
+        }
+
+    def get_status_message(self, current_cycle):
+        s = self.status(current_cycle)
+        cur = f"{s['current']:.4f}" if s["current"] is not None else "n/a"
+        roll = f"{s['rolling']:.4f}" if s["rolling"] is not None else "n/a"
+        return (
+            f"Pool churn: {cur} (rolling {roll}), peak {s['peak']:.4f}, "
+            f"below-threshold streak {s['streak']}/{self.config.churn_patience}"
+        )
+
+
 def create_cycle_stopping_criterion(config, metrics_history):
     """
     Create a stopping criterion based on configuration.
@@ -320,8 +444,11 @@ def create_cycle_stopping_criterion(config, metrics_history):
         return LabelModeStoppingCriterion(config, metrics_history)
     if strategy == "search":
         return SearchModeStoppingCriterion(config, metrics_history)
+    if strategy == "churn":
+        return ChurnStoppingCriterion(config, metrics_history)
     if strategy == "none":
         return None
     raise ValueError(
-        f"Unknown cycle stopping strategy: '{strategy}'. Expected: 'label', 'search', or 'none'"
+        f"Unknown cycle stopping strategy: '{strategy}'. "
+        "Expected: 'label', 'search', 'churn', or 'none'"
     )

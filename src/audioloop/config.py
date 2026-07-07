@@ -115,13 +115,17 @@ class AudioLoopConfig:
     )
 
     # Cross-cycle stopping criteria (for active learning loops)
-    cycle_stopping_strategy: str = "none"  # 'label', 'search', or 'none'
+    cycle_stopping_strategy: str = "none"  # 'label', 'search', 'churn', or 'none'
     cycle_patience: int = 5  # Cycles without improvement before stopping
     cycle_min_delta: float = 0.02  # Min improvement to reset patience
     cycle_min_cycles: int = 10  # Min cycles before stopping allowed
     cycle_window: int = 3  # Cycles to average for rolling metrics
     cycle_std_threshold: float = 0.08  # Max std dev for "stable" performance
     precision_floor: float | str = "auto"  # Min precision for 'search' mode; "auto" or 0.0-1.0
+    # 'churn' mode (label-free): stop when pool-prediction churn falls to <= this fraction
+    # of its running peak for `churn_patience` consecutive cycles.
+    churn_peak_frac: float = 0.05  # Stop threshold as a fraction of peak rolling churn
+    churn_patience: int = 2  # Consecutive cycles below threshold before stopping
 
     # Active learning parameters (experiment configuration)
     total_candidates: int = 50

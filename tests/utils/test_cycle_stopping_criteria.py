@@ -6,12 +6,14 @@ Tests the stopping logic for active learning loops based on candidate
 metrics trends across multiple cycles.
 """
 
+import csv
 from unittest.mock import MagicMock
 
 import pytest
 
 from audioloop.config import AudioLoopConfig
 from audioloop.utils.cycle_stopping_criteria import (
+    ChurnStoppingCriterion,
     CycleStoppingCriterion,
     LabelModeStoppingCriterion,
     SearchModeStoppingCriterion,
@@ -406,6 +408,13 @@ class TestCycleStoppingFactory:
         criterion = create_cycle_stopping_criterion(config, metrics)
         assert isinstance(criterion, SearchModeStoppingCriterion)
 
+    def test_creates_churn_mode(self):
+        """Test creates Churn criterion (label-free)."""
+        config = AudioLoopConfig(cycle_stopping_strategy="churn")
+
+        criterion = create_cycle_stopping_criterion(config, {})
+        assert isinstance(criterion, ChurnStoppingCriterion)
+
     def test_returns_none_for_none_strategy(self):
         """Test returns None when strategy is 'none'."""
         config = AudioLoopConfig(cycle_stopping_strategy="none")
@@ -479,6 +488,92 @@ class TestEdgeCases:
         message = criterion.get_status_message(2)
         assert "Best cycle:" in message
         assert "cycles without improvement:" in message
+
+
+BASE_POOL = {f"f{i}": (i < 5) for i in range(10)}  # 10 clips: f0-f4 positive, f5-f9 negative
+
+
+def _write_preds(path, labels):
+    """Write a predictions_v{N}.csv with the columns the churn rule reads."""
+    with path.open("w", newline="") as f:
+        writer = csv.DictWriter(
+            f, fieldnames=["filename", "prediction", "prob_positive", "ground_truth"]
+        )
+        writer.writeheader()
+        for fn, pred in labels.items():
+            writer.writerow(
+                {
+                    "filename": fn,
+                    "prediction": pred,
+                    "prob_positive": 0.9 if pred else 0.1,
+                    "ground_truth": pred,
+                }
+            )
+
+
+def _churn_config(tmp_path, **overrides):
+    """Mock config exposing only what ChurnStoppingCriterion touches."""
+    cfg = MagicMock()
+    cfg.cycle_window = overrides.get("cycle_window", 1)
+    cfg.cycle_min_cycles = overrides.get("cycle_min_cycles", 10)
+    cfg.churn_peak_frac = overrides.get("churn_peak_frac", 0.5)
+    cfg.churn_patience = overrides.get("churn_patience", 2)
+    cfg.get_predictions_path = lambda v: tmp_path / f"predictions_v{v}.csv"
+    return cfg
+
+
+def _write_converging_run(tmp_path, last=15):
+    """v1 base, v2 flips one clip (churn 0.1 -> sets the peak), v3.. identical (churn 0)."""
+    flipped = dict(BASE_POOL)
+    flipped["f0"] = not BASE_POOL["f0"]
+    _write_preds(tmp_path / "predictions_v1.csv", BASE_POOL)
+    for v in range(2, last + 1):
+        _write_preds(tmp_path / f"predictions_v{v}.csv", flipped)
+
+
+class TestChurnStoppingCriterion:
+    """Test the label-free churn-based stopping logic."""
+
+    def test_fires_when_churn_flattens(self, tmp_path):
+        """Churn drops to 0 from v3 on; with min_cycles=10/patience=2 it fires at cycle 11."""
+        _write_converging_run(tmp_path)
+        cfg = _churn_config(tmp_path)
+        criterion = ChurnStoppingCriterion(cfg, {})
+
+        # Below min_cycles: never stops even though churn is already flat.
+        assert criterion.should_stop(9) is False
+        # Cycle 10 is the first below-threshold cycle (streak 1 of 2).
+        assert criterion.should_stop(10) is False
+        # Cycle 11 exhausts patience -> stop, shipping the converged model.
+        assert criterion.should_stop(11) is True
+        assert criterion.get_best_cycle() == 11
+
+    def test_does_not_fire_while_churning(self, tmp_path):
+        """Predictions that keep flipping (~50% churn) never satisfy the peak-relative rule."""
+        for v in range(1, 16):
+            labels = dict(BASE_POOL)
+            if v % 2 == 1:  # alternate 5 labels every other cycle -> churn ~0.5 each step
+                for i in range(5):
+                    labels[f"f{i}"] = not labels[f"f{i}"]
+            _write_preds(tmp_path / f"predictions_v{v}.csv", labels)
+
+        criterion = ChurnStoppingCriterion(_churn_config(tmp_path), {})
+        assert all(criterion.should_stop(c) is False for c in range(10, 16))
+
+    def test_needs_two_versions(self, tmp_path):
+        """With a single predictions file there is no churn to measure."""
+        _write_preds(tmp_path / "predictions_v1.csv", BASE_POOL)
+        criterion = ChurnStoppingCriterion(_churn_config(tmp_path), {})
+        assert criterion.should_stop(11) is False
+
+    def test_status_reports_churn(self, tmp_path):
+        """status() surfaces current/rolling/peak churn and the streak for display."""
+        _write_converging_run(tmp_path)
+        criterion = ChurnStoppingCriterion(_churn_config(tmp_path), {})
+        s = criterion.status(11)
+        assert s["current"] == 0.0  # v11 identical to v10
+        assert s["peak"] > 0.0  # the early one-clip flip set a positive peak
+        assert "Pool churn" in criterion.get_status_message(11)
 
 
 if __name__ == "__main__":

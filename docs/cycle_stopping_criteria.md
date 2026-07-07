@@ -60,24 +60,46 @@ How it works:
 python -m audioloop.automated_workflow --class-name siren --cycle-stopping-strategy search
 ```
 
+### Churn Mode
+
+**Label-free.** Instead of candidate metrics, churn mode watches how much the model's *predictions on the unlabeled pool* change between cycles. When the model stops changing its mind about the corpus, it has converged. This sidesteps the [Boundary Sampling Bias](#boundary-sampling-bias) that makes candidate F1 an unreliable convergence signal — pool churn is a whole-model property, not a measurement on the deliberately-hard candidate batch.
+
+How it works:
+1. Each cycle, compares the current predictions (`predictions_v{N}.csv`) to the previous cycle's on the shared pool, and computes **churn** = the fraction of clips whose predicted label flipped.
+2. Tracks a rolling average of churn and its running peak.
+3. Stops when the rolling churn has fallen to `<= churn_peak_frac` of its running peak for `churn_patience` consecutive cycles, after `cycle_min_cycles`. (Peak-*relative* rather than an absolute threshold, because the churn floor depends on pool size and class balance.)
+4. Saves the model from the cycle where churn flattened as `model_best.pt`.
+
+```bash
+python -m audioloop.automated_workflow --class-name siren --cycle-stopping-strategy churn
+```
+
+**Tradeoff to know:** churn is a *leading* indicator — predictions stop flipping slightly *before* corpus quality fully peaks (the last gains come from confidence/margin shifts on clips that no longer flip label). So churn mode tends to stop a touch early, which is the safe direction. It is, however, far more reliable than candidate-metric stopping and cannot be fooled into a catastrophic early stop the way candidate F1 can on a weak model. Tune `churn_peak_frac` to trade reliability against how close to the plateau you stop: **lower** (e.g. 0.03) stops later/closer to the peak but may never trigger within budget; **higher** (e.g. 0.10–0.15) stops earlier. The default 0.05 is a reasonable middle.
+
 ## Configuration
 
 Set these in `audioloop.yaml`. The strategy itself can also be set via `--cycle-stopping-strategy` on the CLI.
 
 ```yaml
-# Strategy: "none", "label", or "search"
+# Strategy: "none", "label", "search", or "churn"
 cycle_stopping_strategy: label
 
 # Common parameters
 cycle_patience: 5           # Cycles without improvement before stopping
 cycle_min_delta: 0.02       # Minimum improvement to reset patience
 cycle_min_cycles: 10        # Minimum cycles before stopping is allowed
-cycle_window: 3             # Rolling average window size
+cycle_window: 3             # Rolling average window size (also used by churn mode)
 cycle_std_threshold: 0.08   # Max std dev for "stable" (label mode)
 
 # Search mode only
 precision_floor: auto       # "auto" or a fixed float (0.0-1.0)
+
+# Churn mode only (label-free)
+churn_peak_frac: 0.05       # Stop when rolling churn <= this fraction of its running peak
+churn_patience: 2           # Consecutive cycles below threshold before stopping
 ```
+
+Churn mode reuses `cycle_window` and `cycle_min_cycles`; it ignores `cycle_patience`/`cycle_min_delta`/`cycle_std_threshold` (those govern the candidate-metric strategies) and uses `churn_patience` instead.
 
 ## How Candidate Metrics Work
 
@@ -100,6 +122,8 @@ Cycle | Candidate F1 | Corpus F1
   19  |    0.545     |   0.761   <- Candidate F1 flat, corpus improving
   29  |    0.537     |   0.772   <- Best corpus F1
 ```
+
+[Churn Mode](#churn-mode) avoids this bias entirely: it measures prediction stability over the whole pool rather than accuracy on the hard candidate batch, so it isn't misled when candidate F1 goes flat while the corpus is still improving.
 
 ### Stratification Effects
 
